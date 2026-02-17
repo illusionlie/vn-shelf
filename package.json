@@ -1,0 +1,17 @@
+{
+  "name": "vn-shelf",
+  "version": "1.0.0",
+  "description": "视觉小说书架 - 部署于Cloudflare Worker",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "npm i & wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": ["visual-novel", "vndb", "cloudflare-worker"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - VN Shelf</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="loginPage()" x-init="init()">
+  <!-- 加载进度条 -->
+  <div class="loading-progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+  
+  <!-- 背景-overlay -->
+  <div class="background-overlay"></div>
+  
+  <div class="login-container">
+    <div class="login-box">
+      <h1 class="login-title">VN Shelf</h1>
+      
+      <!-- 初始化表单 -->
+      <template x-if="isInitialized === false">
+        <form @submit.prevent="handleSubmit()">
+          <div class="form-group">
+            <label class="form-label">设置管理员密码 *</label>
+            <input 
+              type="password" 
+              class="form-input" 
+              x-model="password"
+              placeholder="至少6位密码"
+              required
+              minlength="6"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">VNDB API Token (可选)</label>
+            <input 
+              type="text" 
+              class="form-input" 
+              x-model="vndbApiToken"
+              placeholder="可在设置中稍后配置"
+            >
+            <p class="form-hint">
+              在 <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> 获取API Token
+            </p>
+          </div>
+          
+          <p class="form-error" x-text="error" x-show="error"></p>
+          
+          <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
+            <span x-show="isLoading">初始化中...</span>
+            <span x-show="!isLoading">初始化并登录</span>
+          </button>
+        </form>
+      </template>
+      
+      <!-- 登录表单 -->
+      <template x-if="isInitialized === true">
+        <form @submit.prevent="handleSubmit()">
+          <div class="form-group">
+            <label class="form-label">管理员密码</label>
+            <input 
+              type="password" 
+              class="form-input" 
+              x-model="password"
+              placeholder="请输入密码"
+              required
+              autofocus
+            >
+          </div>
+          
+          <p class="form-error" x-text="error" x-show="error"></p>
+          
+          <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
+            <span x-show="isLoading">登录中...</span>
+            <span x-show="!isLoading">登录</span>
+          </button>
+          
+          <p class="text-center text-muted mt-4">
+            <a href="/">返回首页</a>
+          </p>
+        </form>
+      </template>
+      
+      <!-- 加载状态 -->
+      <template x-if="isInitialized === null">
+        <div class="loading">
+          <div class="loading-spinner"></div>
+        </div>
+      </template>
+    </div>
+  </div>
+  
+  <!-- Toast通知 -->
+  <div class="toast-container">
+    <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
+      <div class="toast" :class="'toast-' + toast.type">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+</body>
+</html>

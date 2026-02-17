@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VN Shelf - 视觉小说书架</title>
+  <meta name="description" content="记录我玩过的视觉小说">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="vnShelf()" x-init="init()">
+  <!-- 加载进度条 -->
+  <div class="loading-progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+
+  <!-- 背景-overlay -->
+  <div class="background-overlay"></div>
+
+  <!-- 头部 -->
+  <header class="main-header">
+    <div class="banner">
+      <a href="/" class="banner-title">VN Shelf</a>
+
+      <div class="header-actions">
+        <nav class="banner-nav desktop-only">
+          <a href="/" class="active">首页</a>
+          <a href="/stats">统计</a>
+          <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
+          <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+        </nav>
+        <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
+          <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+        <div class="mobile-nav mobile-only">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="more-menu" class="more-menu">
+            <a href="/">首页</a>
+            <a href="/stats">统计</a>
+            <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 控制条 -->
+    <div class="controls-bar">
+      <div class="search-container">
+        <input type="text" class="search-input" placeholder="搜索视觉小说..." x-model="searchQuery" @input="handleSearch()">
+      </div>
+      <select class="sort-select" x-model="sortBy" @change="handleSortChange()">
+        <option value="created_desc">最新录入</option>
+        <option value="created_asc">最早录入</option>
+        <option value="rating_desc">VNDB评分 ↓</option>
+        <option value="rating_asc">VNDB评分 ↑</option>
+        <option value="personal_desc">个人评分 ↓</option>
+        <option value="personal_asc">个人评分 ↑</option>
+      </select>
+      <template x-if="$store.app.isAdmin">
+        <button class="btn btn-primary" @click="openEdit()">+ 添加</button>
+      </template>
+    </div>
+  </header>
+  
+  <!-- 主内容 -->
+  <main class="container">
+    <!-- 加载状态 -->
+    <template x-if="isLoading">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+      </div>
+    </template>
+    
+    <!-- 空状态 -->
+    <template x-if="!isLoading && filteredList.length === 0">
+      <div class="empty-state">
+        <div class="empty-state-icon">📚</div>
+        <div class="empty-state-title">暂无条目</div>
+        <p class="text-muted">
+          <template x-if="$store.app.isAdmin">
+            <span>点击右上角"添加"按钮添加第一个视觉小说</span>
+          </template>
+          <template x-if="!$store.app.isAdmin">
+            <span>管理员尚未添加任何视觉小说</span>
+          </template>
+        </p>
+      </div>
+    </template>
+    
+    <!-- 卡片网格 -->
+    <div class="cards-grid" x-show="!isLoading && filteredList.length > 0">
+      <template x-for="vn in filteredList" :key="vn.id">
+        <div class="vn-card" @click="openDetail(vn)">
+          <div class="vn-card-image-wrapper">
+            <img 
+              :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'" 
+              :alt="vn.title"
+              class="vn-card-image"
+              @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+            >
+            <span class="all-age-badge" x-show="vn.allAge" title="全年龄作品">全年龄</span>
+          </div>
+          <div class="vn-card-content">
+            <h3 class="vn-card-title">
+              <span x-text="vn.titleCn || vn.titleJa || vn.title"></span>
+            </h3>
+            <p class="vn-card-subtitle" x-text="vn.titleCn ? (vn.titleJa || vn.title) : ''" x-show="vn.titleCn"></p>
+            <p class="vn-card-company" x-text="vn.developers?.[0] || ''" x-show="vn.developers?.[0]"></p>
+            <hr class="card-divider">
+            <div class="vn-card-meta">
+              <div class="vn-card-rating">
+                <div class="stars-container">
+                  <template x-for="i in 10" :key="i">
+                    <span class="star" :class="{ empty: i > Math.round(vn.rating || 0) }">★</span>
+                  </template>
+                </div>
+                <span class="rating-value" x-text="vn.rating?.toFixed(2) || 'N/A'"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </main>
+  
+  <!-- 详情模态框 -->
+  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()">
+    <div class="modal" x-show="showDetail" x-transition>
+      <template x-if="selectedVN">
+        <div>
+          <div class="modal-header">
+            <h2 class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
+            <button class="modal-close" @click="closeDetail()">&times;</button>
+          </div>
+          
+          <div class="modal-body">
+            <div class="detail-header">
+              <img 
+                :src="selectedVN.vndb?.image || ''" 
+                :alt="selectedVN.vndb?.title"
+                class="detail-image"
+                @error="$event.target.style.display='none'"
+              >
+              <div class="detail-info">
+                <h1 class="detail-title">
+                  <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
+                  <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" title="全年龄作品">全年龄</span>
+                </h1>
+                <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>
+                <p class="detail-company" x-text="selectedVN.vndb?.developers?.join(', ') || ''" x-show="selectedVN.vndb?.developers?.length"></p>
+                
+                <!-- VNDB评分 -->
+                <div class="detail-stars-group" x-show="selectedVN.vndb?.rating">
+                  <span class="detail-stars-label">VNDB评分</span>
+                  <div class="detail-stars vndb-rating">
+                    <div class="stars-container">
+                      <template x-for="i in 10" :key="i">
+                        <span class="star" :class="{ empty: i > Math.round(selectedVN.vndb?.rating || 0) }">★</span>
+                      </template>
+                    </div>
+                    <span class="detail-rating-score" x-text="selectedVN.vndb?.rating?.toFixed(1) || '-'"></span>
+                  </div>
+                </div>
+
+                <!-- 个人评分 -->
+                <div class="detail-stars-group" x-show="selectedVN.user?.personalRating">
+                  <span class="detail-stars-label">个人评分</span>
+                  <div class="detail-stars personal-rating">
+                    <div class="stars-container">
+                      <template x-for="i in 10" :key="i">
+                        <span class="star" :class="{ empty: i > Math.round(selectedVN.user?.personalRating || 0) }">★</span>
+                      </template>
+                    </div>
+                    <span class="detail-rating-score" x-text="selectedVN.user?.personalRating?.toFixed(1) || '-'"></span>
+                  </div>
+                </div>
+
+                <div class="detail-meta">
+                  <div class="detail-meta-item">
+                    <span class="detail-meta-label">游戏时长</span>
+                    <span class="detail-meta-value" x-text="selectedVN.vndb?.length || '未知'"></span>
+                  </div>
+                  <div class="detail-meta-item">
+                    <span class="detail-meta-label">我的游玩时长</span>
+                    <span class="detail-meta-value" x-text="selectedVN.user?.playTime || '未记录'"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="detail-tags" x-show="selectedVN.vndb?.tags?.length">
+              <h4 class="detail-tags-title">标签</h4>
+              <div class="detail-tags-list">
+                <template x-for="tag in selectedVN.vndb?.tags?.slice(0, 10)" :key="tag">
+                  <span class="detail-tag" x-text="tag"></span>
+                </template>
+              </div>
+            </div>
+            
+            <div class="detail-review" x-show="selectedVN.user?.review">
+              <h3 class="detail-review-title">简评</h3>
+              <div class="detail-review-content" x-html="renderMarkdown(selectedVN.user?.review || '')"></div>
+            </div>
+          </div>
+          
+          <div class="modal-footer" x-show="$store.app.isAdmin">
+            <button class="btn btn-secondary" @click="openEdit(selectedVN)">编辑</button>
+            <button class="btn btn-danger" @click="deleteVN()">删除</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+  
+  <!-- 编辑模态框 -->
+  <div class="modal-overlay" :class="{ active: showEdit }" @click.self="closeEdit()">
+    <div class="modal" x-show="showEdit" x-transition>
+      <div class="modal-header">
+        <h2 class="modal-title" x-text="editForm.isNew ? '添加条目' : '编辑条目'"></h2>
+        <button class="modal-close" @click="closeEdit()">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <form @submit.prevent="saveEdit()">
+          <template x-if="editForm.isNew">
+            <div class="form-group">
+              <label class="form-label">VNDB ID *</label>
+              <input 
+                type="text" 
+                class="form-input" 
+                x-model="editForm.vndbId"
+                placeholder="例如: v17"
+                required
+              >
+              <p class="form-hint">在VNDB网站上找到视觉小说的ID，格式为v+数字</p>
+            </div>
+          </template>
+          
+          <div class="form-group">
+            <label class="form-label">中文标题</label>
+            <input 
+              type="text" 
+              class="form-input" 
+              x-model="editForm.titleCn"
+              placeholder="游戏的中文译名"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">个人评分</label>
+            <input 
+              type="number" 
+              class="form-input" 
+              x-model="editForm.personalRating"
+              min="0"
+              max="10"
+              step="0.1"
+              placeholder="0-10分"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">游玩时长</label>
+            <input 
+              type="text" 
+              class="form-input" 
+              x-model="editForm.playTime"
+              placeholder="例如: 25小时"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">简评 (支持Markdown)</label>
+            <textarea 
+              class="form-input form-textarea" 
+              x-model="editForm.review"
+              placeholder="写下你的感想..."
+            ></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">开始日期</label>
+            <input 
+              type="date" 
+              class="form-input" 
+              x-model="editForm.startDate"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">完成日期</label>
+            <input
+              type="date"
+              class="form-input"
+              x-model="editForm.finishDate"
+            >
+          </div>
+        </form>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-secondary" @click="closeEdit()">取消</button>
+        <button class="btn btn-primary" @click="saveEdit()">保存</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Toast通知 -->
+  <div class="toast-container">
+    <template x-for="toast in $store.app.toasts" :key="toast.id">
+      <div class="toast" :class="'toast-' + toast.type">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+name = "__WORKER_NAME__"
+main = "src/index.js"
+compatibility_date = "2026-02-14"
+
+# 禁用指标发送
+send_metrics = false
+
+# KV命名空间绑定
+[[kv_namespaces]]
+binding = "KV"   # 不要修改此项
+id = "__KV_NAMESPACE_ID__"
+
+# Queue生产者（批量索引）
+[[queues.producers]]
+queue = "vn-index-queue"
+binding = "VN_INDEX_QUEUE"
+
+# Queue消费者（批量索引处理）
+[[queues.consumers]]
+queue = "vn-index-queue"
+max_batch_size = 1
+max_batch_timeout = 1
+
+# Worker Assets 配置（静态资源）
+[assets]
+directory = "./public"
+binding = "ASSETS"
+html_handling = "auto-trailing-slash"
+
+# 环境变量
+[vars]
+ENVIRONMENT = "development"
+
+# 生产环境配置
+[env.production]
+vars = { ENVIRONMENT = "production" }

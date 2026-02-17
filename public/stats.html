@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>统计 - VN Shelf</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="statsPage()" x-init="init()">
+  <!-- 加载进度条 -->
+   <div class="loading-progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+  
+  <!-- 背景-overlay -->
+  <div class="background-overlay"></div>
+  
+  <!-- 头部导航 -->
+  <header class="main-header">
+    <div class="banner">
+      <a href="/" class="banner-title">VN Shelf</a>
+      <div class="header-actions">
+        <nav class="banner-nav desktop-only">
+          <a href="/">首页</a>
+          <a href="/stats" class="active">统计</a>
+          <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
+          <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+        </nav>
+        <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
+          <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+        <div class="mobile-nav mobile-only">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="more-menu" class="more-menu">
+            <a href="/">首页</a>
+            <a href="/stats" class="active">统计</a>
+            <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  
+  <!-- 主内容 -->
+  <main class="container">
+    <h1 class="page-title">📊 游玩统计</h1>
+    
+    <!-- 加载状态 -->
+    <template x-if="isLoading">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+      </div>
+    </template>
+    
+    <!-- 统计卡片 -->
+    <template x-if="!isLoading && stats">
+      <div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" x-text="stats.total || 0"></div>
+            <div class="stat-label">总条目数</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-value" x-text="formatMinutes(stats.totalPlayTimeMinutes)"></div>
+            <div class="stat-label">总游玩时长</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-value" x-text="formatRating(stats.avgRating)"></div>
+            <div class="stat-label">平均VNDB评分</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-value" x-text="formatRating(stats.avgPersonalRating)"></div>
+            <div class="stat-label">平均个人评分</div>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h2 class="settings-section-title">关于统计</h2>
+          <p class="text-muted">
+            统计数据基于已录入的视觉小说条目计算得出。
+            平均个人评分仅计算已评分的条目。
+          </p>
+        </div>
+      </div>
+    </template>
+    
+    <!-- 空状态 -->
+    <template x-if="!isLoading && !stats">
+      <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <div class="empty-state-title">暂无统计数据</div>
+        <p class="text-muted">添加视觉小说条目后即可查看统计</p>
+      </div>
+    </template>
+  </main>
+  
+  <!-- Toast通知 -->
+  <div class="toast-container">
+    <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
+      <div class="toast" :class="'toast-' + toast.type">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+</body>
+</html>

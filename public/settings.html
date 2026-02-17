@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置 - VN Shelf</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="settingsPage()" x-init="init()">
+  <!-- 加载进度条 -->
+  <div class="loading-progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+  
+  <!-- 背景-overlay -->
+  <div class="background-overlay"></div>
+  
+  <!-- 头部 -->
+  <header class="main-header">
+    <div class="banner">
+      <a href="/" class="banner-title">VN Shelf</a>
+      <div class="header-actions">
+        <nav class="banner-nav desktop-only">
+          <a href="/">首页</a>
+          <a href="/stats">统计</a>
+          <a href="/settings" class="active">设置</a>
+        </nav>
+        <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
+          <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+        <div class="mobile-nav mobile-only">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="more-menu" class="more-menu">
+            <a href="/">首页</a>
+            <a href="/stats">统计</a>
+            <a href="/settings">设置</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  
+  <!-- 主内容 -->
+  <main class="container">
+    <h1 class="page-title">⚙️ 设置</h1>
+    
+    <!-- VNDB API设置 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">VNDB API</h2>
+      
+      <div class="form-group">
+        <label class="form-label">API Token</label>
+        <div style="display: flex; gap: 12px;">
+          <input 
+            type="password" 
+            class="form-input" 
+            x-model="vndbApiToken"
+            placeholder="输入新的API Token"
+          >
+          <button class="btn btn-primary" @click="saveVndbToken()" :disabled="isLoading">
+            保存
+          </button>
+        </div>
+        <p class="form-hint">
+          当前状态: <span x-text="config.hasVndbApiToken ? '已配置' : '未配置'"></span>
+          - 在 <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> 获取Token
+        </p>
+      </div>
+    </section>
+    
+    <!-- 密码设置 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">管理员密码</h2>
+      
+      <div class="form-group">
+        <label class="form-label">新密码</label>
+        <input 
+          type="password" 
+          class="form-input" 
+          x-model="newPassword"
+          placeholder="至少6位密码"
+          minlength="6"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">确认密码</label>
+        <input 
+          type="password" 
+          class="form-input" 
+          x-model="confirmPassword"
+          placeholder="再次输入密码"
+        >
+      </div>
+      
+      <button class="btn btn-primary" @click="changePassword()" :disabled="isLoading">
+        修改密码
+      </button>
+    </section>
+    
+    <!-- 索引管理 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">数据索引</h2>
+      
+      <template x-if="indexStatus">
+        <div class="mb-4">
+          <p class="text-muted">
+            状态: <strong x-text="formatStatus(indexStatus.status)"></strong>
+            <span x-show="indexStatus.status === 'running'">
+              - 进度: <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
+            </span>
+          </p>
+          <p class="text-muted" x-show="indexStatus.failed?.length > 0">
+            失败: <span x-text="indexStatus.failed.join(', ')"></span>
+          </p>
+        </div>
+      </template>
+      
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button 
+          class="btn btn-primary" 
+          @click="startIndex()" 
+          :disabled="isLoading || indexStatus?.status === 'running'"
+        >
+          批量更新索引
+        </button>
+        <button class="btn btn-secondary" @click="loadIndexStatus()">
+          刷新状态
+        </button>
+      </div>
+      
+      <p class="form-hint mt-4">
+        批量索引会从VNDB重新获取所有条目的信息，适用于VNDB数据更新后同步。
+      </p>
+    </section>
+    
+    <!-- 数据导入导出 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">数据管理</h2>
+      
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="btn btn-secondary" @click="exportData()">
+          导出数据
+        </button>
+        
+        <label class="btn btn-secondary" style="cursor: pointer;">
+          导入数据
+          <input 
+            type="file" 
+            accept=".json"
+            @change="importData($event)"
+            style="display: none;"
+          >
+        </label>
+      </div>
+      
+      <p class="form-hint mt-4">
+        导出的数据为JSON格式，可用于备份或迁移。导入时选择"合并"会保留现有数据，选择"替换"会清空现有数据。
+      </p>
+    </section>
+    
+    <!-- 退出登录 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">账户</h2>
+      
+      <button class="btn btn-danger" @click="logout()">
+        退出登录
+      </button>
+    </section>
+  </main>
+  
+  <!-- Toast通知 -->
+  <div class="toast-container">
+    <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
+      <div class="toast" :class="'toast-' + toast.type">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+</body>
+</html>
