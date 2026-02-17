@@ -20,7 +20,7 @@
   --body-bg-color: #edeef0d5;
   --bg-overlay-color: transparent;
   --header-bg-color: rgba(255, 255, 255, 0.45);
-  --card-bg-color: rgba(255, 255, 255, 0.8);
+  --card-bg-color: rgba(255, 255, 255, 0.253);
   --drawer-bg-color: rgba(245, 245, 247, 0.9);
   --modal-bg-color: rgba(242, 242, 247, 0.95);
   --overlay-bg-color: rgba(0, 0, 0, 0.3);
@@ -46,7 +46,7 @@ body.dark-mode {
   --body-bg-color:  #121212ef;
   --bg-overlay-color: transparent;
   --header-bg-color: rgba(28, 28, 30, 0.85);
-  --card-bg-color: rgba(40, 40, 42, 0.75);
+  --card-bg-color: rgba(40, 40, 42, 0.26);
   --drawer-bg-color: rgba(20, 20, 20, 0.9);
   --modal-bg-color: rgba(44, 44, 46, 0.9);
   --overlay-bg-color: rgba(0, 0, 0, 0.5);
@@ -455,8 +455,8 @@ img { max-width: 100%; height: auto; display: block; }
   transition: transform var(--transition-medium), box-shadow var(--transition-medium);
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border-color);
   cursor: pointer;
 }
@@ -565,7 +565,7 @@ img { max-width: 100%; height: auto; display: block; }
 
 .star {
   color: #FFD700;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
 }
 
 .star.empty {
