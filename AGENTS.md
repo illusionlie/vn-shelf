@@ -32,9 +32,10 @@ public/           # 静态资源（Worker Assets）
 ├── css/
 │   └── style.css # 样式文件
 └── js/
-    ├── api.js        # API 封装
-    ├── app.js        # Alpine.js 组件
-    └── markdown.js   # Markdown 渲染
+    ├── api.js            # API 封装
+    ├── app.js            # Alpine.js 组件
+    ├── markdown.js       # Markdown 渲染
+    └── translations.js   # Tags 翻译模块
 ```
 
 ## API 路由
@@ -133,29 +134,53 @@ public/           # 静态资源（Worker Assets）
 
 ## VN 条目数据结构
 
+### 完整条目结构 (存储在 `vn:{id}`)
+
 ```javascript
 {
-  id: "v17",                    // VNDB ID
-  createdAt: "2024-01-01T00:00:00.000Z",
-  vndb: {                       // VNDB 原始数据
-    title: "CLANNAD",
-    titleCn: "CLANNAD",
-    rating: 8.5,
-    length: 120,                // 游玩时长（分钟）
-    image: { url: "...", sexual: 0, violence: 0 },
-    platforms: ["win", "ps2"],
-    developers: [{ name: "Key" }],
-    // ...更多字段
+  id: "v17",                              // VNDB ID
+  createdAt: "2024-01-01T00:00:00.000Z", // 创建时间
+  updatedAt: "2024-01-02T00:00:00.000Z", // 更新时间
+  vndb: {                                 // VNDB 数据（处理后）
+    title: "CLANNAD",                     // 英文标题（VNDB主标题）
+    titleJa: "CLANNAD",                   // 日文标题，没有则使用英文
+    titleCn: "CLANNAD",                   // 中文标题（优先官方，其次汉化组）
+    image: "https://...",                 // 封面图片 URL
+    imageNsfw: false,                     // 是否为 NSFW 图片
+    rating: 8.5,                          // VNDB 评分 (0-10)
+    length: "60小时",                     // 游玩时长文本
+    lengthMinutes: 3600,                  // 游玩时长（分钟）
+    developers: ["Key"],                  // 开发商列表
+    tags: ["泣系", "恋爱"],               // 标签列表（最多10个，按��分排序）
+    allAge: false                         // 全年龄标记（基于 g235 标签）
   },
-  user: {                       // 用户数据
-    titleCn: "自定义中文名",
-    personalRating: 9.0,        // 个人评分 (0-10)
-    playTime: "60小时",         // 游玩时长文本
-    playTimeMinutes: 3600,      // 游玩时长（分钟）
-    review: "评价内容",         // Markdown 格式
-    startDate: "2024-01-01",
-    finishDate: "2024-02-01"
+  user: {                                 // 用户数据
+    titleCn: "自定义中文名",              // 自定义中文标题
+    personalRating: 9.0,                  // 个人评分 (0-10)
+    playTime: "60小时",                   // 游玩时长文本
+    playTimeMinutes: 3600,                // 游玩时长（分钟）
+    review: "评价内容",                   // 评价内容（Markdown 格式）
+    startDate: "2024-01-01",              // 开始日期
+    finishDate: "2024-02-01",             // 完成日期
+    tags: ["自定义标签"]                  // 用户自定义标签
   }
+}
+```
+
+### 列表项结构 (存储在 `vn:list.items[]`)
+
+```javascript
+{
+  id: "v17",                              // VNDB ID
+  title: "CLANNAD",                       // 英文标题
+  titleJa: "CLANNAD",                     // 日文标题
+  titleCn: "CLANNAD",                     // 中文标题（优先用户设置）
+  image: "https://...",                   // 封面图片 URL
+  rating: 8.5,                            // VNDB 评分 (0-10)
+  personalRating: 9.0,                    // 个人评分 (0-10)
+  developers: ["Key"],                    // 开发商列表
+  allAge: false,                          // 全年龄标记
+  createdAt: "2024-01-01T00:00:00.000Z"  // 创建时间
 }
 ```
 
@@ -166,6 +191,45 @@ public/           # 静态资源（Worker Assets）
 - [`isValidVNDBId(id)`](src/utils.js) - 验证 VNDB ID 格式
 - [`jsonResponse(data)`](src/utils.js:128) / [`errorResponse(msg, status)`](src/utils.js) - 统一响应格式
 
+## Tags 翻译模块 (public/js/translations.js)
+
+前端翻译模块，负责 VNDB tags 的中文翻译功能。
+
+### 核心功能
+
+- **翻译数据加载**: 从远程 JSON 文件加载 tags 翻译数据
+- **本地缓存**: 使用 IndexedDB 缓存翻译数据，减少网络请求
+- **版本检查**: 通过 version.json 轻量级检查更新
+- **后台更新**: 缓存优先策略，后台自动检查并更新翻译
+
+### 缓存策略
+
+```
+缓存优先 + 后台更新：
+1. 无缓存 → 直接下载完整数据
+2. 有缓存 → 立即返回缓存，后台检查版本并更新
+3. 版本更新 → 自动下载并更新缓存，触发 translations-updated 事件
+```
+
+### IndexedDB 存储
+
+- 数据库名: `vn-shelf-translations`
+- 存储对象: `translations`
+- 键名: `tagTranslations`
+- 缓存结构:
+  ```javascript
+  {
+    version: "1.0.0",
+    updatedAt: "2024-01-01T00:00:00.000Z",
+    sourceUrl: "https://...",
+    translations: { "original_tag": "中文翻译", ... }
+  }
+  ```
+
+### 事件
+
+- `translations-updated`: 后台更新完成时触发，包含 `detail.version`
+
 ## 开发注意事项
 
 1. **无构建步骤**: 直接修改 `src/` 下的 JS 文件即可
@@ -173,3 +237,4 @@ public/           # 静态资源（Worker Assets）
 3. **本地开发**: 使用 `wrangler dev`，需要配置本地 KV 命名空间
 4. **环境变量**: 在 `wrangler.toml` 的 `[vars]` 中配置
 5. **敏感配置**: API Token 等存储在 KV 中，通过 `/api/config` 接口管理
+6. **翻译数据**: 翻译数据缓存在浏览器 IndexedDB 中，可通过设置页刷新
