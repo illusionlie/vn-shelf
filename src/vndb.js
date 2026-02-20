@@ -50,7 +50,7 @@ export class VNDBClient {
     
     const result = await this.request('/vn', {
       filters: ['id', '=', 'v' + numericId],
-      fields: 'title, alttitle, titles.lang, titles.title, titles.main, titles.official, image.url, image.sexual, image.violence, rating, length, length_minutes, developers.name, tags.id, tags.name, tags.rating',
+      fields: 'title, titles.lang, titles.title, titles.main, titles.official, image.url, image.sexual, image.violence, rating, length_minutes, developers.name, tags.id, tags.name, tags.rating, tags.category, tags.spoiler',
       results: 1
     });
 
@@ -77,7 +77,7 @@ export class VNDBClient {
       lengthMinutes: vn.length_minutes || 0,
       developers: (vn.developers || []).map(d => d.name),
       tags: (vn.tags || [])
-        .filter(t => t.rating > 1) // 只保留评分大于1的标签
+        .filter(t => t.rating > 1 && t.category === 'cont' && (!t.spoiler || t.spoiler === 0)) // 只保留评分大于1、内容标签、无剧透的标签
         .sort((a, b) => b.rating - a.rating)
         .slice(0, 10) // 只保留前10个标签
         .map(t => t.name),
