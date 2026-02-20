@@ -152,6 +152,75 @@
       </p>
     </section>
     
+    <!-- Tags 设置 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">Tags 显示</h2>
+      
+      <div class="form-group">
+        <label class="form-label">Tags 来源</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="tagsMode" value="vndb" x-model="config.tagsMode" @change="saveTagsConfig()">
+            <span>使用 VNDB Tags</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="tagsMode" value="manual" x-model="config.tagsMode" @change="saveTagsConfig()">
+            <span>使用手动 Tags</span>
+          </label>
+        </div>
+        <p class="form-hint">VNDB Tags 从 VNDB 自动获取；手动 Tags 在编辑条目时自行添加。</p>
+      </div>
+      
+      <!-- VNDB Tags 翻译设置 -->
+      <template x-if="config.tagsMode === 'vndb'">
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" x-model="config.translateTags" @change="saveTagsConfig()">
+            <span>启用中文翻译</span>
+          </label>
+          <p class="form-hint">将 VNDB 的英文 Tags 翻译为中文显示。</p>
+        </div>
+      </template>
+      
+      <!-- 翻译文件 URL -->
+      <template x-if="config.tagsMode === 'vndb' && config.translateTags">
+        <div class="form-group">
+          <label class="form-label">翻译文件 URL</label>
+          <div style="display: flex; gap: 12px;">
+            <input
+              type="url"
+              class="form-input"
+              x-model="config.translationUrl"
+              placeholder="留空使用默认翻译源"
+            >
+            <button class="btn btn-secondary" @click="saveTagsConfig()" :disabled="isLoading">
+              保存
+            </button>
+          </div>
+          <p class="form-hint">支持自定义翻译文件，留空使用默认翻译源。</p>
+          
+          <!-- 翻译缓存状态 -->
+          <template x-if="translationCacheStatus">
+            <div class="cache-status mt-4">
+              <p class="text-muted">
+                缓存状态:
+                <strong x-text="translationCacheStatus.version || '未知'"></strong>
+                <span x-show="translationCacheStatus.updatedAt">
+                  - 更新于 <span x-text="formatDate(translationCacheStatus.updatedAt)"></span>
+                </span>
+              </p>
+              <p class="text-muted">
+                已缓存 <strong x-text="translationCacheStatus.count || 0"></strong> 条翻译
+              </p>
+              <button class="btn btn-secondary btn-sm mt-2" @click="clearTranslationCache()">
+                清除缓存
+              </button>
+            </div>
+          </template>
+        </div>
+      </template>
+    </section>
+    
     <!-- 数据导入导出 -->
     <section class="settings-section">
       <h2 class="settings-section-title">数据管理</h2>

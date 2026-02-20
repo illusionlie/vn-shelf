@@ -15,7 +15,11 @@ export async function getSettings(env) {
     vndbApiToken: '',
     adminPasswordHash: '',
     jwtSecret: '',
-    lastIndexTime: null
+    lastIndexTime: null,
+    // Tags 显示配置
+    tagsMode: 'vndb',           // 'vndb' | 'manual'
+    translateTags: true,         // 是否启用前端翻译
+    translationUrl: ''           // 翻译文件 URL（空则使用默认）
   };
 }
 

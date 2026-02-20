@@ -1164,3 +1164,71 @@ img { max-width: 100%; height: auto; display: block; }
 .mt-4 { margin-top: 16px; }
 .mb-4 { margin-bottom: 16px; }
 .p-4 { padding: 16px; }
+
+/* ===== Radio & Checkbox Groups ===== */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.radio-label,
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--tag-bg-color);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.radio-label:hover,
+.checkbox-label:hover {
+  background: var(--input-focus-bg-color);
+  border-color: var(--accent-color);
+}
+
+.radio-label input[type="radio"],
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.radio-label span,
+.checkbox-label span {
+  color: var(--primary-text-color);
+  font-size: 0.95rem;
+}
+
+/* ===== Cache Status ===== */
+.cache-status {
+  padding: 16px;
+  background: var(--tag-bg-color);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.cache-status p {
+  margin-bottom: 8px;
+}
+
+.cache-status p:last-child {
+  margin-bottom: 0;
+}
+
+/* ===== Static Tags List ===== */
+.detail-tags-list.static {
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+/* ===== Button Small ===== */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}

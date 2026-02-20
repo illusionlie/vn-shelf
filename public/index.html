@@ -204,10 +204,10 @@
                 </div>
               </div>
             </div>
-            <div class="detail-tags" x-show="selectedVN.vndb?.tags?.length">
+            <div class="detail-tags" x-show="getDisplayTags(selectedVN).length">
               <h4 class="detail-tags-title">标签</h4>
               <div class="detail-tags-list">
-                <template x-for="tag in selectedVN.vndb?.tags?.slice(0, 10)" :key="tag">
+                <template x-for="tag in getDisplayTags(selectedVN).slice(0, 15)" :key="tag">
                   <span class="detail-tag" x-text="tag"></span>
                 </template>
               </div>
@@ -310,6 +310,27 @@
               class="form-input"
               x-model="editForm.finishDate"
             >
+          </div>
+          
+          <div class="form-group" x-show="config.tagsMode === 'manual'">
+            <label class="form-label">标签（手动模式）</label>
+            <input
+              type="text"
+              class="form-input"
+              x-model="editForm.tags"
+              placeholder="多个标签用逗号分隔，例如：神作, 催泪, 神曲"
+            >
+            <p class="form-hint">当前为手动标签模式，请输入自定义标签。</p>
+          </div>
+          
+          <div class="form-group" x-show="config.tagsMode === 'vndb' && !editForm.isNew">
+            <label class="form-label">标签</label>
+            <div class="detail-tags-list static">
+              <template x-for="tag in getDisplayTags(selectedVN || editForm).slice(0, 15)" :key="tag">
+                <span class="detail-tag" x-text="tag"></span>
+              </template>
+            </div>
+            <p class="form-hint">当前为 VNDB 标签模式，标签来自 VNDB 数据。如需自定义标签，请在设置中切换为手动模式。</p>
           </div>
         </form>
       </div>

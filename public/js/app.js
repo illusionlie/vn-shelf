@@ -5,6 +5,13 @@
 
 import { authAPI, vnAPI, statsAPI, indexAPI, configAPI, dataAPI } from './api.js';
 import { renderMarkdown } from './markdown.js';
+import {
+  initTranslations,
+  translateTags,
+  getTranslationsCacheStatus,
+  clearTranslationsCache,
+  DEFAULT_TRANSLATION_URL
+} from './translations.js';
 
 // =========== 进度条 ============
 
@@ -116,9 +123,70 @@ function vnShelf() {
     showDetail: false,
     showEdit: false,
     editForm: {},
+    // 翻译相关状态
+    config: null,
+    translations: null,
     
     async init() {
+      await this.loadConfig();
+      await this.initTranslations();
       await this.loadVNList();
+    },
+    
+    async loadConfig() {
+      try {
+        const res = await configAPI.get();
+        this.config = res.data || {
+          tagsMode: 'vndb',
+          translateTags: true,
+          translationUrl: ''
+        };
+      } catch {
+        // 未登录时使用默认配置
+        this.config = {
+          tagsMode: 'vndb',
+          translateTags: true,
+          translationUrl: ''
+        };
+      }
+    },
+    
+    async initTranslations() {
+      // 只在 vndb 模式且启用翻译时加载翻译数据
+      if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
+        const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
+        try {
+          this.translations = await initTranslations(url);
+        } catch (error) {
+          console.error('[vnShelf] Failed to load translations:', error);
+          this.translations = null;
+        }
+      }
+    },
+    
+    /**
+     * 获取要显示的 tags
+     * @param {Object} vn - VN 条目
+     * @returns {string[]} - 要显示的 tags 数组
+     */
+    getDisplayTags(vn) {
+      if (!vn) return [];
+      
+      // 手动模式：优先使用用户 tags
+      if (this.config.tagsMode === 'manual') {
+        return vn.user?.tags || [];
+      }
+      
+      // VNDB 模式
+      const vndbTags = vn.vndb?.tags || [];
+      
+      // 如果启用翻译且有翻译数据，翻译 tags
+      if (this.config.translateTags && this.translations) {
+        return translateTags(vndbTags, this.translations);
+      }
+      
+      // 否则返回原始英文 tags
+      return vndbTags;
     },
     
     async loadVNList() {
@@ -168,6 +236,8 @@ function vnShelf() {
     
     openEdit(vn = null) {
       if (vn) {
+        // 解析 tags 为文本（用于编辑）
+        const userTags = vn.user?.tags || [];
         this.editForm = {
           id: vn.id,
           vndbId: vn.id,
@@ -178,6 +248,7 @@ function vnShelf() {
           review: vn.user?.review || '',
           startDate: vn.user?.startDate || '',
           finishDate: vn.user?.finishDate || '',
+          tags: userTags.join(', '), // 逗号分隔的文本
           isNew: false
         };
       } else {
@@ -190,6 +261,7 @@ function vnShelf() {
           review: '',
           startDate: '',
           finishDate: '',
+          tags: '',
           isNew: true
         };
       }
@@ -202,8 +274,24 @@ function vnShelf() {
       this.editForm = {};
     },
     
+    /**
+     * 解析 tags 文本为数组
+     * @param {string} tagsText - 逗号分隔的 tags 文本
+     * @returns {string[]} - tags 数组
+     */
+    parseTags(tagsText) {
+      if (!tagsText || !tagsText.trim()) return [];
+      return tagsText
+        .split(/[,，]/) // 支持中英文逗号
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+    },
+    
     async saveEdit() {
-      try {   
+      try {
+        // 解析 tags
+        const tags = this.parseTags(this.editForm.tags);
+        
         if (this.editForm.isNew) {
           await vnAPI.create({
             vndbId: this.editForm.vndbId,
@@ -214,6 +302,7 @@ function vnShelf() {
             review: this.editForm.review,
             startDate: this.editForm.startDate,
             finishDate: this.editForm.finishDate,
+            tags: tags
           });
           this.$store.app.addToast('添加成功');
         } else {
@@ -225,6 +314,7 @@ function vnShelf() {
             review: this.editForm.review,
             startDate: this.editForm.startDate,
             finishDate: this.editForm.finishDate,
+            tags: tags
           });
           this.$store.app.addToast('更新成功');
         }
@@ -308,27 +398,32 @@ function loginPage() {
 
 function settingsPage() {
   return {
-    config: {},
-    vndbApiToken: '',
-    newPassword: '',
-    confirmPassword: '',
-    indexStatus: null,
-    isLoading: false,
-    tagsSettings: {
+    config: {
       tagsMode: 'vndb',
       translateTags: true,
       translationUrl: ''
     },
+    vndbApiToken: '',
+    newPassword: '',
+    confirmPassword: '',
+    indexStatus: null,
+    translationCacheStatus: null,
+    isLoading: false,
     
     async init() {
       await this.loadConfig();
       await this.loadIndexStatus();
+      await this.loadTranslationCacheStatus();
     },
     
     async loadConfig() {
       try {
         const res = await configAPI.get();
-        this.config = res.data || {};
+        this.config = res.data || {
+          tagsMode: 'vndb',
+          translateTags: true,
+          translationUrl: ''
+        };
       } catch (error) {
         this.$store.app.addToast('加载配置失败: ' + error.message, 'error');
       }
@@ -452,6 +547,63 @@ function settingsPage() {
         failed: '失败'
       };
       return map[status] || status;
+    },
+    
+    formatDate(dateStr) {
+      if (!dateStr) return '未知';
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      } catch {
+        return dateStr;
+      }
+    },
+    
+    async loadTranslationCacheStatus() {
+      try {
+        this.translationCacheStatus = await getTranslationsCacheStatus();
+      } catch {
+        this.translationCacheStatus = null;
+      }
+    },
+    
+    async saveTagsConfig() {
+      this.isLoading = true;
+      try {
+        await configAPI.update({
+          tagsMode: this.config.tagsMode,
+          translateTags: this.config.translateTags,
+          translationUrl: this.config.translationUrl
+        });
+        this.$store.app.addToast('Tags 设置已保存');
+        
+        // 如果启用了翻译，预加载翻译数据
+        if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
+          const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
+          await initTranslations(url, null, false);
+          await this.loadTranslationCacheStatus();
+        }
+      } catch (error) {
+        this.$store.app.addToast('保存失败: ' + error.message, 'error');
+      } finally {
+        this.isLoading = false;
+      }
+    },
+    
+    async clearTranslationCache() {
+      if (!confirm('确定要清除翻译缓存吗？下次使用时需要重新下载翻译数据。')) return;
+      
+      try {
+        await clearTranslationsCache();
+        this.translationCacheStatus = null;
+        this.$store.app.addToast('翻译缓存已清除');
+      } catch (error) {
+        this.$store.app.addToast('清除缓存失败: ' + error.message, 'error');
+      }
     }
   };
 }
