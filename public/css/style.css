@@ -78,6 +78,12 @@ body {
   transition: padding-left var(--transition-medium), color var(--transition-medium), background-color var(--transition-medium);
 }
 
+/* 登录页特殊样式 - 无需顶部 padding */
+body.login-page {
+  padding-top: 0;
+  overflow: hidden; /* 禁止滚动 */
+}
+
 /* ===== Loading Progress Bar ===== */
 .loading-progress-bar {
   position: fixed;
