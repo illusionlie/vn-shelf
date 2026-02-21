@@ -200,28 +200,3 @@ export function formatDate(date, format = 'YYYY-MM-DD') {
 export function isValidVNDBId(id) {
   return /^v\d+$/.test(id);
 }
-
-/**
- * 简易Markdown渲染
- * @param {string} text - Markdown文本
- * @returns {string}
- */
-export function renderMarkdown(text) {
-  if (!text) return '';
-  
-  return text
-    // 转义HTML
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    // 粗体
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // 斜体
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // 删除线
-    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    // 链接
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    // 换行
-    .replace(/\n/g, '<br>');
-}
