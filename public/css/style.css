@@ -1238,3 +1238,255 @@ img { max-width: 100%; height: auto; display: block; }
   padding: 6px 12px;
   font-size: 0.85rem;
 }
+
+/* ===== Markdown Styles ===== */
+/* 基础段落 */
+.md-paragraph {
+  margin: 0 0 1em 0;
+  line-height: 1.8;
+}
+
+.md-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+/* 标题 */
+.md-heading {
+  margin: 1.5em 0 0.5em 0;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--primary-text-color);
+}
+
+.md-h1 { font-size: 1.75rem; margin-top: 1em; }
+.md-h2 { font-size: 1.5rem; margin-top: 1.25em; }
+.md-h3 { font-size: 1.25rem; margin-top: 1.25em; }
+.md-h4 { font-size: 1.1rem; }
+.md-h5 { font-size: 1rem; }
+.md-h6 { font-size: 0.95rem; color: var(--secondary-text-color); }
+
+.md-heading:first-child {
+  margin-top: 0;
+}
+
+/* 粗��、斜体、删除线 */
+.md-strong {
+  font-weight: 600;
+  color: var(--primary-text-color);
+}
+
+.md-em {
+  font-style: italic;
+}
+
+.md-del {
+  text-decoration: line-through;
+  color: var(--muted-text-color);
+}
+
+/* 高亮/标记 */
+.md-mark {
+  background: linear-gradient(120deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.2) 100%);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 上标、下标 */
+.md-sup {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+.md-sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+}
+
+/* 行内代码 */
+.md-code-inline {
+  background: var(--tag-bg-color);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9em;
+  color: var(--accent-color);
+  border: 1px solid var(--border-color);
+}
+
+/* 代码块 */
+.md-code-block {
+  background: var(--tag-bg-color);
+  border-radius: var(--border-radius-md);
+  padding: 16px;
+  margin: 1em 0;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+}
+
+.md-code-block .md-code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--primary-text-color);
+  white-space: pre;
+  display: block;
+}
+
+/* 链接 */
+.md-link {
+  color: var(--accent-color);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.md-link:hover {
+  border-bottom-color: var(--accent-color);
+}
+
+/* 图片 */
+.md-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--border-radius-sm);
+  margin: 0.5em 0;
+  display: block;
+}
+
+/* 水平分割线 */
+.md-hr {
+  border: none;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), var(--border-color), rgba(255, 255, 255, 0));
+  margin: 1.5em 0;
+}
+
+/* 列表 */
+.md-list {
+  margin: 0.5em 0 1em 0;
+  padding-left: 1.5em;
+}
+
+.md-list-unordered {
+  list-style-type: disc;
+}
+
+.md-list-ordered {
+  list-style-type: decimal;
+}
+
+.md-list-item {
+  margin: 0.25em 0;
+  line-height: 1.7;
+}
+
+.md-list-item::marker {
+  color: var(--accent-color);
+}
+
+/* 任务列表 */
+.md-task-item {
+  list-style-type: none;
+  margin-left: -1.5em;
+}
+
+.md-task {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: default;
+}
+
+.md-task input[type="checkbox"] {
+  margin-top: 4px;
+  accent-color: var(--accent-color);
+  cursor: default;
+}
+
+/* 引用块 */
+.md-blockquote {
+  margin: 1em 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--accent-color);
+  background: var(--tag-bg-color);
+  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+  color: var(--secondary-text-color);
+}
+
+.md-blockquote .md-paragraph {
+  margin: 0;
+}
+
+.md-blockquote .md-paragraph + .md-paragraph {
+  margin-top: 0.5em;
+}
+
+/* 表格 */
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.95rem;
+  overflow-x: auto;
+  display: block;
+}
+
+.md-row {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.md-row:last-child {
+  border-bottom: none;
+}
+
+.md-row-header .md-cell {
+  font-weight: 600;
+  background: var(--tag-bg-color);
+}
+
+.md-cell {
+  padding: 10px 14px;
+  text-align: left;
+}
+
+/* 换行 */
+.md-br {
+  display: block;
+  content: "";
+  margin-top: 0.5em;
+}
+
+/* 在详情页评价区域中的 Markdown 样式调整 */
+.detail-review-content .md-heading {
+  margin-top: 1em;
+}
+
+.detail-review-content .md-code-block {
+  margin: 0.75em 0;
+}
+
+.detail-review-content .md-list {
+  margin: 0.5em 0;
+}
+
+.detail-review-content .md-blockquote {
+  margin: 0.75em 0;
+}
+
+.detail-review-content .md-table {
+  margin: 0.75em 0;
+}
+
+/* 深色模式下的特殊调整 */
+body.dark-mode .md-mark {
+  background: linear-gradient(120deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.15) 100%);
+}
+
+body.dark-mode .md-code-block {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+body.dark-mode .md-table {
+  background: var(--tag-bg-color);
+  border-radius: var(--border-radius-sm);
+}
