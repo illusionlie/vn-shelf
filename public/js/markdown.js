@@ -16,6 +16,39 @@ function escapeHtml(text) {
 }
 
 /**
+ * 检查 URL 是否安全（防止 XSS）
+ * 只允许 http、https、mailto 协议和相对路径
+ * @param {string} url - 要检查的 URL
+ * @returns {boolean}
+ */
+function isSafeUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  
+  const trimmedUrl = url.trim().toLowerCase();
+  
+  // 允许相对路径（以 / 或 # 开头）
+  if (trimmedUrl.startsWith('/') || trimmedUrl.startsWith('#')) {
+    return true;
+  }
+  
+  // 允许的安全协议白名单
+  const safeProtocols = ['http://', 'https://', 'mailto:'];
+  
+  // 检查是否以安全协议开头
+  if (safeProtocols.some(protocol => trimmedUrl.startsWith(protocol))) {
+    return true;
+  }
+  
+  // 不包含协议的相对 URL（如 example.com/path）也允许
+  // 但要排除 javascript: 等危险协议
+  if (!trimmedUrl.includes(':') || /^[a-z0-9]/i.test(trimmedUrl)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * 解析内联元素（粗体、斜体、删除线、代码、链接、图片）
  * @param {string} text - 已转义的文本
  * @returns {string} 解析后的 HTML
@@ -24,12 +57,20 @@ function parseInline(text) {
   // 图片 ![alt](url) - 必须在链接之前处理
   text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
     const safeAlt = alt.replace(/"/g, '&quot;');
+    // 验证 URL 安全性
+    if (!isSafeUrl(url)) {
+      return `<span class="md-image-unsafe" title="不安全的图片链接已禁用">[图片]</span>`;
+    }
     const safeUrl = url.replace(/"/g, '&quot;');
     return `<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" class="md-image">`;
   });
   
   // 链接 [text](url)
   text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+    // 验证 URL 安全性
+    if (!isSafeUrl(url)) {
+      return `<span class="md-link-unsafe" title="不安全的链接已禁用">${linkText}</span>`;
+    }
     const safeUrl = url.replace(/"/g, '&quot;');
     return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="md-link">${linkText}</a>`;
   });
