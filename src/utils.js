@@ -200,3 +200,17 @@ export function formatDate(date, format = 'YYYY-MM-DD') {
 export function isValidVNDBId(id) {
   return /^v\d+$/.test(id);
 }
+
+/**
+ * 安全解析请求体 JSON
+ * @param {Request} request - Request 对象
+ * @returns {Promise<{success: boolean, data?: *, error?: Response}>}
+ */
+export async function parseRequestBody(request) {
+  try {
+    const data = await request.json();
+    return { success: true, data };
+  } catch (e) {
+    return { success: false, error: errorResponse('请求体格式错误', 400) };
+  }
+}

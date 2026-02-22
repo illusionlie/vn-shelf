@@ -2,7 +2,7 @@
  * 路由模块
  */
 
-import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parsePlayTime } from './utils.js';
+import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parsePlayTime, parseRequestBody } from './utils.js';
 import { 
   getVNList, 
   getVNEntry, 
@@ -159,8 +159,9 @@ async function handleInit(request, env) {
     return errorResponse('已经初始化', 400);
   }
   
-  const body = await request.json();
-  const { password, vndbApiToken } = body;
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+  const { password, vndbApiToken } = bodyResult.data;
   
   if (!password || password.length < 6) {
     return errorResponse('密码长度至少6位', 400);
@@ -178,8 +179,9 @@ async function handleInit(request, env) {
 }
 
 async function handleLogin(request, env) {
-  const body = await request.json();
-  const { password } = body;
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+  const { password } = bodyResult.data;
   
   if (!password) {
     return errorResponse('请输入密码', 400);
@@ -273,8 +275,9 @@ async function handleCreateVN(request, env, auth) {
     return errorResponse('未授权', 401);
   }
   
-  const body = await request.json();
-  const { vndbId, titleCn, personalRating, playTime, playTimeMinutes, review, startDate, finishDate, tags } = body;
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+  const { vndbId, titleCn, personalRating, playTime, playTimeMinutes, review, startDate, finishDate, tags } = bodyResult.data;
   
   if (!vndbId || !isValidVNDBId(vndbId)) {
     return errorResponse('无效的VNDB ID', 400);
@@ -334,8 +337,9 @@ async function handleUpdateVN(request, env, id, auth) {
     return errorResponse('条目不存在', 404);
   }
   
-  const body = await request.json();
-  const { titleCn, personalRating, playTime, playTimeMinutes, review, startDate, finishDate, tags, refreshVNDB } = body;
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+  const { titleCn, personalRating, playTime, playTimeMinutes, review, startDate, finishDate, tags, refreshVNDB } = bodyResult.data;
   
   // 是否刷新VNDB数据
   if (refreshVNDB) {
@@ -476,7 +480,9 @@ async function handleUpdateConfig(request, env, auth) {
     return errorResponse('未授权', 401);
   }
   
-  const body = await request.json();
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+  const body = bodyResult.data;
   const settings = await getSettings(env);
   
   if (body.vndbApiToken !== undefined) {
@@ -526,8 +532,9 @@ async function handleImport(request, env, auth) {
     return errorResponse('未授权', 401);
   }
   
-  const body = await request.json();
-  const { entries, mode } = body;
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+  const { entries, mode } = bodyResult.data;
   
   if (!entries || !Array.isArray(entries)) {
     return errorResponse('无效的导入数据', 400);
