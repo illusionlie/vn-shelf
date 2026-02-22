@@ -94,7 +94,7 @@ export default {
     // 检查是否全部完成
     const status = await getIndexStatus(env);
     if (status.processed >= status.total && status.status === 'running') {
-      status.status = status.failed.length > 0 ? 'completed' : 'completed';
+      status.status = status.failed.length > 0 ? 'partial' : 'completed';
       status.completedAt = new Date().toISOString();
       await saveIndexStatus(env, status);
       

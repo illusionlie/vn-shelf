@@ -544,7 +544,8 @@ function settingsPage() {
         idle: '空闲',
         running: '运行中',
         completed: '已完成',
-        failed: '失败'
+        failed: '失败',
+        partial: '部分完成'
       };
       return map[status] || status;
     },
