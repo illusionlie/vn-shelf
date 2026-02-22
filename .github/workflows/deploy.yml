@@ -10,6 +10,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     environment: production
     name: Build and Deploy to Cloudflare
     steps:
