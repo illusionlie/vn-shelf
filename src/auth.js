@@ -66,7 +66,8 @@ export async function verifyJWT(token, secret) {
     }
     
     return payload;
-  } catch {
+  } catch (e) {
+    console.error('JWT verification error:', e);
     return null;
   }
 }
