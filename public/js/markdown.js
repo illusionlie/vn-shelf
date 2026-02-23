@@ -23,29 +23,43 @@ function escapeHtml(text) {
  */
 function isSafeUrl(url) {
   if (!url || typeof url !== 'string') return false;
-  
-  const trimmedUrl = url.trim().toLowerCase();
-  
-  // 允许相对路径（以 / 或 # 开头）
-  if (trimmedUrl.startsWith('/') || trimmedUrl.startsWith('#')) {
+
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return false;
+
+  // 去除控制字符与空白，防止 javascript:\nalert(1) 这类混淆绕过
+  const normalizedForProtocol = trimmedUrl.replace(/[\u0000-\u001F\u007F\s]+/g, '');
+  const lowerNormalizedUrl = normalizedForProtocol.toLowerCase();
+
+  // 允许锚点
+  if (lowerNormalizedUrl.startsWith('#')) {
     return true;
   }
-  
-  // 允许的安全协议白名单
-  const safeProtocols = ['http://', 'https://', 'mailto:'];
-  
-  // 检查是否以安全协议开头
-  if (safeProtocols.some(protocol => trimmedUrl.startsWith(protocol))) {
+
+  // 允许相对路径，明确拒绝协议相对 URL（//example.com）
+  if (trimmedUrl.startsWith('/') && !trimmedUrl.startsWith('//')) {
     return true;
   }
-  
-  // 不包含协议的相对 URL（如 example.com/path）也允许
-  // 但要排除 javascript: 等危险协议
-  if (!trimmedUrl.includes(':') || /^[a-z0-9]/i.test(trimmedUrl)) {
+  if (trimmedUrl.startsWith('./') || trimmedUrl.startsWith('../')) {
     return true;
   }
-  
-  return false;
+
+  // 严格白名单：仅允许 http、https、mailto
+  if (
+    lowerNormalizedUrl.startsWith('http://') ||
+    lowerNormalizedUrl.startsWith('https://') ||
+    lowerNormalizedUrl.startsWith('mailto:')
+  ) {
+    return true;
+  }
+
+  // 任何显式协议（如 javascript:, data:, vbscript:, file:）一律拒绝
+  if (/^[a-z][a-z0-9+.-]*:/i.test(lowerNormalizedUrl)) {
+    return false;
+  }
+
+  // 其余视为无协议的相对路径（如 example.com/path）
+  return true;
 }
 
 /**
@@ -61,7 +75,7 @@ function parseInline(text) {
     if (!isSafeUrl(url)) {
       return `<span class="md-image-unsafe" title="不安全的图片链接已禁用">[图片]</span>`;
     }
-    const safeUrl = url.replace(/"/g, '&quot;');
+    const safeUrl = url.trim().replace(/"/g, '&quot;');
     return `<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" class="md-image">`;
   });
   
@@ -71,7 +85,7 @@ function parseInline(text) {
     if (!isSafeUrl(url)) {
       return `<span class="md-link-unsafe" title="不安全的链接已禁用">${linkText}</span>`;
     }
-    const safeUrl = url.replace(/"/g, '&quot;');
+    const safeUrl = url.trim().replace(/"/g, '&quot;');
     return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="md-link">${linkText}</a>`;
   });
   
