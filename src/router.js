@@ -25,7 +25,7 @@ import {
   getIndexStatus,
   saveIndexStatus
 } from './kv.js';
-import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parsePlayTime, parseRequestBody } from './utils.js';
+import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
 
 /**
@@ -311,40 +311,10 @@ function formatPlayTimeText(hours, partMinutes) {
 function normalizePlayTimeInput({
   playTimeHours,
   playTimePartMinutes,
-  deprecatedTotalMinutes,
-  legacyTextPlayTime,
-  hasLegacyTextPlayTimeField = false,
   fallbackTotalMinutes = 0
 }) {
   const hasHours = isFieldProvided(playTimeHours);
   const hasPartMinutes = isFieldProvided(playTimePartMinutes);
-  const hasDeprecatedTotalMinutes = isFieldProvided(deprecatedTotalMinutes);
-
-  // 兼容旧接口：仅传 playTimeMinutes（总分钟）时仍可写入
-  if (!hasHours && !hasPartMinutes && hasDeprecatedTotalMinutes) {
-    const totalMinutes = parseNonNegativeIntegerField(deprecatedTotalMinutes, '游玩时长总分钟');
-    const normalized = splitTotalPlayTimeMinutes(totalMinutes);
-    return {
-      ...normalized,
-      text: formatPlayTimeText(normalized.hours, normalized.partMinutes)
-    };
-  }
-
-  // 兼容旧接口：仅传 playTime（文本）时，使用旧解析规则兜底
-  if (!hasHours && !hasPartMinutes && !hasDeprecatedTotalMinutes && hasLegacyTextPlayTimeField) {
-    const legacyTextRaw = legacyTextPlayTime === undefined || legacyTextPlayTime === null
-      ? ''
-      : String(legacyTextPlayTime);
-    const totalMinutes = Math.max(0, parsePlayTime(legacyTextRaw));
-    const normalized = splitTotalPlayTimeMinutes(totalMinutes);
-    const normalizedText = formatPlayTimeText(normalized.hours, normalized.partMinutes);
-
-    return {
-      ...normalized,
-      text: normalizedText || legacyTextRaw.trim()
-    };
-  }
-
   const fallback = splitTotalPlayTimeMinutes(fallbackTotalMinutes);
 
   const hours = hasHours
@@ -371,14 +341,20 @@ async function handleCreateVN(request, env, auth) {
 
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
+
+  if (
+    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTime') ||
+    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTimeMinutes')
+  ) {
+    return errorResponse('仅支持 playTimeHours 和 playTimePartMinutes 字段', 400);
+  }
+
   const {
     vndbId,
     titleCn,
     personalRating,
-    playTime,
     playTimeHours,
     playTimePartMinutes,
-    playTimeMinutes,
     review,
     startDate,
     finishDate,
@@ -412,9 +388,6 @@ async function handleCreateVN(request, env, auth) {
     normalizedPlayTime = normalizePlayTimeInput({
       playTimeHours,
       playTimePartMinutes,
-      deprecatedTotalMinutes: playTimeMinutes,
-      legacyTextPlayTime: playTime,
-      hasLegacyTextPlayTimeField: playTime !== undefined,
       fallbackTotalMinutes: 0
     });
   } catch (error) {
@@ -458,13 +431,19 @@ async function handleUpdateVN(request, env, id, auth) {
 
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
+
+  if (
+    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTime') ||
+    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTimeMinutes')
+  ) {
+    return errorResponse('仅支持 playTimeHours 和 playTimePartMinutes 字段', 400);
+  }
+
   const {
     titleCn,
     personalRating,
-    playTime,
     playTimeHours,
     playTimePartMinutes,
-    playTimeMinutes,
     review,
     startDate,
     finishDate,
@@ -492,12 +471,10 @@ async function handleUpdateVN(request, env, id, auth) {
   // 更新用户数据
   const validatedRating = validateRating(personalRating);
 
-  // 更新游玩时长（新接口：小时 + 分钟；兼容旧接口总分钟）
+  // 更新游玩时长（仅支持小时 + 分钟）
   const hasPlayTimeInput =
     isFieldProvided(playTimeHours) ||
-    isFieldProvided(playTimePartMinutes) ||
-    isFieldProvided(playTimeMinutes) ||
-    playTime !== undefined;
+    isFieldProvided(playTimePartMinutes);
 
   let playTimePatch = {};
   if (hasPlayTimeInput) {
@@ -505,9 +482,6 @@ async function handleUpdateVN(request, env, id, auth) {
       const normalizedPlayTime = normalizePlayTimeInput({
         playTimeHours,
         playTimePartMinutes,
-        deprecatedTotalMinutes: playTimeMinutes,
-        legacyTextPlayTime: playTime,
-        hasLegacyTextPlayTimeField: playTime !== undefined,
         fallbackTotalMinutes: entry.user?.playTimeMinutes
       });
 

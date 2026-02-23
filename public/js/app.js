@@ -238,16 +238,12 @@ function vnShelf() {
       if (vn) {
         // 解析 tags 为文本（用于编辑）
         const userTags = vn.user?.tags || [];
-        const legacyTotalMinutes = Number(vn.user?.playTimeMinutes);
-        const safeTotalMinutes = Number.isFinite(legacyTotalMinutes) && legacyTotalMinutes >= 0
-          ? Math.floor(legacyTotalMinutes)
-          : 0;
         const playTimeHours = Number.isFinite(Number(vn.user?.playTimeHours)) && Number(vn.user?.playTimeHours) >= 0
           ? Math.floor(Number(vn.user?.playTimeHours))
-          : Math.floor(safeTotalMinutes / 60);
+          : 0;
         const playTimePartMinutes = Number.isFinite(Number(vn.user?.playTimePartMinutes)) && Number(vn.user?.playTimePartMinutes) >= 0
           ? Math.floor(Number(vn.user?.playTimePartMinutes))
-          : (safeTotalMinutes % 60);
+          : 0;
 
         this.editForm = {
           id: vn.id,
@@ -288,39 +284,33 @@ function vnShelf() {
     formatUserPlayTime(user) {
       if (!user) return '未记录';
 
-      const totalMinutes = Number(user.playTimeMinutes);
-      const hasPositiveTotalMinutes = Number.isFinite(totalMinutes) && totalMinutes > 0;
       const rawHours = Number(user.playTimeHours);
       const rawPartMinutes = Number(user.playTimePartMinutes);
       const hasHours = Number.isFinite(rawHours) && rawHours >= 0;
       const hasPartMinutes = Number.isFinite(rawPartMinutes) && rawPartMinutes >= 0;
-      const legacyText = typeof user.playTime === 'string' ? user.playTime.trim() : '';
 
-      let normalizedTotalMinutes;
-      if (hasHours || hasPartMinutes) {
-        const hours = hasHours ? Math.floor(rawHours) : 0;
-        const partMinutes = hasPartMinutes ? Math.floor(rawPartMinutes) : 0;
-        normalizedTotalMinutes = hours * 60 + partMinutes;
-      } else if (hasPositiveTotalMinutes) {
-        normalizedTotalMinutes = Math.floor(totalMinutes);
-      } else {
-        return legacyText || '未记录';
+      if (!hasHours && !hasPartMinutes) {
+        return '未记录';
       }
+
+      const inputHours = hasHours ? Math.floor(rawHours) : 0;
+      const inputPartMinutes = hasPartMinutes ? Math.floor(rawPartMinutes) : 0;
+      const normalizedTotalMinutes = inputHours * 60 + inputPartMinutes;
 
       if (normalizedTotalMinutes <= 0) {
-        return legacyText || '未记录';
+        return '未记录';
       }
 
-      const hours = Math.floor(normalizedTotalMinutes / 60);
-      const partMinutes = normalizedTotalMinutes % 60;
+      const displayHours = Math.floor(normalizedTotalMinutes / 60);
+      const displayPartMinutes = normalizedTotalMinutes % 60;
 
-      if (hours > 0 && partMinutes > 0) {
-        return `${hours}小时${partMinutes}分钟`;
+      if (displayHours > 0 && displayPartMinutes > 0) {
+        return `${displayHours}小时${displayPartMinutes}分钟`;
       }
-      if (hours > 0) {
-        return `${hours}小时`;
+      if (displayHours > 0) {
+        return `${displayHours}小时`;
       }
-      return `${partMinutes}分钟`;
+      return `${displayPartMinutes}分钟`;
     },
 
     normalizePlayTimeInput() {

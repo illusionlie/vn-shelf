@@ -234,7 +234,6 @@ async function downloadAndCacheTranslations(url) {
  * 2. 有缓存 → 立即返回缓存，后台检查版本并更新
  *
  * @param {string} url - 翻译文件 URL
- * @param {string|null} currentVersion - 已废弃，保留参数兼容性
  * @param {boolean} forceRefresh - 是否强制刷新
  * @returns {Promise<Object|null>} - 翻译映射对象
  */
