@@ -28,7 +28,7 @@ jobs:
 
       - name: Run lint
         id: lint
-        run: npm run lint
+        run: npx eslint "src/**/*.js" "public/js/**/*.js" --max-warnings 0
 
   wrangler-dry-run:
     name: Wrangler Deploy Dry Run
