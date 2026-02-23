@@ -238,13 +238,24 @@ function vnShelf() {
       if (vn) {
         // 解析 tags 为文本（用于编辑）
         const userTags = vn.user?.tags || [];
+        const legacyTotalMinutes = Number(vn.user?.playTimeMinutes);
+        const safeTotalMinutes = Number.isFinite(legacyTotalMinutes) && legacyTotalMinutes >= 0
+          ? Math.floor(legacyTotalMinutes)
+          : 0;
+        const playTimeHours = Number.isFinite(Number(vn.user?.playTimeHours)) && Number(vn.user?.playTimeHours) >= 0
+          ? Math.floor(Number(vn.user?.playTimeHours))
+          : Math.floor(safeTotalMinutes / 60);
+        const playTimePartMinutes = Number.isFinite(Number(vn.user?.playTimePartMinutes)) && Number(vn.user?.playTimePartMinutes) >= 0
+          ? Math.floor(Number(vn.user?.playTimePartMinutes))
+          : (safeTotalMinutes % 60);
+
         this.editForm = {
           id: vn.id,
           vndbId: vn.id,
           titleCn: vn.user?.titleCn || '',
           personalRating: vn.user?.personalRating || 0,
-          playTime: vn.user?.playTime || '',
-          playTimeMinutes: vn.user?.playTimeMinutes || 0,
+          playTimeHours,
+          playTimePartMinutes,
           review: vn.user?.review || '',
           startDate: vn.user?.startDate || '',
           finishDate: vn.user?.finishDate || '',
@@ -256,8 +267,8 @@ function vnShelf() {
           vndbId: '',
           titleCn: '',
           personalRating: 0,
-          playTime: '',
-          playTimeMinutes: 0,
+          playTimeHours: 0,
+          playTimePartMinutes: 0,
           review: '',
           startDate: '',
           finishDate: '',
@@ -274,6 +285,61 @@ function vnShelf() {
       this.editForm = {};
     },
     
+    formatUserPlayTime(user) {
+      if (!user) return '未记录';
+
+      const totalMinutes = Number(user.playTimeMinutes);
+      const hasPositiveTotalMinutes = Number.isFinite(totalMinutes) && totalMinutes > 0;
+      const rawHours = Number(user.playTimeHours);
+      const rawPartMinutes = Number(user.playTimePartMinutes);
+      const hasHours = Number.isFinite(rawHours) && rawHours >= 0;
+      const hasPartMinutes = Number.isFinite(rawPartMinutes) && rawPartMinutes >= 0;
+      const legacyText = typeof user.playTime === 'string' ? user.playTime.trim() : '';
+
+      let normalizedTotalMinutes;
+      if (hasHours || hasPartMinutes) {
+        const hours = hasHours ? Math.floor(rawHours) : 0;
+        const partMinutes = hasPartMinutes ? Math.floor(rawPartMinutes) : 0;
+        normalizedTotalMinutes = hours * 60 + partMinutes;
+      } else if (hasPositiveTotalMinutes) {
+        normalizedTotalMinutes = Math.floor(totalMinutes);
+      } else {
+        return legacyText || '未记录';
+      }
+
+      if (normalizedTotalMinutes <= 0) {
+        return legacyText || '未记录';
+      }
+
+      const hours = Math.floor(normalizedTotalMinutes / 60);
+      const partMinutes = normalizedTotalMinutes % 60;
+
+      if (hours > 0 && partMinutes > 0) {
+        return `${hours}小时${partMinutes}分钟`;
+      }
+      if (hours > 0) {
+        return `${hours}小时`;
+      }
+      return `${partMinutes}分钟`;
+    },
+
+    normalizePlayTimeInput() {
+      const rawHours = Number(this.editForm.playTimeHours);
+      const rawPartMinutes = Number(this.editForm.playTimePartMinutes);
+
+      if (!Number.isFinite(rawHours) || rawHours < 0) {
+        throw new Error('游玩时长小时必须是非负数字');
+      }
+      if (!Number.isFinite(rawPartMinutes) || rawPartMinutes < 0) {
+        throw new Error('游玩时长分钟必须是非负数字');
+      }
+
+      return {
+        playTimeHours: Math.floor(rawHours),
+        playTimePartMinutes: Math.floor(rawPartMinutes)
+      };
+    },
+
     /**
      * 解析 tags 文本为数组
      * @param {string} tagsText - 逗号分隔的 tags 文本
@@ -291,14 +357,15 @@ function vnShelf() {
       try {
         // 解析 tags
         const tags = this.parseTags(this.editForm.tags);
-        
+        const playTimeData = this.normalizePlayTimeInput();
+
         if (this.editForm.isNew) {
           await vnAPI.create({
             vndbId: this.editForm.vndbId,
             titleCn: this.editForm.titleCn,
             personalRating: this.editForm.personalRating,
-            playTime: this.editForm.playTime,
-            playTimeMinutes: this.editForm.playTimeMinutes,
+            playTimeHours: playTimeData.playTimeHours,
+            playTimePartMinutes: playTimeData.playTimePartMinutes,
             review: this.editForm.review,
             startDate: this.editForm.startDate,
             finishDate: this.editForm.finishDate,
@@ -309,8 +376,8 @@ function vnShelf() {
           await vnAPI.update(this.editForm.id, {
             titleCn: this.editForm.titleCn,
             personalRating: this.editForm.personalRating,
-            playTime: this.editForm.playTime,
-            playTimeMinutes: this.editForm.playTimeMinutes,
+            playTimeHours: playTimeData.playTimeHours,
+            playTimePartMinutes: playTimeData.playTimePartMinutes,
             review: this.editForm.review,
             startDate: this.editForm.startDate,
             finishDate: this.editForm.finishDate,

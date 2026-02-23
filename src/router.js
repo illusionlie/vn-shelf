@@ -270,6 +270,100 @@ async function handleGetVN(request, env, id) {
   return jsonResponse(entry);
 }
 
+function isFieldProvided(value) {
+  return value !== undefined && value !== null && value !== '';
+}
+
+function parseNonNegativeIntegerField(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${fieldName}必须是非负数字`);
+  }
+  return Math.floor(parsed);
+}
+
+function splitTotalPlayTimeMinutes(totalMinutes) {
+  const safeTotal = Number(totalMinutes);
+  const normalizedTotal = Number.isFinite(safeTotal) && safeTotal >= 0
+    ? Math.floor(safeTotal)
+    : 0;
+
+  return {
+    totalMinutes: normalizedTotal,
+    hours: Math.floor(normalizedTotal / 60),
+    partMinutes: normalizedTotal % 60
+  };
+}
+
+function formatPlayTimeText(hours, partMinutes) {
+  if (hours > 0 && partMinutes > 0) {
+    return `${hours}小时${partMinutes}分钟`;
+  }
+  if (hours > 0) {
+    return `${hours}小时`;
+  }
+  if (partMinutes > 0) {
+    return `${partMinutes}分钟`;
+  }
+  return '';
+}
+
+function normalizePlayTimeInput({
+  playTimeHours,
+  playTimePartMinutes,
+  deprecatedTotalMinutes,
+  legacyTextPlayTime,
+  hasLegacyTextPlayTimeField = false,
+  fallbackTotalMinutes = 0
+}) {
+  const hasHours = isFieldProvided(playTimeHours);
+  const hasPartMinutes = isFieldProvided(playTimePartMinutes);
+  const hasDeprecatedTotalMinutes = isFieldProvided(deprecatedTotalMinutes);
+
+  // 兼容旧接口：仅传 playTimeMinutes（总分钟）时仍可写入
+  if (!hasHours && !hasPartMinutes && hasDeprecatedTotalMinutes) {
+    const totalMinutes = parseNonNegativeIntegerField(deprecatedTotalMinutes, '游玩时长总分钟');
+    const normalized = splitTotalPlayTimeMinutes(totalMinutes);
+    return {
+      ...normalized,
+      text: formatPlayTimeText(normalized.hours, normalized.partMinutes)
+    };
+  }
+
+  // 兼容旧接口：仅传 playTime（文本）时，使用旧解析规则兜底
+  if (!hasHours && !hasPartMinutes && !hasDeprecatedTotalMinutes && hasLegacyTextPlayTimeField) {
+    const legacyTextRaw = legacyTextPlayTime === undefined || legacyTextPlayTime === null
+      ? ''
+      : String(legacyTextPlayTime);
+    const totalMinutes = Math.max(0, parsePlayTime(legacyTextRaw));
+    const normalized = splitTotalPlayTimeMinutes(totalMinutes);
+    const normalizedText = formatPlayTimeText(normalized.hours, normalized.partMinutes);
+
+    return {
+      ...normalized,
+      text: normalizedText || legacyTextRaw.trim()
+    };
+  }
+
+  const fallback = splitTotalPlayTimeMinutes(fallbackTotalMinutes);
+
+  const hours = hasHours
+    ? parseNonNegativeIntegerField(playTimeHours, '游玩时长小时')
+    : fallback.hours;
+
+  const partMinutes = hasPartMinutes
+    ? parseNonNegativeIntegerField(playTimePartMinutes, '游玩时长分钟')
+    : fallback.partMinutes;
+
+  // 允许分钟 >= 60，自动进位
+  const normalized = splitTotalPlayTimeMinutes(hours * 60 + partMinutes);
+
+  return {
+    ...normalized,
+    text: formatPlayTimeText(normalized.hours, normalized.partMinutes)
+  };
+}
+
 async function handleCreateVN(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
@@ -277,7 +371,19 @@ async function handleCreateVN(request, env, auth) {
   
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
-  const { vndbId, titleCn, personalRating, playTime, playTimeMinutes, review, startDate, finishDate, tags } = bodyResult.data;
+  const {
+    vndbId,
+    titleCn,
+    personalRating,
+    playTime,
+    playTimeHours,
+    playTimePartMinutes,
+    playTimeMinutes,
+    review,
+    startDate,
+    finishDate,
+    tags
+  } = bodyResult.data;
   
   if (!vndbId || !isValidVNDBId(vndbId)) {
     return errorResponse('无效的VNDB ID', 400);
@@ -301,16 +407,19 @@ async function handleCreateVN(request, env, auth) {
     return errorResponse(`VNDB API错误: ${error.message}`, 500);
   }
   
-  // 解析游玩时长：优先使用显式传入的 playTimeMinutes（0 应被保留）；无效值回退到文本解析
-  const explicitPlayTimeMinutes = Number(playTimeMinutes);
-  const hasValidExplicitPlayTimeMinutes =
-    playTimeMinutes !== undefined &&
-    playTimeMinutes !== null &&
-    Number.isFinite(explicitPlayTimeMinutes) &&
-    explicitPlayTimeMinutes >= 0;
-  const parsedPlayTimeMinutes = hasValidExplicitPlayTimeMinutes
-    ? explicitPlayTimeMinutes
-    : parsePlayTime(playTime);
+  let normalizedPlayTime;
+  try {
+    normalizedPlayTime = normalizePlayTimeInput({
+      playTimeHours,
+      playTimePartMinutes,
+      deprecatedTotalMinutes: playTimeMinutes,
+      legacyTextPlayTime: playTime,
+      hasLegacyTextPlayTimeField: playTime !== undefined,
+      fallbackTotalMinutes: 0
+    });
+  } catch (error) {
+    return errorResponse(error.message, 400);
+  }
   
   // 创建条目
   const entry = {
@@ -320,8 +429,10 @@ async function handleCreateVN(request, env, auth) {
     user: {
       titleCn: titleCn || vndbData.titleCn || '', // 优先使用用户输入，否则使用VNDB中文标题
       personalRating: validRating,
-      playTime: playTime || '',
-      playTimeMinutes: parsedPlayTimeMinutes,
+      playTime: normalizedPlayTime.text,
+      playTimeHours: normalizedPlayTime.hours,
+      playTimePartMinutes: normalizedPlayTime.partMinutes,
+      playTimeMinutes: normalizedPlayTime.totalMinutes,
       review: review || '',
       startDate: startDate || null,
       finishDate: finishDate || null,
@@ -347,7 +458,19 @@ async function handleUpdateVN(request, env, id, auth) {
   
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
-  const { titleCn, personalRating, playTime, playTimeMinutes, review, startDate, finishDate, tags, refreshVNDB } = bodyResult.data;
+  const {
+    titleCn,
+    personalRating,
+    playTime,
+    playTimeHours,
+    playTimePartMinutes,
+    playTimeMinutes,
+    review,
+    startDate,
+    finishDate,
+    tags,
+    refreshVNDB
+  } = bodyResult.data;
   
   // 是否刷新VNDB数据
   if (refreshVNDB) {
@@ -369,23 +492,41 @@ async function handleUpdateVN(request, env, id, auth) {
   // 更新用户数据
   const validatedRating = validateRating(personalRating);
   
-  // 解析游玩时长：如果 playTime 更新了，重新解析分钟数；显式分钟无效时回退文本解析
-  const newPlayTime = playTime !== undefined ? playTime : entry.user.playTime;
-  const explicitUpdatedPlayTimeMinutes = Number(playTimeMinutes);
-  const hasValidExplicitUpdatedPlayTimeMinutes =
-    playTimeMinutes !== undefined &&
-    playTimeMinutes !== null &&
-    Number.isFinite(explicitUpdatedPlayTimeMinutes) &&
-    explicitUpdatedPlayTimeMinutes >= 0;
-  const newPlayTimeMinutes = hasValidExplicitUpdatedPlayTimeMinutes
-    ? explicitUpdatedPlayTimeMinutes
-    : (playTime !== undefined ? parsePlayTime(playTime) : entry.user.playTimeMinutes);
-  
+  // 更新游玩时长（新接口：小时 + 分钟；兼容旧接口总分钟）
+  const hasPlayTimeInput =
+    isFieldProvided(playTimeHours) ||
+    isFieldProvided(playTimePartMinutes) ||
+    isFieldProvided(playTimeMinutes) ||
+    playTime !== undefined;
+
+  let playTimePatch = {};
+  if (hasPlayTimeInput) {
+    try {
+      const normalizedPlayTime = normalizePlayTimeInput({
+        playTimeHours,
+        playTimePartMinutes,
+        deprecatedTotalMinutes: playTimeMinutes,
+        legacyTextPlayTime: playTime,
+        hasLegacyTextPlayTimeField: playTime !== undefined,
+        fallbackTotalMinutes: entry.user?.playTimeMinutes
+      });
+
+      playTimePatch = {
+        playTime: normalizedPlayTime.text,
+        playTimeHours: normalizedPlayTime.hours,
+        playTimePartMinutes: normalizedPlayTime.partMinutes,
+        playTimeMinutes: normalizedPlayTime.totalMinutes
+      };
+    } catch (error) {
+      return errorResponse(error.message, 400);
+    }
+  }
+
   entry.user = {
+    ...(entry.user || {}),
     titleCn: titleCn !== undefined ? titleCn : entry.user.titleCn,
     personalRating: validatedRating !== undefined ? validatedRating : entry.user.personalRating,
-    playTime: newPlayTime,
-    playTimeMinutes: newPlayTimeMinutes,
+    ...playTimePatch,
     review: review !== undefined ? review : entry.user.review,
     startDate: startDate !== undefined ? startDate : entry.user.startDate,
     finishDate: finishDate !== undefined ? finishDate : entry.user.finishDate,

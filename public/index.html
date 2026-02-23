@@ -199,7 +199,7 @@
                   </div>
                   <div class="detail-meta-item">
                     <span class="detail-meta-label">我的游玩时长</span>
-                    <span class="detail-meta-value" x-text="selectedVN.user?.playTime || '未记录'"></span>
+                    <span class="detail-meta-value" x-text="formatUserPlayTime(selectedVN.user)"></span>
                   </div>
                 </div>
               </div>
@@ -276,13 +276,25 @@
           </div>
           
           <div class="form-group">
-            <label class="form-label">游玩时长</label>
-            <input 
-              type="text" 
-              class="form-input" 
-              x-model="editForm.playTime"
-              placeholder="例如: 25小时"
-            >
+            <label class="form-label">游玩时长（小时 / 分钟）</label>
+            <div style="display:flex; gap:10px;">
+              <input
+                type="number"
+                class="form-input"
+                x-model.number="editForm.playTimeHours"
+                min="0"
+                step="1"
+                placeholder="小时"
+              >
+              <input
+                type="number"
+                class="form-input"
+                x-model.number="editForm.playTimePartMinutes"
+                min="0"
+                step="1"
+                placeholder="分钟"
+              >
+            </div>
           </div>
           
           <div class="form-group">
