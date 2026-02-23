@@ -2,7 +2,6 @@
  * VN Shelf - Cloudflare Worker入口
  */
 
-import { handleRequest } from './router.js';
 import {
   getVNEntry,
   saveVNEntry,
@@ -11,6 +10,7 @@ import {
   recordIndexItemResult,
   reconcileIndexStatusFromItems
 } from './kv.js';
+import { handleRequest } from './router.js';
 import { fetchVNDB } from './vndb.js';
 
 const INDEX_RECONCILE_INTERVAL_MS = 5000;
@@ -23,7 +23,7 @@ export default {
     try {
       // 先尝试从 Assets 获取静态资源
       const url = new URL(request.url);
-      
+
       // 对于页面路由，尝试从 Assets 获取
       if (!url.pathname.startsWith('/api/')) {
         try {
@@ -36,7 +36,7 @@ export default {
           // Assets 未找到，继续处理 API 路由
         }
       }
-      
+
       // 处理 API 路由
       return await handleRequest(request, env, ctx);
     } catch (error) {

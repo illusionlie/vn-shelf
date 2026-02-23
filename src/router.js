@@ -2,30 +2,30 @@
  * 路由模块
  */
 
-import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parsePlayTime, parseRequestBody } from './utils.js';
-import { 
-  getVNList, 
-  getVNEntry, 
-  saveVNEntry, 
-  deleteVNEntry, 
-  addEntryToList, 
-  removeEntryFromList,
-  getSettings, 
-  saveSettings, 
-  exportData, 
-  importData,
-  getIndexStatus,
-  saveIndexStatus
-} from './kv.js';
-import { 
-  authMiddleware, 
-  createJWT, 
-  setAuthCookie, 
-  clearAuthCookie, 
+import {
+  authMiddleware,
+  createJWT,
+  setAuthCookie,
+  clearAuthCookie,
   verifyAdminPassword,
   initAdminPassword,
   isInitialized
 } from './auth.js';
+import {
+  getVNList,
+  getVNEntry,
+  saveVNEntry,
+  deleteVNEntry,
+  addEntryToList,
+  removeEntryFromList,
+  getSettings,
+  saveSettings,
+  exportData,
+  importData,
+  getIndexStatus,
+  saveIndexStatus
+} from './kv.js';
+import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parsePlayTime, parseRequestBody } from './utils.js';
 import { fetchVNDB, createVNDBClient } from './vndb.js';
 
 /**
@@ -66,19 +66,19 @@ async function handleAPI(request, env, path, method) {
   if (path === '/api/auth/status' && method === 'GET') {
     return handleAuthStatus(request, env);
   }
-  
+
   if (path === '/api/auth/init' && method === 'POST') {
     return handleInit(request, env);
   }
-  
+
   if (path === '/api/auth/login' && method === 'POST') {
     return handleLogin(request, env);
   }
-  
+
   if (path === '/api/auth/logout' && method === 'POST') {
     return handleLogout(request, env);
   }
-  
+
   if (path === '/api/auth/verify' && method === 'GET') {
     return handleVerify(request, env);
   }
@@ -87,53 +87,53 @@ async function handleAPI(request, env, path, method) {
   if (path === '/api/vn' && method === 'GET') {
     return handleGetVNList(request, env);
   }
-  
+
   if (path.match(/^\/api\/vn\/v\d+$/) && method === 'GET') {
     const id = path.split('/').pop();
     return handleGetVN(request, env, id);
   }
-  
+
   if (path === '/api/stats' && method === 'GET') {
     return handleGetStats(request, env);
   }
 
   // 需要认证的接口
   const auth = await authMiddleware(request, env);
-  
+
   if (path === '/api/vn' && method === 'POST') {
     return handleCreateVN(request, env, auth);
   }
-  
+
   if (path.match(/^\/api\/vn\/v\d+$/) && method === 'PUT') {
     const id = path.split('/').pop();
     return handleUpdateVN(request, env, id, auth);
   }
-  
+
   if (path.match(/^\/api\/vn\/v\d+$/) && method === 'DELETE') {
     const id = path.split('/').pop();
     return handleDeleteVN(request, env, id, auth);
   }
-  
+
   if (path === '/api/index/start' && method === 'POST') {
     return handleStartIndex(request, env, auth);
   }
-  
+
   if (path === '/api/index/status' && method === 'GET') {
     return handleGetIndexStatus(request, env, auth);
   }
-  
+
   if (path === '/api/config' && method === 'GET') {
     return handleGetConfig(request, env, auth);
   }
-  
+
   if (path === '/api/config' && method === 'PUT') {
     return handleUpdateConfig(request, env, auth);
   }
-  
+
   if (path === '/api/export' && method === 'GET') {
     return handleExport(request, env, auth);
   }
-  
+
   if (path === '/api/import' && method === 'POST') {
     return handleImport(request, env, auth);
   }
@@ -146,7 +146,7 @@ async function handleAPI(request, env, path, method) {
 async function handleAuthStatus(request, env) {
   const initialized = await isInitialized(env);
   const auth = await authMiddleware(request, env);
-  
+
   return jsonResponse({
     initialized,
     authenticated: auth.authenticated
@@ -158,23 +158,23 @@ async function handleInit(request, env) {
   if (initialized) {
     return errorResponse('已经初始化', 400);
   }
-  
+
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const { password, vndbApiToken } = bodyResult.data;
-  
+
   if (!password || password.length < 6) {
     return errorResponse('密码长度至少6位', 400);
   }
-  
+
   await initAdminPassword(env, password);
-  
+
   if (vndbApiToken) {
     const settings = await getSettings(env);
     settings.vndbApiToken = vndbApiToken;
     await saveSettings(env, settings);
   }
-  
+
   return successResponse(null, '初始化成功');
 }
 
@@ -182,22 +182,22 @@ async function handleLogin(request, env) {
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const { password } = bodyResult.data;
-  
+
   if (!password) {
     return errorResponse('请输入密码', 400);
   }
-  
+
   const valid = await verifyAdminPassword(env, password);
   if (!valid) {
     return errorResponse('密码错误', 401);
   }
-  
+
   const settings = await getSettings(env);
   const token = await createJWT(settings.jwtSecret, { sub: 'admin' });
-  
+
   const response = successResponse(null, '登录成功');
   setAuthCookie(response, token, env.ENVIRONMENT === 'production');
-  
+
   return response;
 }
 
@@ -221,25 +221,25 @@ async function handleGetVNList(request, env) {
   const url = new URL(request.url);
   const sort = url.searchParams.get('sort') || 'created_desc';
   const search = url.searchParams.get('search') || '';
-  
+
   const list = await getVNList(env);
   let items = list.items;
-  
+
   // 搜索过滤
   if (search) {
     const query = search.toLowerCase();
-    items = items.filter(item => 
+    items = items.filter(item =>
       item.title.toLowerCase().includes(query) ||
       (item.titleJa && item.titleJa.toLowerCase().includes(query)) ||
       (item.titleCn && item.titleCn.toLowerCase().includes(query))
     );
   }
-  
+
   // 排序
   const [field, order] = sort.split('_');
   items.sort((a, b) => {
     let valA, valB;
-    
+
     if (field === 'created') {
       valA = new Date(a.createdAt || 0);
       valB = new Date(b.createdAt || 0);
@@ -250,10 +250,10 @@ async function handleGetVNList(request, env) {
       valA = a.rating || 0;
       valB = b.rating || 0;
     }
-    
+
     return order === 'desc' ? valB - valA : valA - valB;
   });
-  
+
   return jsonResponse({
     data: items,
     total: items.length
@@ -262,11 +262,11 @@ async function handleGetVNList(request, env) {
 
 async function handleGetVN(request, env, id) {
   const entry = await getVNEntry(env, id);
-  
+
   if (!entry) {
     return errorResponse('条目不存在', 404);
   }
-  
+
   return jsonResponse(entry);
 }
 
@@ -368,7 +368,7 @@ async function handleCreateVN(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const {
@@ -384,21 +384,21 @@ async function handleCreateVN(request, env, auth) {
     finishDate,
     tags
   } = bodyResult.data;
-  
+
   if (!vndbId || !isValidVNDBId(vndbId)) {
     return errorResponse('无效的VNDB ID', 400);
   }
-  
+
   // 验证个人评分
   const parsedRating = parseFloat(personalRating);
   const validRating = isNaN(parsedRating) ? 0 : Math.max(0, Math.min(10, parsedRating));
-  
+
   // 检查是否已存在
   const existing = await getVNEntry(env, vndbId);
   if (existing) {
     return errorResponse('该条目已存在', 400);
   }
-  
+
   // 从VNDB获取信息
   let vndbData;
   try {
@@ -406,7 +406,7 @@ async function handleCreateVN(request, env, auth) {
   } catch (error) {
     return errorResponse(`VNDB API错误: ${error.message}`, 500);
   }
-  
+
   let normalizedPlayTime;
   try {
     normalizedPlayTime = normalizePlayTimeInput({
@@ -420,7 +420,7 @@ async function handleCreateVN(request, env, auth) {
   } catch (error) {
     return errorResponse(error.message, 400);
   }
-  
+
   // 创建条目
   const entry = {
     id: vndbId,
@@ -439,10 +439,10 @@ async function handleCreateVN(request, env, auth) {
       tags: Array.isArray(tags) ? tags : [] // 用户手动 tags
     }
   };
-  
+
   await saveVNEntry(env, entry);
   await addEntryToList(env, entry);
-  
+
   return successResponse(entry, '创建成功');
 }
 
@@ -450,12 +450,12 @@ async function handleUpdateVN(request, env, id, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const entry = await getVNEntry(env, id);
   if (!entry) {
     return errorResponse('条目不存在', 404);
   }
-  
+
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const {
@@ -471,7 +471,7 @@ async function handleUpdateVN(request, env, id, auth) {
     tags,
     refreshVNDB
   } = bodyResult.data;
-  
+
   // 是否刷新VNDB数据
   if (refreshVNDB) {
     try {
@@ -480,7 +480,7 @@ async function handleUpdateVN(request, env, id, auth) {
       return errorResponse(`VNDB API错误: ${error.message}`, 500);
     }
   }
-  
+
   // 验证个人评分
   const validateRating = (rating) => {
     if (rating === undefined || rating === null) return undefined;
@@ -488,10 +488,10 @@ async function handleUpdateVN(request, env, id, auth) {
     if (isNaN(parsed)) return 0;
     return Math.max(0, Math.min(10, parsed));
   };
-  
+
   // 更新用户数据
   const validatedRating = validateRating(personalRating);
-  
+
   // 更新游玩时长（新接口：小时 + 分钟；兼容旧接口总分钟）
   const hasPlayTimeInput =
     isFieldProvided(playTimeHours) ||
@@ -532,10 +532,10 @@ async function handleUpdateVN(request, env, id, auth) {
     finishDate: finishDate !== undefined ? finishDate : entry.user.finishDate,
     tags: tags !== undefined ? (Array.isArray(tags) ? tags : []) : (entry.user.tags || [])
   };
-  
+
   await saveVNEntry(env, entry);
   await addEntryToList(env, entry); // 更新列表中的条目
-  
+
   return successResponse(entry, '更新成功');
 }
 
@@ -543,15 +543,15 @@ async function handleDeleteVN(request, env, id, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const entry = await getVNEntry(env, id);
   if (!entry) {
     return errorResponse('条目不存在', 404);
   }
-  
+
   await deleteVNEntry(env, id);
   await removeEntryFromList(env, id);
-  
+
   return successResponse(null, '删除成功');
 }
 
@@ -568,13 +568,13 @@ async function handleStartIndex(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const list = await getVNList(env);
-  
+
   if (list.items.length === 0) {
     return errorResponse('没有需要索引的条目', 400);
   }
-  
+
   // 创建索引状态
   const taskId = `idx_${Date.now()}`;
   const status = {
@@ -588,9 +588,9 @@ async function handleStartIndex(request, env, auth) {
     error: null,
     lastReconciledAt: null
   };
-  
+
   await saveIndexStatus(env, status);
-  
+
   // 发送所有ID到Queue（同一批次共享同一个 taskId）
   for (const item of list.items) {
     await env.VN_INDEX_QUEUE.send({
@@ -599,7 +599,7 @@ async function handleStartIndex(request, env, auth) {
       retryCount: 0
     });
   }
-  
+
   return successResponse({ total: list.items.length }, '索引任务已启动');
 }
 
@@ -607,7 +607,7 @@ async function handleGetIndexStatus(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const status = await getIndexStatus(env);
   return jsonResponse(status);
 }
@@ -618,9 +618,9 @@ async function handleGetConfig(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const settings = await getSettings(env);
-  
+
   // 不返回敏感信息
   return successResponse({
     hasVndbApiToken: !!settings.vndbApiToken,
@@ -637,40 +637,40 @@ async function handleUpdateConfig(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const body = bodyResult.data;
   const settings = await getSettings(env);
-  
+
   if (body.vndbApiToken !== undefined) {
     settings.vndbApiToken = body.vndbApiToken;
   }
-  
+
   if (body.newPassword) {
     if (body.newPassword.length < 6) {
       return errorResponse('密码长度至少6位', 400);
     }
     await initAdminPassword(env, body.newPassword);
   }
-  
+
   // Tags 相关配置
   if (body.tagsMode !== undefined) {
     if (['vndb', 'manual'].includes(body.tagsMode)) {
       settings.tagsMode = body.tagsMode;
     }
   }
-  
+
   if (body.translateTags !== undefined) {
     settings.translateTags = !!body.translateTags;
   }
-  
+
   if (body.translationUrl !== undefined) {
     settings.translationUrl = body.translationUrl;
   }
-  
+
   await saveSettings(env, settings);
-  
+
   return successResponse(null, '设置已更新');
 }
 
@@ -680,7 +680,7 @@ async function handleExport(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const data = await exportData(env);
   return jsonResponse(data);
 }
@@ -689,16 +689,16 @@ async function handleImport(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
   }
-  
+
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const { entries, mode } = bodyResult.data;
   const importMode = mode || 'merge';
-  
+
   if (!['merge', 'replace'].includes(importMode)) {
     return errorResponse(`无效的导入模式: ${importMode}，仅支持 merge 或 replace`, 400);
   }
-  
+
   if (!Array.isArray(entries)) {
     return errorResponse('导入数据 entries 必须是数组', 400);
   }
@@ -706,41 +706,41 @@ async function handleImport(request, env, auth) {
   if (importMode === 'merge' && entries.length === 0) {
     return errorResponse('导入数据 entries 必须为非空数组', 400);
   }
-  
+
   const seenIds = new Set();
-  
+
   // 完整预校验：先校验全部条目，再执行导入写入/删除
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const entryIndex = i + 1;
-    
+
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
       return errorResponse(`导入数据第${entryIndex}条必须是对象`, 400);
     }
-    
+
     if (!entry.id || typeof entry.id !== 'string') {
       return errorResponse(`导入数据第${entryIndex}条缺少有效 id`, 400);
     }
-    
+
     if (!isValidVNDBId(entry.id)) {
       return errorResponse(`导入数据第${entryIndex}条 id 无效: ${entry.id}`, 400);
     }
-    
+
     if (seenIds.has(entry.id)) {
       return errorResponse(`导入数据存在重复 id: ${entry.id}`, 400);
     }
     seenIds.add(entry.id);
-    
+
     if (!entry.vndb || typeof entry.vndb !== 'object' || Array.isArray(entry.vndb)) {
       return errorResponse(`导入数据第${entryIndex}条 vndb 字段必须是对象`, 400);
     }
-    
+
     if (!entry.user || typeof entry.user !== 'object' || Array.isArray(entry.user)) {
       return errorResponse(`导入数据第${entryIndex}条 user 字段必须是对象`, 400);
     }
   }
-  
+
   await importData(env, { entries }, importMode);
-  
+
   return successResponse({ count: entries.length }, '导入成功');
 }

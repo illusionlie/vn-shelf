@@ -1,7 +1,7 @@
 /**
  * VN Shelf 翻译模块
  * 负责 tags 翻译数据的加载、缓存和翻译功能
- * 
+ *
  * 加载策略：缓存优先 + 后台更新
  * 1. 有缓存时立即返回缓存（用户无感知）
  * 2. 后台检查 version.json 是否有更新
@@ -24,16 +24,16 @@ const DEFAULT_VERSION_URL = 'https://illusionlie.github.io/vndb-tags-cn/version.
 function openTranslationsDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(TRANSLATIONS_DB_NAME, 1);
-    
+
     request.onerror = () => {
       console.error('[Translations] Failed to open IndexedDB:', request.error);
       reject(request.error);
     };
-    
+
     request.onsuccess = () => {
       resolve(request.result);
     };
-    
+
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(TRANSLATIONS_STORE)) {
@@ -54,16 +54,16 @@ async function getFromIndexedDB() {
       const transaction = db.transaction(TRANSLATIONS_STORE, 'readonly');
       const store = transaction.objectStore(TRANSLATIONS_STORE);
       const request = store.get(TRANSLATIONS_KEY);
-      
+
       request.onerror = () => {
         console.error('[Translations] Failed to read from IndexedDB:', request.error);
         reject(request.error);
       };
-      
+
       request.onsuccess = () => {
         resolve(request.result?.value || null);
       };
-      
+
       transaction.oncomplete = () => {
         db.close();
       };
@@ -89,16 +89,16 @@ async function saveToIndexedDB(data) {
         key: TRANSLATIONS_KEY,
         value: data
       });
-      
+
       request.onerror = () => {
         console.error('[Translations] Failed to save to IndexedDB:', request.error);
         reject(request.error);
       };
-      
+
       request.onsuccess = () => {
         resolve(true);
       };
-      
+
       transaction.oncomplete = () => {
         db.close();
       };
@@ -120,16 +120,16 @@ async function clearTranslationsCache() {
       const transaction = db.transaction(TRANSLATIONS_STORE, 'readwrite');
       const store = transaction.objectStore(TRANSLATIONS_STORE);
       const request = store.delete(TRANSLATIONS_KEY);
-      
+
       request.onerror = () => {
         console.error('[Translations] Failed to clear IndexedDB:', request.error);
         reject(request.error);
       };
-      
+
       request.onsuccess = () => {
         resolve(true);
       };
-      
+
       transaction.oncomplete = () => {
         db.close();
       };
@@ -150,13 +150,13 @@ async function clearTranslationsCache() {
 async function fetchRemoteVersion(versionUrl) {
   try {
     const response = await fetch(versionUrl, { cache: 'no-store' }); // 禁用缓存，确保获取最新版本
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
+
     return {
       version: data.version || 'unknown',
       updatedAt: data.updatedAt || new Date().toISOString()
@@ -194,21 +194,21 @@ function deriveVersionUrl(translationUrl) {
  */
 async function downloadAndCacheTranslations(url) {
   console.log('[Translations] Downloading translations from:', url);
-  
+
   try {
     const response = await fetch(url, { cache: 'no-store' });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
+
     // 验证数据格式
     if (!data.translations || typeof data.translations !== 'object') {
       throw new Error('Invalid translation data format: missing translations object');
     }
-    
+
     // 存入 IndexedDB
     const cacheData = {
       version: data.version || 'unknown',
@@ -216,10 +216,10 @@ async function downloadAndCacheTranslations(url) {
       translations: data.translations,
       sourceUrl: url
     };
-    
+
     await saveToIndexedDB(cacheData);
     console.log('[Translations] Cached translations successfully, version:', cacheData.version);
-    
+
     return data.translations;
   } catch (error) {
     console.error('[Translations] Failed to download translations:', error);
@@ -240,7 +240,7 @@ async function downloadAndCacheTranslations(url) {
  */
 async function initTranslations(url, currentVersion = null, forceRefresh = false) {
   const translationUrl = url || DEFAULT_TRANSLATION_URL;
-  
+
   // 强制刷新：直接下载
   if (forceRefresh) {
     const translations = await downloadAndCacheTranslations(translationUrl);
@@ -251,67 +251,67 @@ async function initTranslations(url, currentVersion = null, forceRefresh = false
     const cached = await getFromIndexedDB();
     return cached?.translations || null;
   }
-  
+
   // 检查 IndexedDB 缓存
   const cached = await getFromIndexedDB();
-  
+
   // 无缓存：直接下载
   if (!cached) {
     console.log('[Translations] No cache found, downloading...');
     const translations = await downloadAndCacheTranslations(translationUrl);
     return translations;
   }
-  
+
   // 缓存的 URL 不匹配：直接下载
   if (cached.sourceUrl !== translationUrl) {
     console.log('[Translations] URL changed, downloading new translations...');
     const translations = await downloadAndCacheTranslations(translationUrl);
     return translations;
   }
-  
+
   // 有缓存：立即返回缓存，后台检查更新
   console.log('[Translations] Using cached version:', cached.version);
-  
+
   // 后台检查版本更新（不阻塞返回）
   checkForUpdatesInBackground(translationUrl, cached.version);
-  
+
   return cached.translations;
 }
 
 /**
  * 后台检查翻译更新
  * 如果有新版本，自动下载并更新缓存
- * 
+ *
  * @param {string} translationUrl - 翻译文件 URL
  * @param {string} currentVersion - 当前缓存版本
  */
 async function checkForUpdatesInBackground(translationUrl, currentVersion) {
   const versionUrl = deriveVersionUrl(translationUrl);
-  
+
   try {
     console.log('[Translations] Background check: fetching version.json...');
     const remoteVersion = await fetchRemoteVersion(versionUrl);
-    
+
     if (!remoteVersion) {
       console.log('[Translations] Background check: cannot fetch version');
       return;
     }
-    
+
     // 比较版本
     if (remoteVersion.version === currentVersion) {
       console.log('[Translations] Background check: version up-to-date');
       return;
     }
-    
+
     // 版本不同，下载新数据
     console.log('[Translations] Background check: new version available:', currentVersion, '→', remoteVersion.version);
     const translations = await downloadAndCacheTranslations(translationUrl);
-    
+
     if (translations) {
       console.log('[Translations] Background check: cache updated successfully');
       // 触发自定义事件，通知应用翻译已更新
-      window.dispatchEvent(new CustomEvent('translations-updated', { 
-        detail: { version: remoteVersion.version } 
+      window.dispatchEvent(new CustomEvent('translations-updated', {
+        detail: { version: remoteVersion.version }
       }));
     }
   } catch (error) {
@@ -350,7 +350,7 @@ function translateTags(tags, translations) {
 async function getTranslationsCacheStatus() {
   const cached = await getFromIndexedDB();
   if (!cached) return null;
-  
+
   return {
     version: cached.version,
     updatedAt: cached.updatedAt,

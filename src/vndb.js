@@ -49,7 +49,7 @@ export class VNDBClient {
   async getVN(id) {
     // 移除v前缀获取数字ID
     const numericId = id.replace(/^v/, '');
-    
+
     const result = await this.request('/vn', {
       filters: ['id', '=', 'v' + numericId],
       fields: 'title, titles.lang, titles.title, titles.main, titles.official, image.url, image.sexual, image.violence, rating, length_minutes, developers.name, tags.id, tags.name, tags.rating, tags.category, tags.spoiler',
@@ -60,13 +60,13 @@ export class VNDBClient {
       throw new Error(`未找到视觉小说: ${id}`);
     }
     const vn = result.results[0];
-    
+
     // 提取各种语言的标题
     const titles = this.extractTitles(vn.titles || []);
-    
+
     // 检查是否有 "No Sexual Content" 标签 (g235)
     const hasAllAgeTag = (vn.tags || []).some(t => t.id === 'g235');
-    
+
     // 转换为我们的数据格式
     return {
       title: vn.title || '', // 英文标题（VNDB主标题）
@@ -86,7 +86,7 @@ export class VNDBClient {
       allAge: hasAllAgeTag // 标记为全年龄作品
     };
   }
- 
+
   /**
    * 从标题列表中提取各种语言的标题
    * @param {Array} titles - 标题数组
@@ -97,30 +97,30 @@ export class VNDBClient {
       chinese: { official: null, fan: null },
       japanese: null
     };
-    
+
     // 优先简体中文，其次繁体中文
     const chineseLangs = ['zh-Hans', 'zh-Hant', 'zh'];
-    
+
     for (const lang of chineseLangs) {
       // 查找官方中文标题
       const officialTitle = titles.find(t => t.lang === lang && t.official);
       if (officialTitle && !result.chinese.official) {
         result.chinese.official = officialTitle.title;
       }
-      
+
       // 查找非官方中文标题（汉化组）
       const fanTitle = titles.find(t => t.lang === lang && !t.official);
       if (fanTitle && !result.chinese.fan) {
         result.chinese.fan = fanTitle.title;
       }
     }
-    
+
     // 提取日文标题
     const japaneseTitle = titles.find(t => t.lang === 'ja');
     if (japaneseTitle) {
       result.japanese = japaneseTitle.title;
     }
-    
+
     return result;
   }
 
@@ -131,7 +131,7 @@ export class VNDBClient {
    */
   async getVNBatch(ids) {
     const results = [];
-    
+
     for (const id of ids) {
       try {
         const vn = await this.getVN(id);
@@ -140,7 +140,7 @@ export class VNDBClient {
         results.push({ id, success: false, error: error.message });
       }
     }
-    
+
     return results;
   }
 
@@ -177,10 +177,10 @@ function formatLengthFromMinutes(minutes) {
   if (!minutes || minutes <= 0) {
     return '未知';
   }
-  
+
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  
+
   if (hours === 0) {
     return `${mins}分钟`;
   } else if (mins === 0) {
@@ -197,11 +197,11 @@ function formatLengthFromMinutes(minutes) {
  */
 export async function createVNDBClient(env) {
   const settings = await getSettings(env);
-  
+
   if (!settings.vndbApiToken) {
     throw new Error('VNDB API Token未配置');
   }
-  
+
   return new VNDBClient(settings.vndbApiToken);
 }
 
@@ -214,7 +214,7 @@ export async function createVNDBClient(env) {
  */
 export async function fetchVNDB(id, env, maxRetries = 3) {
   const client = await createVNDBClient(env);
-  
+
   let lastError;
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -227,6 +227,6 @@ export async function fetchVNDB(id, env, maxRetries = 3) {
       }
     }
   }
-  
+
   throw lastError;
 }

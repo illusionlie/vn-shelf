@@ -19,7 +19,7 @@ function initProgressBar() {
   const progressBar = document.querySelector('.loading-progress-bar');
   const progressFill = progressBar?.querySelector('.progress-fill');
   if (!progressFill) return;
-  
+
   let progress = 0;
   const interval = setInterval(() => {
     progress += Math.random() * 15;
@@ -29,7 +29,7 @@ function initProgressBar() {
     }
     progressFill.style.width = progress + '%';
   }, 200);
-  
+
   // 页面加载完成时
   window.addEventListener('load', () => {
     clearInterval(interval);
@@ -91,18 +91,18 @@ document.addEventListener('alpine:init', () => {
         this.isAdmin = res.success;
       } catch { this.isAdmin = false; }
     },
-    
+
     addToast(message, type = 'success') {
       const id = Date.now();
       this.toasts.push({ id, message, type });
       setTimeout(() => this.removeToast(id), 3000);
     },
-    
+
     removeToast(id) {
       this.toasts = this.toasts.filter(t => t.id !== id);
     }
   });
-  
+
   // 注册 Alpine 组件
   Alpine.data('vnShelf', vnShelf);
   Alpine.data('loginPage', loginPage);
@@ -126,13 +126,13 @@ function vnShelf() {
     // 翻译相关状态
     config: null,
     translations: null,
-    
+
     async init() {
       await this.loadConfig();
       await this.initTranslations();
       await this.loadVNList();
     },
-    
+
     async loadConfig() {
       try {
         const res = await configAPI.get();
@@ -150,7 +150,7 @@ function vnShelf() {
         };
       }
     },
-    
+
     async initTranslations() {
       // 只在 vndb 模式且启用翻译时加载翻译数据
       if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
@@ -163,7 +163,7 @@ function vnShelf() {
         }
       }
     },
-    
+
     /**
      * 获取要显示的 tags
      * @param {Object} vn - VN 条目
@@ -171,24 +171,24 @@ function vnShelf() {
      */
     getDisplayTags(vn) {
       if (!vn) return [];
-      
+
       // 手动模式：优先使用用户 tags
       if (this.config.tagsMode === 'manual') {
         return vn.user?.tags || [];
       }
-      
+
       // VNDB 模式
       const vndbTags = vn.vndb?.tags || [];
-      
+
       // 如果启用翻译且有翻译数据，翻译 tags
       if (this.config.translateTags && this.translations) {
         return translateTags(vndbTags, this.translations);
       }
-      
+
       // 否则返回原始英文 tags
       return vndbTags;
     },
-    
+
     async loadVNList() {
       this.isLoading = true;
       try {
@@ -201,24 +201,24 @@ function vnShelf() {
         this.isLoading = false;
       }
     },
-    
+
     handleSearch() {
       if (!this.searchQuery) {
         this.filteredList = this.vnList;
         return;
       }
-      
+
       const query = this.searchQuery.toLowerCase();
-      this.filteredList = this.vnList.filter(vn => 
+      this.filteredList = this.vnList.filter(vn =>
         vn.title.toLowerCase().includes(query) ||
         (vn.titleCn && vn.titleCn.toLowerCase().includes(query))
       );
     },
-    
+
     handleSortChange() {
       this.loadVNList();
     },
-    
+
     async openDetail(vn) {
       try {
         const res = await vnAPI.get(vn.id);
@@ -228,12 +228,12 @@ function vnShelf() {
         this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
       }
     },
-    
+
     closeDetail() {
       this.showDetail = false;
       this.selectedVN = null;
     },
-    
+
     openEdit(vn = null) {
       if (vn) {
         // 解析 tags 为文本（用于编辑）
@@ -279,12 +279,12 @@ function vnShelf() {
       this.showEdit = true;
       this.showDetail = false;
     },
-    
+
     closeEdit() {
       this.showEdit = false;
       this.editForm = {};
     },
-    
+
     formatUserPlayTime(user) {
       if (!user) return '未记录';
 
@@ -352,7 +352,7 @@ function vnShelf() {
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
     },
-    
+
     async saveEdit() {
       try {
         // 解析 tags
@@ -391,10 +391,10 @@ function vnShelf() {
         this.$store.app.addToast('保存失败: ' + error.message, 'error');
       }
     },
-    
+
     async deleteVN() {
       if (!confirm('确定要删除这个条目吗？')) return;
-      
+
       try {
         await vnAPI.delete(this.selectedVN.id);
         this.$store.app.addToast('删除成功');
@@ -404,7 +404,7 @@ function vnShelf() {
         this.$store.app.addToast('删除失败: ' + error.message, 'error');
       }
     },
-    
+
     renderMarkdown
   };
 }
@@ -418,7 +418,7 @@ function loginPage() {
     vndbApiToken: '',
     error: '',
     isLoading: false,
-    
+
     async init() {
       try {
         // 这里只检查初始化
@@ -433,22 +433,22 @@ function loginPage() {
         this.isInitialized = false;
       }
     },
-    
+
     async handleSubmit() {
       if (!this.password) {
         this.error = '请输入密码';
         return;
       }
-      
+
       this.isLoading = true;
       this.error = '';
-      
+
       try {
         if (!this.isInitialized) {
           // 初始化
           await authAPI.init(this.password, this.vndbApiToken);
         }
-        
+
         // 登录
         await authAPI.login(this.password);
         window.location.href = '/';
@@ -476,13 +476,13 @@ function settingsPage() {
     indexStatus: null,
     translationCacheStatus: null,
     isLoading: false,
-    
+
     async init() {
       await this.loadConfig();
       await this.loadIndexStatus();
       await this.loadTranslationCacheStatus();
     },
-    
+
     async loadConfig() {
       try {
         const res = await configAPI.get();
@@ -495,7 +495,7 @@ function settingsPage() {
         this.$store.app.addToast('加载配置失败: ' + error.message, 'error');
       }
     },
-    
+
     async loadIndexStatus() {
       try {
         this.indexStatus = await indexAPI.getStatus();
@@ -503,10 +503,10 @@ function settingsPage() {
         this.indexStatus = null;
       }
     },
-    
+
     async saveVndbToken() {
       if (!this.vndbApiToken) return;
-      
+
       this.isLoading = true;
       try {
         await configAPI.update({ vndbApiToken: this.vndbApiToken });
@@ -519,18 +519,18 @@ function settingsPage() {
         this.isLoading = false;
       }
     },
-    
+
     async changePassword() {
       if (!this.newPassword || this.newPassword.length < 6) {
         this.$store.app.addToast('密码长度至少6位', 'error');
         return;
       }
-      
+
       if (this.newPassword !== this.confirmPassword) {
         this.$store.app.addToast('两次输入的密码不一致', 'error');
         return;
       }
-      
+
       this.isLoading = true;
       try {
         await configAPI.update({ newPassword: this.newPassword });
@@ -543,7 +543,7 @@ function settingsPage() {
         this.isLoading = false;
       }
     },
-    
+
     async startIndex() {
       this.isLoading = true;
       try {
@@ -556,7 +556,7 @@ function settingsPage() {
         this.isLoading = false;
       }
     },
-    
+
     async exportData() {
       try {
         const data = await dataAPI.export();
@@ -572,31 +572,31 @@ function settingsPage() {
         this.$store.app.addToast('导出失败: ' + error.message, 'error');
       }
     },
-    
+
     async importData(event) {
       const file = event.target.files[0];
       if (!file) return;
-      
+
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        
+
         if (!data.entries || !Array.isArray(data.entries)) {
           throw new Error('无效的导入文件格式');
         }
-        
+
         const mode = confirm('选择导入模式：\n确定 = 合并（保留现有数据）\n取消 = 替换（清空现有数据）') ? 'merge' : 'replace';
-        
+
         await dataAPI.import(data, mode);
         this.$store.app.addToast(`导入成功，共${data.entries.length}个条目`);
       } catch (error) {
         this.$store.app.addToast('导入失败: ' + error.message, 'error');
       }
-      
+
       // 清空文件输入
       event.target.value = '';
     },
-    
+
     async logout() {
       try {
         await authAPI.logout();
@@ -605,7 +605,7 @@ function settingsPage() {
         this.$store.app.addToast('退出失败: ' + error.message, 'error');
       }
     },
-    
+
     formatStatus(status) {
       const map = {
         idle: '空闲',
@@ -616,7 +616,7 @@ function settingsPage() {
       };
       return map[status] || status;
     },
-    
+
     formatDate(dateStr) {
       if (!dateStr) return '未知';
       try {
@@ -630,7 +630,7 @@ function settingsPage() {
         return dateStr;
       }
     },
-    
+
     async loadTranslationCacheStatus() {
       try {
         this.translationCacheStatus = await getTranslationsCacheStatus();
@@ -638,7 +638,7 @@ function settingsPage() {
         this.translationCacheStatus = null;
       }
     },
-    
+
     async saveTagsConfig() {
       this.isLoading = true;
       try {
@@ -648,7 +648,7 @@ function settingsPage() {
           translationUrl: this.config.translationUrl
         });
         this.$store.app.addToast('Tags 设置已保存');
-        
+
         // 如果启用了翻译，预加载翻译数据
         if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
           const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
@@ -661,10 +661,10 @@ function settingsPage() {
         this.isLoading = false;
       }
     },
-    
+
     async clearTranslationCache() {
       if (!confirm('确定要清除翻译缓存吗？下次使用时需要重新下载翻译数据。')) return;
-      
+
       try {
         await clearTranslationsCache();
         this.translationCacheStatus = null;
@@ -682,11 +682,11 @@ function statsPage() {
   return {
     stats: null,
     isLoading: true,
-    
+
     async init() {
       await this.loadStats();
     },
-    
+
     async loadStats() {
       this.isLoading = true;
       try {
@@ -698,7 +698,7 @@ function statsPage() {
         this.isLoading = false;
       }
     },
-    
+
     formatMinutes(minutes) {
       if (!minutes) return '0小时';
       const hours = Math.floor(minutes / 60);
@@ -707,7 +707,7 @@ function statsPage() {
       const remainHours = hours % 24;
       return `${days}天${remainHours}小时`;
     },
-    
+
     formatRating(rating) {
       if (!rating) return '0.00';
       return rating.toFixed(2);

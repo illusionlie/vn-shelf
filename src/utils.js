@@ -47,10 +47,10 @@ export function sleep(ms) {
  */
 export function parsePlayTime(text) {
   if (!text || typeof text !== 'string') return 0;
-  
+
   const normalized = text.toLowerCase().trim();
   let totalMinutes = 0;
-  
+
   // 匹配 "X天Y小时" 或 "XdYh" 格式
   const dayHourMatch = normalized.match(/(\d+)\s*(?:天|d|days?)\s*(?:(\d+)\s*(?:小时|h|hours?))?/);
   if (dayHourMatch) {
@@ -59,7 +59,7 @@ export function parsePlayTime(text) {
     totalMinutes = days * 24 * 60 + hours * 60;
     return totalMinutes;
   }
-  
+
   // 匹配 "X小时Y分钟" 或 "XhYmin" 格式
   const hourMinMatch = normalized.match(/(\d+)\s*(?:小时|h|hours?)\s*(?:(\d+)\s*(?:分钟|min|minutes?))?/);
   if (hourMinMatch) {
@@ -68,14 +68,14 @@ export function parsePlayTime(text) {
     totalMinutes = hours * 60 + mins;
     return totalMinutes;
   }
-  
+
   // 匹配 "X分钟" 或 "Xmin" 格式
   const minMatch = normalized.match(/(\d+)\s*(?:分钟|min|minutes?)(?!\s*(?:小时|h|hours?))/);
   if (minMatch) {
     totalMinutes = parseInt(minMatch[1], 10) || 0;
     return totalMinutes;
   }
-  
+
   // 匹配 "X小时" 或 "Xh" 格式
   const hourMatch = normalized.match(/(\d+)\s*(?:小时|h|hours?)(?!\s*(?:分钟|min|minutes?))/);
   if (hourMatch) {
@@ -83,7 +83,7 @@ export function parsePlayTime(text) {
     totalMinutes = hours * 60;
     return totalMinutes;
   }
-  
+
   // 匹配 "HH:MM" 时间格式
   const timeMatch = normalized.match(/^(\d+):(\d+)$/);
   if (timeMatch) {
@@ -92,7 +92,7 @@ export function parsePlayTime(text) {
     totalMinutes = hours * 60 + mins;
     return totalMinutes;
   }
-  
+
   // 匹配纯数字（默认为小时）
   const numMatch = normalized.match(/^(\d+(?:\.\d+)?)$/);
   if (numMatch) {
@@ -100,7 +100,7 @@ export function parsePlayTime(text) {
     totalMinutes = Math.round(hours * 60);
     return totalMinutes;
   }
-  
+
   return 0;
 }
 
@@ -163,14 +163,14 @@ export function successResponse(data = null, message = '操作成功') {
 export function parseCookies(cookieString) {
   const cookies = {};
   if (!cookieString) return cookies;
-  
+
   cookieString.split(';').forEach(cookie => {
     const [name, ...rest] = cookie.trim().split('=');
     if (name && rest.length > 0) {
       cookies[name] = rest.join('=');
     }
   });
-  
+
   return cookies;
 }
 
@@ -185,7 +185,7 @@ export function formatDate(date, format = 'YYYY-MM-DD') {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  
+
   return format
     .replace('YYYY', year)
     .replace('MM', month)

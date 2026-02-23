@@ -19,18 +19,18 @@ async function apiRequest(endpoint, options = {}) {
     },
     ...options
   };
-  
+
   if (options.body && typeof options.body === 'object') {
     config.body = JSON.stringify(options.body);
   }
-  
+
   const response = await fetch(url, config);
   const data = await response.json();
-  
+
   if (!response.ok) {
     throw new Error(data.error || `HTTP ${response.status}`);
   }
-  
+
   return data;
 }
 
@@ -48,7 +48,7 @@ export const authAPI = {
       body: { password, vndbApiToken }
     });
   },
-  
+
   /**
    * 登录
    * @param {string} password - 密码
@@ -59,7 +59,7 @@ export const authAPI = {
       body: { password }
     });
   },
-  
+
   /**
    * 退出登录
    */
@@ -68,7 +68,7 @@ export const authAPI = {
       method: 'POST'
     });
   },
-  
+
   /**
    * 验证Token
    */
@@ -95,11 +95,11 @@ export const vnAPI = {
     const query = new URLSearchParams();
     if (params.sort) query.set('sort', params.sort);
     if (params.search) query.set('search', params.search);
-    
+
     const queryString = query.toString();
     return apiRequest(`/vn${queryString ? '?' + queryString : ''}`);
   },
-  
+
   /**
    * 获取单个VN详情
    * @param {string} id - VNDB ID
@@ -107,7 +107,7 @@ export const vnAPI = {
   async get(id) {
     return apiRequest(`/vn/${id}`);
   },
-  
+
   /**
    * 创建VN条目
    * @param {Object} data - 条目数据
@@ -118,7 +118,7 @@ export const vnAPI = {
       body: data
     });
   },
-  
+
   /**
    * 更新VN条目
    * @param {string} id - VNDB ID
@@ -130,7 +130,7 @@ export const vnAPI = {
       body: data
     });
   },
-  
+
   /**
    * 删除VN条目
    * @param {string} id - VNDB ID
@@ -164,7 +164,7 @@ export const indexAPI = {
       method: 'POST'
     });
   },
-  
+
   /**
    * 获取索引状态
    */
@@ -182,7 +182,7 @@ export const configAPI = {
   async get() {
     return apiRequest('/config');
   },
-  
+
   /**
    * 更新配置
    * @param {Object} data - 配置数据
@@ -204,7 +204,7 @@ export const dataAPI = {
   async export() {
     return apiRequest('/export');
   },
-  
+
   /**
    * 导入数据
    * @param {Object} data - 导入数据

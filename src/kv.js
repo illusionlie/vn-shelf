@@ -567,14 +567,14 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
 export async function exportData(env) {
   const list = await getVNList(env);
   const entries = [];
-  
+
   for (const item of list.items) {
     const entry = await getVNEntry(env, item.id);
     if (entry) {
       entries.push(entry);
     }
   }
-  
+
   return {
     version: '1.0',
     exportedAt: new Date().toISOString(),
@@ -596,12 +596,12 @@ export async function importData(env, data, mode = 'merge') {
       await deleteVNEntry(env, item.id);
     }
   }
-  
+
   // 写入新数据
   for (const entry of data.entries) {
     await saveVNEntry(env, entry);
   }
-  
+
   // 重建列表
   await rebuildVNList(env);
 }

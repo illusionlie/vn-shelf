@@ -2,8 +2,8 @@
  * 认证模块
  */
 
-import { randomString, parseCookies } from './utils.js';
 import { getSettings, saveSettings } from './kv.js';
+import { randomString, parseCookies } from './utils.js';
 
 /**
  * 创建JWT Token
@@ -16,7 +16,7 @@ export async function createJWT(secret, payload) {
     alg: 'HS256',
     typ: 'JWT'
   };
-  
+
   const now = Math.floor(Date.now() / 1000);
   const fullPayload = {
     ...payload,
@@ -24,14 +24,14 @@ export async function createJWT(secret, payload) {
     exp: now + 24 * 60 * 60, // 24小时有效期
     jti: randomString(16)
   };
-  
+
   // Base64URL编码
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(fullPayload));
-  
+
   // 签名
   const signature = await sign(`${encodedHeader}.${encodedPayload}`, secret);
-  
+
   return `${encodedHeader}.${encodedPayload}.${signature}`;
 }
 
@@ -47,24 +47,24 @@ export async function verifyJWT(token, secret) {
     if (parts.length !== 3) {
       return null;
     }
-    
+
     const [encodedHeader, encodedPayload, signature] = parts;
-    
+
     // 验证签名
     const expectedSignature = await sign(`${encodedHeader}.${encodedPayload}`, secret);
     if (signature !== expectedSignature) {
       return null;
     }
-    
+
     // 解码载荷
     const payload = JSON.parse(base64UrlDecode(encodedPayload));
-    
+
     // 验证过期时间
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {
       return null;
     }
-    
+
     return payload;
   } catch (e) {
     console.error('JWT verification error:', e);
@@ -87,13 +87,13 @@ async function sign(message, secret) {
     false,
     ['sign']
   );
-  
+
   const signature = await crypto.subtle.sign(
     'HMAC',
     key,
     encoder.encode(message)
   );
-  
+
   return base64UrlEncode(new Uint8Array(signature));
 }
 
@@ -136,7 +136,7 @@ export async function hashPassword(password, salt) {
     false,
     ['deriveBits']
   );
-  
+
   const hash = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
@@ -147,7 +147,7 @@ export async function hashPassword(password, salt) {
     keyMaterial,
     256
   );
-  
+
   return Array.from(new Uint8Array(hash))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
@@ -174,19 +174,19 @@ export async function verifyPassword(password, salt, storedHash) {
 export async function authMiddleware(request, env) {
   const cookie = request.headers.get('Cookie') || '';
   const cookies = parseCookies(cookie);
-  
+
   if (!cookies.auth_token) {
     return { authenticated: false, error: 'No token' };
   }
-  
+
   const settings = await getSettings(env);
-  
+
   try {
     const payload = await verifyJWT(cookies.auth_token, settings.jwtSecret);
     if (!payload) {
       return { authenticated: false, error: 'Invalid token' };
     }
-    
+
     return { authenticated: true, user: payload };
   } catch (e) {
     return { authenticated: false, error: 'Token verification failed' };
@@ -208,7 +208,7 @@ export function setAuthCookie(response, token, secure = true) {
     secure ? 'Secure' : '',
     `Max-Age=${24 * 60 * 60}`
   ].filter(Boolean).join('; ');
-  
+
   response.headers.set('Set-Cookie', cookieValue);
 }
 
@@ -224,7 +224,7 @@ export function clearAuthCookie(response) {
     'SameSite=Strict',
     'Max-Age=0'
   ].join('; ');
-  
+
   response.headers.set('Set-Cookie', cookieValue);
 }
 
@@ -236,11 +236,11 @@ export function clearAuthCookie(response) {
 export async function initAdminPassword(env, password) {
   const salt = randomString(16);
   const hash = await hashPassword(password, salt);
-  
+
   const settings = await getSettings(env);
   settings.adminPasswordHash = `${salt}:${hash}`;
   settings.jwtSecret = randomString(32);
-  
+
   await saveSettings(env, settings);
 }
 
@@ -252,11 +252,11 @@ export async function initAdminPassword(env, password) {
  */
 export async function verifyAdminPassword(env, password) {
   const settings = await getSettings(env);
-  
+
   if (!settings.adminPasswordHash) {
     return false;
   }
-  
+
   const [salt, hash] = settings.adminPasswordHash.split(':');
   return verifyPassword(password, salt, hash);
 }
