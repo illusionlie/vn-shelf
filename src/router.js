@@ -301,8 +301,16 @@ async function handleCreateVN(request, env, auth) {
     return errorResponse(`VNDB API错误: ${error.message}`, 500);
   }
   
-  // 解析游玩时长：优先使用显式传入的 playTimeMinutes，否则从 playTime 文本解析
-  const parsedPlayTimeMinutes = playTimeMinutes || parsePlayTime(playTime);
+  // 解析游玩时长：优先使用显式传入的 playTimeMinutes（0 应被保留）；无效值回退到文本解析
+  const explicitPlayTimeMinutes = Number(playTimeMinutes);
+  const hasValidExplicitPlayTimeMinutes =
+    playTimeMinutes !== undefined &&
+    playTimeMinutes !== null &&
+    Number.isFinite(explicitPlayTimeMinutes) &&
+    explicitPlayTimeMinutes >= 0;
+  const parsedPlayTimeMinutes = hasValidExplicitPlayTimeMinutes
+    ? explicitPlayTimeMinutes
+    : parsePlayTime(playTime);
   
   // 创建条目
   const entry = {
@@ -361,10 +369,16 @@ async function handleUpdateVN(request, env, id, auth) {
   // 更新用户数据
   const validatedRating = validateRating(personalRating);
   
-  // 解析游玩时长：如果 playTime 更新了，重新解析分钟数
+  // 解析游玩时长：如果 playTime 更新了，重新解析分钟数；显式分钟无效时回退文本解析
   const newPlayTime = playTime !== undefined ? playTime : entry.user.playTime;
-  const newPlayTimeMinutes = playTimeMinutes !== undefined
-    ? playTimeMinutes
+  const explicitUpdatedPlayTimeMinutes = Number(playTimeMinutes);
+  const hasValidExplicitUpdatedPlayTimeMinutes =
+    playTimeMinutes !== undefined &&
+    playTimeMinutes !== null &&
+    Number.isFinite(explicitUpdatedPlayTimeMinutes) &&
+    explicitUpdatedPlayTimeMinutes >= 0;
+  const newPlayTimeMinutes = hasValidExplicitUpdatedPlayTimeMinutes
+    ? explicitUpdatedPlayTimeMinutes
     : (playTime !== undefined ? parsePlayTime(playTime) : entry.user.playTimeMinutes);
   
   entry.user = {
@@ -421,23 +435,26 @@ async function handleStartIndex(request, env, auth) {
   }
   
   // 创建索引状态
+  const taskId = `idx_${Date.now()}`;
   const status = {
     status: 'running',
+    taskId,
     total: list.items.length,
     processed: 0,
     failed: [],
     startedAt: new Date().toISOString(),
     completedAt: null,
-    error: null
+    error: null,
+    lastReconciledAt: null
   };
   
   await saveIndexStatus(env, status);
   
-  // 发送所有ID到Queue
+  // 发送所有ID到Queue（同一批次共享同一个 taskId）
   for (const item of list.items) {
     await env.VN_INDEX_QUEUE.send({
       vndbId: item.id,
-      taskId: `idx_${Date.now()}`,
+      taskId,
       retryCount: 0
     });
   }
@@ -535,12 +552,54 @@ async function handleImport(request, env, auth) {
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
   const { entries, mode } = bodyResult.data;
+  const importMode = mode || 'merge';
   
-  if (!entries || !Array.isArray(entries)) {
-    return errorResponse('无效的导入数据', 400);
+  if (!['merge', 'replace'].includes(importMode)) {
+    return errorResponse(`无效的导入模式: ${importMode}，仅支持 merge 或 replace`, 400);
   }
   
-  await importData(env, { entries }, mode || 'merge');
+  if (!Array.isArray(entries)) {
+    return errorResponse('导入数据 entries 必须是数组', 400);
+  }
+
+  if (importMode === 'merge' && entries.length === 0) {
+    return errorResponse('导入数据 entries 必须为非空数组', 400);
+  }
+  
+  const seenIds = new Set();
+  
+  // 完整预校验：先校验全部条目，再执行导入写入/删除
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const entryIndex = i + 1;
+    
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return errorResponse(`导入数据第${entryIndex}条必须是对象`, 400);
+    }
+    
+    if (!entry.id || typeof entry.id !== 'string') {
+      return errorResponse(`导入数据第${entryIndex}条缺少有效 id`, 400);
+    }
+    
+    if (!isValidVNDBId(entry.id)) {
+      return errorResponse(`导入数据第${entryIndex}条 id 无效: ${entry.id}`, 400);
+    }
+    
+    if (seenIds.has(entry.id)) {
+      return errorResponse(`导入数据存在重复 id: ${entry.id}`, 400);
+    }
+    seenIds.add(entry.id);
+    
+    if (!entry.vndb || typeof entry.vndb !== 'object' || Array.isArray(entry.vndb)) {
+      return errorResponse(`导入数据第${entryIndex}条 vndb 字段必须是对象`, 400);
+    }
+    
+    if (!entry.user || typeof entry.user !== 'object' || Array.isArray(entry.user)) {
+      return errorResponse(`导入数据第${entryIndex}条 user 字段必须是对象`, 400);
+    }
+  }
+  
+  await importData(env, { entries }, importMode);
   
   return successResponse({ count: entries.length }, '导入成功');
 }
