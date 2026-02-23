@@ -3,8 +3,17 @@
  */
 
 import { handleRequest } from './router.js';
-import { getVNEntry, saveVNEntry, getIndexStatus, saveIndexStatus, rebuildVNList } from './kv.js';
+import {
+  getVNEntry,
+  saveVNEntry,
+  getIndexStatus,
+  rebuildVNList,
+  recordIndexItemResult,
+  reconcileIndexStatusFromItems
+} from './kv.js';
 import { fetchVNDB } from './vndb.js';
+
+const INDEX_RECONCILE_INTERVAL_MS = 5000;
 
 export default {
   /**
@@ -46,60 +55,138 @@ export default {
    * Queue消息处理（批量索引）
    */
   async queue(batch, env, ctx) {
+    const touchedTasks = new Map();
+
     for (const message of batch.messages) {
-      const { vndbId, taskId, retryCount = 0 } = message.body;
-      
+      const { vndbId, taskId, retryCount = 0 } = message.body || {};
+
+      if (!vndbId || !taskId) {
+        console.warn('[index][queue-item] skip invalid message body', { body: message.body });
+        message.ack();
+        continue;
+      }
+
+      const taskMeta = touchedTasks.get(taskId) || { settledCount: 0 };
+      touchedTasks.set(taskId, taskMeta);
+
       try {
         // 1. 从VNDB获取数据
         const vndbData = await fetchVNDB(vndbId, env);
-        
+
         // 2. 获取现有条目
         const entry = await getVNEntry(env, vndbId);
-        
+
         if (entry) {
           // 更新VNDB数据
           entry.vndb = vndbData;
           await saveVNEntry(env, entry);
         }
-        
-        // 3. 更新进度
-        const status = await getIndexStatus(env);
-        status.processed++;
-        await saveIndexStatus(env, status);
-        
+
+        // 3. 幂等写入单条结果（按 taskId + vndbId 唯一）
+        await recordIndexItemResult(env, {
+          taskId,
+          vndbId,
+          state: 'success',
+          retryCount
+        });
+
+        taskMeta.settledCount += 1;
+        console.log('[index][queue-item] success recorded', { taskId, vndbId, retryCount });
+
         // 4. 确认消息
         message.ack();
-        
       } catch (error) {
         console.error(`Index error for ${vndbId}:`, error);
-        
+
         if (retryCount < 3) {
           // 重试：重新发送消息，延迟60秒
           await env.VN_INDEX_QUEUE.send({
             ...message.body,
             retryCount: retryCount + 1
           }, { delaySeconds: 60 });
+          console.warn('[index][queue-item] scheduled retry', {
+            taskId,
+            vndbId,
+            retryCount: retryCount + 1
+          });
         } else {
-          // 标记失败
-          const status = await getIndexStatus(env);
-          status.failed.push(vndbId);
-          status.processed++;
-          await saveIndexStatus(env, status);
+          // 达到重试上限后才写入 failed，避免中间失败污染最终计数
+          await recordIndexItemResult(env, {
+            taskId,
+            vndbId,
+            state: 'failed',
+            retryCount,
+            error: error?.message || String(error)
+          });
+          taskMeta.settledCount += 1;
+          console.warn('[index][queue-item] failed recorded', { taskId, vndbId, retryCount });
         }
-        
+
         message.ack();
       }
     }
-    
-    // 检查是否全部完成
-    const status = await getIndexStatus(env);
-    if (status.processed >= status.total && status.status === 'running') {
-      status.status = status.failed.length > 0 ? 'partial' : 'completed';
-      status.completedAt = new Date().toISOString();
-      await saveIndexStatus(env, status);
-      
-      // 重建聚合列表
-      await rebuildVNList(env);
+
+    // 5. 基于条目结果汇总任务状态，避免并发 RMW 覆盖
+    //    增加节流，避免每个批次都全量扫描 task 结果键造成 O(n²) I/O
+    for (const [taskId, taskMeta] of touchedTasks.entries()) {
+      const before = await getIndexStatus(env);
+      if (before.taskId !== taskId || before.status !== 'running') {
+        continue;
+      }
+
+      const nowMs = Date.now();
+      const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : NaN;
+      const shouldReconcileByInterval =
+        !Number.isFinite(lastReconciledAtMs) || (nowMs - lastReconciledAtMs) >= INDEX_RECONCILE_INTERVAL_MS;
+
+      const remaining = Math.max(0, (before.total || 0) - (before.processed || 0));
+      const shouldReconcileNearCompletion = taskMeta.settledCount > 0 && remaining <= taskMeta.settledCount;
+
+      if (!shouldReconcileByInterval && !shouldReconcileNearCompletion) {
+        // 若本批次被节流，注册一次延迟汇总，确保任务在“最后一批很快结束”时仍能收敛到终态
+        if (ctx && typeof ctx.waitUntil === 'function' && Number.isFinite(lastReconciledAtMs)) {
+          const delayMs = Math.max(0, INDEX_RECONCILE_INTERVAL_MS - (nowMs - lastReconciledAtMs));
+
+          ctx.waitUntil((async () => {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+
+            const delayedBefore = await getIndexStatus(env);
+            if (delayedBefore.taskId !== taskId || delayedBefore.status !== 'running') {
+              return;
+            }
+
+            const delayedNext = await reconcileIndexStatusFromItems(env, taskId);
+
+            if (
+              delayedBefore.status === 'running' &&
+              (delayedNext.status === 'completed' || delayedNext.status === 'partial')
+            ) {
+              await rebuildVNList(env);
+            }
+          })());
+        }
+        continue;
+      }
+
+      const next = await reconcileIndexStatusFromItems(env, taskId);
+
+      console.log('[index][queue-reconcile]', {
+        taskId,
+        status: next.status,
+        processed: next.processed,
+        total: next.total,
+        failedCount: next.failed?.length || 0,
+        settledInBatch: taskMeta.settledCount
+      });
+
+      // 仅在 running -> completed/partial 的转移时触发聚合重建
+      if (
+        before.taskId === taskId &&
+        before.status === 'running' &&
+        (next.status === 'completed' || next.status === 'partial')
+      ) {
+        await rebuildVNList(env);
+      }
     }
   }
 };
