@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  wrangler-dry-run:
+    name: Wrangler Deploy Dry Run
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate wrangler.toml for CI
+        shell: bash
+        run: |
+          sed -e "s/__WORKER_NAME__/vn-shelf-ci/g" \
+            -e "s/__KV_NAMESPACE_ID__/00000000000000000000000000000000/g" \
+            wrangler.toml.example > wrangler.toml
+
+      - name: Check deploy command (dry run)
+        run: npx wrangler deploy --dry-run --config wrangler.toml
