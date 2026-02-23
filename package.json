@@ -6,12 +6,22 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "npm i & wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "lint": "eslint \"src/**/*.js\" \"public/js/**/*.js\"",
+    "lint:fix": "npm run lint -- --fix"
   },
-  "keywords": ["visual-novel", "vndb", "cloudflare-worker"],
+  "keywords": [
+    "visual-novel",
+    "vndb",
+    "cloudflare-worker"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "eslint": "^9.39.3",
+    "eslint-plugin-import": "^2.32.0",
+    "globals": "^15.15.0",
     "wrangler": "^4.0.0"
   }
 }
