@@ -26,12 +26,12 @@ import {
   saveIndexStatus
 } from './kv.js';
 import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parsePlayTime, parseRequestBody } from './utils.js';
-import { fetchVNDB, createVNDBClient } from './vndb.js';
+import { fetchVNDB } from './vndb.js';
 
 /**
  * 路由处理器
  */
-export async function handleRequest(request, env, ctx) {
+export async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
@@ -201,7 +201,7 @@ async function handleLogin(request, env) {
   return response;
 }
 
-async function handleLogout(request, env) {
+async function handleLogout() {
   const response = successResponse(null, '已退出登录');
   clearAuthCookie(response);
   return response;

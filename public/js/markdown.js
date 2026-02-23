@@ -28,6 +28,7 @@ function isSafeUrl(url) {
   if (!trimmedUrl) return false;
 
   // 去除控制字符与空白，防止 javascript:\nalert(1) 这类混淆绕过
+  // eslint-disable-next-line no-control-regex
   const normalizedForProtocol = trimmedUrl.replace(/[\u0000-\u001F\u007F\s]+/g, '');
   const lowerNormalizedUrl = normalizedForProtocol.toLowerCase();
 

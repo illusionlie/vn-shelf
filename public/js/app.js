@@ -652,7 +652,7 @@ function settingsPage() {
         // 如果启用了翻译，预加载翻译数据
         if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
           const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
-          await initTranslations(url, null, false);
+          await initTranslations(url, false);
           await this.loadTranslationCacheStatus();
         }
       } catch (error) {

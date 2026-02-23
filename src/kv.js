@@ -2,8 +2,6 @@
  * KV操作封装模块
  */
 
-import { safeJSONParse } from './utils.js';
-
 // 索引条目结果保留 14 天，避免 KV 键无限增长
 const INDEX_ITEM_RESULT_TTL_SECONDS = 14 * 24 * 60 * 60;
 

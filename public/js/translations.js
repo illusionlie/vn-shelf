@@ -238,7 +238,7 @@ async function downloadAndCacheTranslations(url) {
  * @param {boolean} forceRefresh - 是否强制刷新
  * @returns {Promise<Object|null>} - 翻译映射对象
  */
-async function initTranslations(url, currentVersion = null, forceRefresh = false) {
+async function initTranslations(url, forceRefresh = false) {
   const translationUrl = url || DEFAULT_TRANSLATION_URL;
 
   // 强制刷新：直接下载
