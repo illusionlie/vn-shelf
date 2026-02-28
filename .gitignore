@@ -11,3 +11,4 @@ wrangler.toml
 
 # 项目计划
 plans/
+.ace-tool/
