@@ -224,6 +224,45 @@ function toNonNegativeNumber(value) {
 }
 
 /**
+ * 从列表项集合重算统计快照
+ * @param {Array} items
+ * @returns {{ total: number, totalPlayTimeMinutes: number, avgRating: number, avgPersonalRating: number }}
+ */
+function buildListStats(items) {
+  const safeItems = Array.isArray(items) ? items : [];
+
+  const totals = safeItems.reduce((acc, item) => {
+    const rating = toNonNegativeNumber(item?.rating);
+    const personalRating = toNonNegativeNumber(item?.personalRating);
+    const playTimeMinutes = toNonNegativeNumber(item?.playTimeMinutes);
+
+    acc.totalPlayTimeMinutes += playTimeMinutes;
+    acc.ratingsSum += rating;
+
+    if (personalRating > 0) {
+      acc.personalRatingsCount += 1;
+      acc.personalRatingsSum += personalRating;
+    }
+
+    return acc;
+  }, {
+    totalPlayTimeMinutes: 0,
+    ratingsSum: 0,
+    personalRatingsCount: 0,
+    personalRatingsSum: 0
+  });
+
+  return {
+    total: safeItems.length,
+    totalPlayTimeMinutes: totals.totalPlayTimeMinutes,
+    avgRating: safeItems.length > 0 ? totals.ratingsSum / safeItems.length : 0,
+    avgPersonalRating: totals.personalRatingsCount > 0
+      ? totals.personalRatingsSum / totals.personalRatingsCount
+      : 0
+  };
+}
+
+/**
  * 将完整条目转换为列表项
  * 说明：playTimeMinutes 主要用于增量统计，不影响既有展示逻辑。
  * @param {Object} entry
@@ -248,36 +287,6 @@ function buildListItem(entry) {
 }
 
 /**
- * 读取列表项用于增量统计的关键字段
- * @param {Object|null} item
- * @returns {{ rating: number, personalRating: number, playTimeMinutes: number, hasPersonalRating: boolean }}
- */
-function getListItemStatsInput(item) {
-  const rating = toNonNegativeNumber(item?.rating);
-  const personalRating = toNonNegativeNumber(item?.personalRating);
-  const playTimeMinutes = toNonNegativeNumber(item?.playTimeMinutes);
-
-  return {
-    rating,
-    personalRating,
-    playTimeMinutes,
-    hasPersonalRating: personalRating > 0
-  };
-}
-
-/**
- * 统计“有个人评分”的条目数（personalRating > 0）
- * @param {Array} items
- * @returns {number}
- */
-function countPersonalRatedItems(items) {
-  if (!Array.isArray(items)) return 0;
-  return items.reduce((count, item) => {
-    return count + (toNonNegativeNumber(item?.personalRating) > 0 ? 1 : 0);
-  }, 0);
-}
-
-/**
  * 按给定 ID 快照重建 VN 列表聚合数据
  * @param {Object} env - 环境变量
  * @param {string[]} ids - 需要参与聚合的条目 ID 快照
@@ -297,39 +306,11 @@ async function rebuildVNListByIds(env, ids) {
     }
   }
 
-  // 计算统计数据（全量语义基准）
-  const totals = entries.reduce((acc, entry) => {
-    const rating = toNonNegativeNumber(entry.vndb?.rating);
-    const personalRating = toNonNegativeNumber(entry.user?.personalRating);
-    const playTimeMinutes = toNonNegativeNumber(entry.user?.playTimeMinutes);
-
-    acc.totalPlayTimeMinutes += playTimeMinutes;
-    acc.ratingsSum += rating;
-
-    if (personalRating > 0) {
-      acc.personalRatingsCount += 1;
-      acc.personalRatingsSum += personalRating;
-    }
-
-    return acc;
-  }, {
-    totalPlayTimeMinutes: 0,
-    ratingsSum: 0,
-    personalRatingsCount: 0,
-    personalRatingsSum: 0
-  });
-
   // 构建新列表
+  const items = entries.map(buildListItem);
   const newList = {
-    items: entries.map(buildListItem),
-    stats: {
-      total: entries.length,
-      totalPlayTimeMinutes: totals.totalPlayTimeMinutes,
-      avgRating: entries.length > 0 ? totals.ratingsSum / entries.length : 0,
-      avgPersonalRating: totals.personalRatingsCount > 0
-        ? totals.personalRatingsSum / totals.personalRatingsCount
-        : 0
-    },
+    items,
+    stats: buildListStats(items),
     updatedAt: new Date().toISOString()
   };
 
@@ -359,13 +340,9 @@ export async function rebuildVNList(env) {
 export async function addEntryToList(env, entry) {
   const list = await getVNList(env);
 
-  // 基于当前列表计算更新前 personalRating>0 的计数（用于增量平均值）
-  const prevPersonalRatedCount = countPersonalRatedItems(list.items);
-
   // 检查是否已存在
   const existingIndex = list.items.findIndex(item => item.id === entry.id);
   const nextItem = buildListItem(entry);
-  const previousItem = existingIndex >= 0 ? list.items[existingIndex] : null;
 
   if (existingIndex >= 0) {
     // 更新现有条目
@@ -375,14 +352,8 @@ export async function addEntryToList(env, entry) {
     list.items.push(nextItem);
   }
 
-  // 更新统计（增量，不再全量回读所有条目）
-  await updateListStats(env, list, {
-    previousItem,
-    nextItem,
-    totalDelta: existingIndex >= 0 ? 0 : 1,
-    prevPersonalRatedCount,
-    nextPersonalRatedCount: countPersonalRatedItems(list.items)
-  });
+  list.stats = buildListStats(list.items);
+  await saveVNList(env, list);
 }
 
 /**
@@ -392,103 +363,17 @@ export async function addEntryToList(env, entry) {
  */
 export async function removeEntryFromList(env, id) {
   const list = await getVNList(env);
-  const prevPersonalRatedCount = countPersonalRatedItems(list.items);
 
   const existingIndex = list.items.findIndex(item => item.id === id);
-  const previousItem = existingIndex >= 0 ? list.items[existingIndex] : null;
 
   if (existingIndex >= 0) {
     list.items.splice(existingIndex, 1);
-  }
-
-  // 删除不存在条目时 totalDelta 为 0，避免把统计减成负值
-  await updateListStats(env, list, {
-    previousItem,
-    nextItem: null,
-    totalDelta: existingIndex >= 0 ? -1 : 0,
-    prevPersonalRatedCount,
-    nextPersonalRatedCount: countPersonalRatedItems(list.items)
-  });
-}
-
-/**
- * 增量更新列表统计
- * 公式：
- * - ratingSum' = ratingSum - oldRating + newRating
- * - playTime' = playTime - oldPlayTime + newPlayTime
- * - personalSum' = personalSum - oldPersonal(>0) + newPersonal(>0)
- * 再由 sum / count 还原平均值；count 对 avgPersonalRating 仅统计 personalRating > 0。
- *
- * 一致性假设：list.items 与 list.stats 来自同一基线。
- * 若检测到基线异常（如旧数据缺少 playTimeMinutes 或 total 不一致），
- * 自动回退到全量 rebuildVNList() 进行兜底校正。
- *
- * @param {Object} env - 环境变量
- * @param {Object} list - 列表对象
- * @param {Object} delta - 统计增量上下文
- */
-async function updateListStats(env, list, delta) {
-  const {
-    previousItem = null,
-    nextItem = null,
-    totalDelta = 0,
-    prevPersonalRatedCount = 0,
-    nextPersonalRatedCount = 0
-  } = delta || {};
-
-  list.stats = list.stats || {
-    total: 0,
-    totalPlayTimeMinutes: 0,
-    avgRating: 0,
-    avgPersonalRating: 0
-  };
-
-  const prevStats = list.stats;
-  const prevTotal = Math.max(0, toNonNegativeNumber(prevStats.total));
-  const prevTotalPlayTime = toNonNegativeNumber(prevStats.totalPlayTimeMinutes);
-  const prevAvgRating = toNonNegativeNumber(prevStats.avgRating);
-  const prevAvgPersonalRating = toNonNegativeNumber(prevStats.avgPersonalRating);
-
-  const prevInput = getListItemStatsInput(previousItem);
-  const nextInput = getListItemStatsInput(nextItem);
-
-  const expectedTotal = Math.max(0, prevTotal + totalDelta);
-  const actualTotal = Array.isArray(list.items) ? list.items.length : 0;
-  const snapshotIds = Array.isArray(list.items)
-    ? list.items.map(item => item?.id).filter(id => typeof id === 'string' && id)
-    : [];
-
-  // 基线异常（例如旧数据缺少 playTimeMinutes）时走全量重建兜底
-  // 注意：这里必须使用“当前内存快照”而非 KV 旧列表，避免新增条目丢失
-  const missingLegacyStatField = previousItem && (previousItem.playTimeMinutes === undefined || previousItem.playTimeMinutes === null);
-  if (expectedTotal !== actualTotal || missingLegacyStatField) {
-    await rebuildVNListByIds(env, snapshotIds);
+    list.stats = buildListStats(list.items);
+    await saveVNList(env, list);
     return;
   }
 
-  const prevRatingSum = prevAvgRating * prevTotal;
-  const prevPersonalSum = prevAvgPersonalRating * Math.max(0, toNonNegativeNumber(prevPersonalRatedCount));
-
-  const nextRatingSum = Math.max(0, prevRatingSum - prevInput.rating + nextInput.rating);
-  const nextTotalPlayTime = Math.max(0, prevTotalPlayTime - prevInput.playTimeMinutes + nextInput.playTimeMinutes);
-
-  const nextPersonalSum = Math.max(
-    0,
-    prevPersonalSum
-      - (prevInput.hasPersonalRating ? prevInput.personalRating : 0)
-      + (nextInput.hasPersonalRating ? nextInput.personalRating : 0)
-  );
-
-  const safePersonalRatedCount = Math.max(0, toNonNegativeNumber(nextPersonalRatedCount));
-
-  list.stats = {
-    total: actualTotal,
-    totalPlayTimeMinutes: nextTotalPlayTime,
-    avgRating: actualTotal > 0 ? nextRatingSum / actualTotal : 0,
-    avgPersonalRating: safePersonalRatedCount > 0 ? nextPersonalSum / safePersonalRatedCount : 0
-  };
-
-  await saveVNList(env, list);
+  // 删除不存在条目时保持幂等，不写回 KV
 }
 
 /**

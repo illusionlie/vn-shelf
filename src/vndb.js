@@ -125,26 +125,6 @@ export class VNDBClient {
   }
 
   /**
-   * 批量获取视觉小说信息
-   * @param {string[]} ids - VNDB ID数组
-   * @returns {Promise<Object[]>}
-   */
-  async getVNBatch(ids) {
-    const results = [];
-
-    for (const id of ids) {
-      try {
-        const vn = await this.getVN(id);
-        results.push({ id, success: true, data: vn });
-      } catch (error) {
-        results.push({ id, success: false, error: error.message });
-      }
-    }
-
-    return results;
-  }
-
-  /**
    * 搜索视觉小说
    * @param {string} query - 搜索关键词
    * @param {number} limit - 结果数量限制

@@ -13,6 +13,38 @@ import {
   DEFAULT_TRANSLATION_URL
 } from './translations.js';
 
+function formatUserPlayTime(user) {
+  if (!user) return '未记录';
+
+  const rawHours = Number(user.playTimeHours);
+  const rawPartMinutes = Number(user.playTimePartMinutes);
+  const hasHours = Number.isFinite(rawHours) && rawHours >= 0;
+  const hasPartMinutes = Number.isFinite(rawPartMinutes) && rawPartMinutes >= 0;
+
+  if (!hasHours && !hasPartMinutes) {
+    return '未记录';
+  }
+
+  const inputHours = hasHours ? Math.floor(rawHours) : 0;
+  const inputPartMinutes = hasPartMinutes ? Math.floor(rawPartMinutes) : 0;
+  const normalizedTotalMinutes = inputHours * 60 + inputPartMinutes;
+
+  if (normalizedTotalMinutes <= 0) {
+    return '未记录';
+  }
+
+  const displayHours = Math.floor(normalizedTotalMinutes / 60);
+  const displayPartMinutes = normalizedTotalMinutes % 60;
+
+  if (displayHours > 0 && displayPartMinutes > 0) {
+    return `${displayHours}小时${displayPartMinutes}分钟`;
+  }
+  if (displayHours > 0) {
+    return `${displayHours}小时`;
+  }
+  return `${displayPartMinutes}分钟`;
+}
+
 // =========== 进度条 ============
 
 function initProgressBar() {
@@ -89,7 +121,12 @@ document.addEventListener('alpine:init', () => {
       try {
         const res = await authAPI.verify();
         this.isAdmin = res.success;
-      } catch { this.isAdmin = false; }
+      } catch (error) {
+        console.warn('[app] auth verify failed', {
+          error: error?.message || String(error)
+        });
+        this.isAdmin = false;
+      }
     },
 
     addToast(message, type = 'success') {
@@ -142,7 +179,10 @@ function vnShelf() {
           translateTags: true,
           translationUrl: ''
         };
-      } catch {
+      } catch (error) {
+        console.warn('[vnShelf] load config fallback to defaults', {
+          error: error?.message || String(error)
+        });
         // 未登录时使用默认配置
         this.config = {
           tagsMode: 'vndb',
@@ -282,37 +322,7 @@ function vnShelf() {
       this.editForm = {};
     },
 
-    formatUserPlayTime(user) {
-      if (!user) return '未记录';
-
-      const rawHours = Number(user.playTimeHours);
-      const rawPartMinutes = Number(user.playTimePartMinutes);
-      const hasHours = Number.isFinite(rawHours) && rawHours >= 0;
-      const hasPartMinutes = Number.isFinite(rawPartMinutes) && rawPartMinutes >= 0;
-
-      if (!hasHours && !hasPartMinutes) {
-        return '未记录';
-      }
-
-      const inputHours = hasHours ? Math.floor(rawHours) : 0;
-      const inputPartMinutes = hasPartMinutes ? Math.floor(rawPartMinutes) : 0;
-      const normalizedTotalMinutes = inputHours * 60 + inputPartMinutes;
-
-      if (normalizedTotalMinutes <= 0) {
-        return '未记录';
-      }
-
-      const displayHours = Math.floor(normalizedTotalMinutes / 60);
-      const displayPartMinutes = normalizedTotalMinutes % 60;
-
-      if (displayHours > 0 && displayPartMinutes > 0) {
-        return `${displayHours}小时${displayPartMinutes}分钟`;
-      }
-      if (displayHours > 0) {
-        return `${displayHours}小时`;
-      }
-      return `${displayPartMinutes}分钟`;
-    },
+    formatUserPlayTime,
 
     normalizePlayTimeInput() {
       const rawHours = Number(this.editForm.playTimeHours);
@@ -490,7 +500,10 @@ function settingsPage() {
     async loadIndexStatus() {
       try {
         this.indexStatus = await indexAPI.getStatus();
-      } catch {
+      } catch (error) {
+        console.warn('[settings] load index status failed', {
+          error: error?.message || String(error)
+        });
         this.indexStatus = null;
       }
     },
@@ -610,22 +623,26 @@ function settingsPage() {
 
     formatDate(dateStr) {
       if (!dateStr) return '未知';
-      try {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-      } catch {
+      const date = new Date(dateStr);
+      if (Number.isNaN(date.getTime())) {
+        console.warn('[settings] formatDate received invalid date', { dateStr });
         return dateStr;
       }
+
+      return date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
     },
 
     async loadTranslationCacheStatus() {
       try {
         this.translationCacheStatus = await getTranslationsCacheStatus();
-      } catch {
+      } catch (error) {
+        console.warn('[settings] load translation cache status failed', {
+          error: error?.message || String(error)
+        });
         this.translationCacheStatus = null;
       }
     },
@@ -1134,37 +1151,7 @@ function tierlistPage() {
       return Array.isArray(vn?.vndb?.tags) ? vn.vndb.tags : [];
     },
 
-    formatUserPlayTime(user) {
-      if (!user) return '未记录';
-
-      const rawHours = Number(user.playTimeHours);
-      const rawPartMinutes = Number(user.playTimePartMinutes);
-      const hasHours = Number.isFinite(rawHours) && rawHours >= 0;
-      const hasPartMinutes = Number.isFinite(rawPartMinutes) && rawPartMinutes >= 0;
-
-      if (!hasHours && !hasPartMinutes) {
-        return '未记录';
-      }
-
-      const inputHours = hasHours ? Math.floor(rawHours) : 0;
-      const inputPartMinutes = hasPartMinutes ? Math.floor(rawPartMinutes) : 0;
-      const normalizedTotalMinutes = inputHours * 60 + inputPartMinutes;
-
-      if (normalizedTotalMinutes <= 0) {
-        return '未记录';
-      }
-
-      const displayHours = Math.floor(normalizedTotalMinutes / 60);
-      const displayPartMinutes = normalizedTotalMinutes % 60;
-
-      if (displayHours > 0 && displayPartMinutes > 0) {
-        return `${displayHours}小时${displayPartMinutes}分钟`;
-      }
-      if (displayHours > 0) {
-        return `${displayHours}小时`;
-      }
-      return `${displayPartMinutes}分钟`;
-    },
+    formatUserPlayTime,
 
     renderMarkdown
   };

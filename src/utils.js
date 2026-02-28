@@ -18,40 +18,6 @@ export function randomString(length = 32) {
   return result;
 }
 
-/**
- * 生成UUID
- * @returns {string}
- */
-export function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-/**
- * 延迟函数
- * @param {number} ms - 毫秒数
- * @returns {Promise<void>}
- */
-export function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * JSON安全解析
- * @param {string} str - JSON字符串
- * @param {*} defaultValue - 解析失败时的默认值
- * @returns {*}
- */
-export function safeJSONParse(str, defaultValue = null) {
-  try {
-    return str ? JSON.parse(str) : defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
 
 /**
  * 创建JSON响应
@@ -137,15 +103,15 @@ export function isValidVNDBId(id) {
 }
 
 /**
- * 安全解析请求体 JSON
+ * 解析请求体 JSON
  * @param {Request} request - Request 对象
- * @returns {Promise<{success: boolean, data?: *, error?: Response}>}
+ * @returns {Promise<*>}
+ * @throws {Error} 请求体不是合法 JSON 时抛错
  */
 export async function parseRequestBody(request) {
   try {
-    const data = await request.json();
-    return { success: true, data };
-  } catch (e) {
-    return { success: false, error: errorResponse('请求体格式错误', 400) };
+    return await request.json();
+  } catch {
+    throw new Error('请求体格式错误');
   }
 }

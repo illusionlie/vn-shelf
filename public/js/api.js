@@ -5,6 +5,20 @@
 const API_BASE = '/api';
 
 /**
+ * 构建标准化 API 错误
+ * @param {number} status
+ * @param {Object} payload
+ * @returns {Error & {status: number, code: string|null, payload: Object}}
+ */
+function createApiError(status, payload = {}) {
+  const error = new Error(payload.error || `HTTP ${status}`);
+  error.status = status;
+  error.code = payload.code || null;
+  error.payload = payload;
+  return error;
+}
+
+/**
  * 发送API请求
  * @param {string} endpoint - 端点
  * @param {Object} options - 请求选项
@@ -25,10 +39,16 @@ async function apiRequest(endpoint, options = {}) {
   }
 
   const response = await fetch(url, config);
-  const data = await response.json();
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    // 非 JSON 响应统一降级为空对象
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || `HTTP ${response.status}`);
+    throw createApiError(response.status, data);
   }
 
   return data;

@@ -13,6 +13,8 @@ import {
 import { handleRequest } from './router.js';
 import { fetchVNDB } from './vndb.js';
 
+const INDEX_MAX_RETRY = 3;
+const INDEX_RETRY_DELAY_SECONDS = 60;
 const INDEX_RECONCILE_INTERVAL_MS = 5000;
 
 export default {
@@ -32,8 +34,12 @@ export default {
           if (assetResponse.status === 200) {
             return assetResponse;
           }
-        } catch (e) {
-          // Assets 未找到，继续处理 API 路由
+        } catch (error) {
+          // 记录静态资源异常，继续尝试 API 路由
+          console.warn('[worker][assets] fetch failed, fallback to router', {
+            path: url.pathname,
+            error: error?.message || String(error)
+          });
         }
       }
 
@@ -92,42 +98,62 @@ export default {
 
         taskMeta.settledCount += 1;
         console.log('[index][queue-item] success recorded', { taskId, vndbId, retryCount });
-
-        // 4. 确认消息
         message.ack();
       } catch (error) {
         console.error(`Index error for ${vndbId}:`, error);
 
-        if (retryCount < 3) {
-          // 重试：重新发送消息，延迟60秒
-          await env.VN_INDEX_QUEUE.send({
-            ...message.body,
-            retryCount: retryCount + 1
-          }, { delaySeconds: 60 });
-          console.warn('[index][queue-item] scheduled retry', {
-            taskId,
-            vndbId,
-            retryCount: retryCount + 1
-          });
-        } else {
-          // 达到重试上限后才写入 failed，避免中间失败污染最终计数
-          await recordIndexItemResult(env, {
-            taskId,
-            vndbId,
-            state: 'failed',
-            retryCount,
-            error: error?.message || String(error)
-          });
-          taskMeta.settledCount += 1;
-          console.warn('[index][queue-item] failed recorded', { taskId, vndbId, retryCount });
-        }
+        if (retryCount < INDEX_MAX_RETRY) {
+          try {
+            // 重试：重新发送消息，延迟 60 秒
+            await env.VN_INDEX_QUEUE.send({
+              ...message.body,
+              retryCount: retryCount + 1
+            }, { delaySeconds: INDEX_RETRY_DELAY_SECONDS });
 
-        message.ack();
+            // 已成功补发重试消息，确认当前消息避免重复结算
+            message.ack();
+            console.warn('[index][queue-item] scheduled retry and acked original message', {
+              taskId,
+              vndbId,
+              retryCount: retryCount + 1
+            });
+          } catch (retryError) {
+            // 补发失败时触发当前消息重试，避免消息丢失
+            console.error('[index][queue-item] retry schedule failed, trigger original message retry', {
+              taskId,
+              vndbId,
+              retryCount: retryCount + 1,
+              error: retryError?.message || String(retryError)
+            });
+            message.retry();
+          }
+        } else {
+          try {
+            // 达到重试上限后写入失败结果
+            await recordIndexItemResult(env, {
+              taskId,
+              vndbId,
+              state: 'failed',
+              retryCount,
+              error: error?.message || String(error)
+            });
+            taskMeta.settledCount += 1;
+            console.warn('[index][queue-item] failed recorded', { taskId, vndbId, retryCount });
+            message.ack();
+          } catch (recordError) {
+            console.error('[index][queue-item] failed result record failed, trigger original message retry', {
+              taskId,
+              vndbId,
+              retryCount,
+              error: recordError?.message || String(recordError)
+            });
+            message.retry();
+          }
+        }
       }
     }
 
-    // 5. 基于条目结果汇总任务状态，避免并发 RMW 覆盖
-    //    增加节流，避免每个批次都全量扫描 task 结果键造成 O(n²) I/O
+    // 基于条目结果汇总任务状态，增加节流避免每个批次都触发全量扫描
     for (const [taskId, taskMeta] of touchedTasks.entries()) {
       const before = await getIndexStatus(env);
       if (before.taskId !== taskId || before.status !== 'running') {
@@ -135,7 +161,7 @@ export default {
       }
 
       const nowMs = Date.now();
-      const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : NaN;
+      const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : Number.NaN;
       const shouldReconcileByInterval =
         !Number.isFinite(lastReconciledAtMs) || (nowMs - lastReconciledAtMs) >= INDEX_RECONCILE_INTERVAL_MS;
 
@@ -143,7 +169,7 @@ export default {
       const shouldReconcileNearCompletion = taskMeta.settledCount > 0 && remaining <= taskMeta.settledCount;
 
       if (!shouldReconcileByInterval && !shouldReconcileNearCompletion) {
-        // 若本批次被节流，注册一次延迟汇总，确保任务在“最后一批很快结束”时仍能收敛到终态
+        // 若本批次被节流，注册一次延迟汇总，保证任务可收敛到终态
         if (ctx && typeof ctx.waitUntil === 'function' && Number.isFinite(lastReconciledAtMs)) {
           const delayMs = Math.max(0, INDEX_RECONCILE_INTERVAL_MS - (nowMs - lastReconciledAtMs));
 
@@ -165,6 +191,7 @@ export default {
             }
           })());
         }
+
         continue;
       }
 

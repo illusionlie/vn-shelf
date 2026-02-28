@@ -35,6 +35,14 @@ import { fetchVNDB } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
 
+async function parseJsonBodyOr400(request) {
+  try {
+    return await parseRequestBody(request);
+  } catch (error) {
+    throw errorResponse(error?.message || '请求体格式错误', 400);
+  }
+}
+
 /**
  * 路由处理器
  */
@@ -207,9 +215,13 @@ async function handleInit(request, env) {
     return errorResponse('已经初始化', 400);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
-  const { password, vndbApiToken } = bodyResult.data;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
+  const { password, vndbApiToken } = body;
 
   if (!password || password.length < 6) {
     return errorResponse('密码长度至少6位', 400);
@@ -227,9 +239,13 @@ async function handleInit(request, env) {
 }
 
 async function handleLogin(request, env) {
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
-  const { password } = bodyResult.data;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
+  const { password } = body;
 
   if (!password) {
     return errorResponse('请输入密码', 400);
@@ -480,12 +496,16 @@ async function handleCreateVN(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
   if (
-    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTime') ||
-    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTimeMinutes')
+    Object.prototype.hasOwnProperty.call(body, 'playTime') ||
+    Object.prototype.hasOwnProperty.call(body, 'playTimeMinutes')
   ) {
     return errorResponse('仅支持 playTimeHours 和 playTimePartMinutes 字段', 400);
   }
@@ -500,7 +520,7 @@ async function handleCreateVN(request, env, auth) {
     startDate,
     finishDate,
     tags
-  } = bodyResult.data;
+  } = body;
 
   if (!vndbId || !isValidVNDBId(vndbId)) {
     return errorResponse('无效的VNDB ID', 400);
@@ -571,12 +591,16 @@ async function handleUpdateVN(request, env, id, auth) {
     return errorResponse('条目不存在', 404);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
   if (
-    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTime') ||
-    Object.prototype.hasOwnProperty.call(bodyResult.data, 'playTimeMinutes')
+    Object.prototype.hasOwnProperty.call(body, 'playTime') ||
+    Object.prototype.hasOwnProperty.call(body, 'playTimeMinutes')
   ) {
     return errorResponse('仅支持 playTimeHours 和 playTimePartMinutes 字段', 400);
   }
@@ -591,7 +615,7 @@ async function handleUpdateVN(request, env, id, auth) {
     finishDate,
     tags,
     refreshVNDB
-  } = bodyResult.data;
+  } = body;
 
   // 是否刷新VNDB数据
   if (refreshVNDB) {
@@ -687,12 +711,16 @@ async function handleCreateTier(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
-  const name = normalizeTierName(bodyResult.data?.name);
-  const color = typeof bodyResult.data?.color === 'string'
-    ? bodyResult.data.color.trim()
+  const name = normalizeTierName(body?.name);
+  const color = typeof body?.color === 'string'
+    ? body.color.trim()
     : '#666666';
 
   if (!name) {
@@ -725,10 +753,13 @@ async function handleUpdateTier(request, env, id, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
-  const body = bodyResult.data;
   if (!isPlainObject(body)) {
     return errorResponse('请求体必须是对象', 400);
   }
@@ -791,10 +822,14 @@ async function handleUpdateTierOrder(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
-  const tierIds = bodyResult.data?.tierIds;
+  const tierIds = body?.tierIds;
   if (!Array.isArray(tierIds)) {
     return errorResponse('tierIds 必须是数组', 400);
   }
@@ -843,10 +878,13 @@ async function handleBatchUpdateVNTier(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
-  const body = bodyResult.data;
   if (!isPlainObject(body)) {
     return errorResponse('请求体必须是对象', 400);
   }
@@ -935,10 +973,13 @@ async function handleUpdateVNTier(request, env, id, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
 
-  const body = bodyResult.data;
   if (!isPlainObject(body)) {
     return errorResponse('请求体必须是对象', 400);
   }
@@ -1068,9 +1109,12 @@ async function handleUpdateConfig(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
-  const body = bodyResult.data;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
   const settings = await getSettings(env);
 
   if (body.vndbApiToken !== undefined) {
@@ -1120,9 +1164,13 @@ async function handleImport(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const bodyResult = await parseRequestBody(request);
-  if (!bodyResult.success) return bodyResult.error;
-  const { entries, tierList, mode } = bodyResult.data;
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
+  const { entries, tierList, mode } = body;
   const importMode = mode || 'merge';
 
   if (tierList !== undefined) {

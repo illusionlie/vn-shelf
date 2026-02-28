@@ -66,8 +66,10 @@ export async function verifyJWT(token, secret) {
     }
 
     return payload;
-  } catch (e) {
-    console.error('JWT verification error:', e);
+  } catch (error) {
+    console.warn('[auth] JWT verification failed', {
+      error: error?.message || String(error)
+    });
     return null;
   }
 }
@@ -181,16 +183,17 @@ export async function authMiddleware(request, env) {
 
   const settings = await getSettings(env);
 
-  try {
-    const payload = await verifyJWT(cookies.auth_token, settings.jwtSecret);
-    if (!payload) {
-      return { authenticated: false, error: 'Invalid token' };
-    }
-
-    return { authenticated: true, user: payload };
-  } catch (e) {
-    return { authenticated: false, error: 'Token verification failed' };
+  if (!settings.jwtSecret) {
+    console.warn('[auth] jwtSecret not configured');
+    return { authenticated: false, error: 'Auth not initialized' };
   }
+
+  const payload = await verifyJWT(cookies.auth_token, settings.jwtSecret);
+  if (!payload) {
+    return { authenticated: false, error: 'Invalid token' };
+  }
+
+  return { authenticated: true, user: payload };
 }
 
 /**
