@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tier List - VN Shelf</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="tierlistPage()" x-init="init()">
+  <!-- 加载进度条 -->
+  <div class="loading-progress-bar">
+    <div class="progress-fill"></div>
+  </div>
+
+  <!-- 背景-overlay -->
+  <div class="background-overlay"></div>
+
+  <!-- 头部导航 -->
+  <header class="main-header">
+    <div class="banner">
+      <a href="/" class="banner-title">VN Shelf</a>
+      <div class="header-actions">
+        <nav class="banner-nav desktop-only">
+          <a href="/">首页</a>
+          <a href="/tier" class="active">Tier List</a>
+          <a href="/stats">统计</a>
+          <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
+          <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+        </nav>
+        <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
+          <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+        <div class="mobile-nav mobile-only">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="more-menu" class="more-menu">
+            <a href="/">首页</a>
+            <a href="/tier" class="active">Tier List</a>
+            <a href="/stats">统计</a>
+            <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-bar tier-controls">
+      <div class="tier-controls-title-wrap">
+        <h1 class="page-title tier-page-title">🏆 Tier List</h1>
+      </div>
+      <template x-if="$store.app.isAdmin">
+        <button class="btn btn-primary" @click="openCreateTier()">+ 添加 Tier</button>
+      </template>
+    </div>
+  </header>
+
+  <!-- 主内容 -->
+  <main class="container tier-container">
+    <!-- 加载状态 -->
+    <template x-if="isLoading">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+      </div>
+    </template>
+
+    <template x-if="!isLoading">
+      <div class="tier-board">
+        <template x-if="tiers.length === 0">
+          <div class="empty-state">
+            <div class="empty-state-icon">🏷️</div>
+            <div class="empty-state-title">暂无 Tier</div>
+            <p class="text-muted">管理员可先创建 Tier，再拖拽 VN 封面进行分类</p>
+          </div>
+        </template>
+
+        <template x-for="tier in tiers" :key="tier.id">
+          <section class="tier-row">
+            <div class="tier-label" :style="`background:${tier.color}`">
+              <span x-text="tier.name"></span>
+            </div>
+            <div
+              class="tier-items"
+              :class="{ 'drag-over': dragOverTierId === tier.id }"
+              @dragover="onDragOver(tier.id, $event)"
+              @dragleave="onDragLeave(tier.id, $event)"
+              @drop="onDrop(tier.id, $event)"
+            >
+              <template x-for="(vn, index) in getTierItems(tier.id)" :key="vn.id">
+                <div class="tier-vn-slot">
+                  <div class="tier-drop-indicator" x-show="isDropBefore(tier.id, index)"></div>
+                  <button
+                    type="button"
+                    class="tier-vn-card"
+                    :class="{ dragging: draggedVN?.id === vn.id }"
+                    :draggable="$store.app.isAdmin"
+                    @dragstart="onDragStart(vn, $event)"
+                    @dragend="onDragEnd()"
+                    @click="openDetail(vn)"
+                    :data-vn-id="vn.id"
+                  >
+                    <img
+                      :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                      :alt="vn.titleCn || vn.titleJa || vn.title"
+                      @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                    >
+                  </button>
+                </div>
+              </template>
+
+              <div class="tier-drop-indicator tier-drop-indicator-end" x-show="isDropAtEnd(tier.id)"></div>
+
+              <template x-if="getTierItems(tier.id).length === 0">
+                <div class="tier-empty">拖拽条目到此处</div>
+              </template>
+            </div>
+
+            <template x-if="$store.app.isAdmin">
+              <div class="tier-row-actions">
+                <button class="btn btn-secondary btn-sm" @click="moveTier(tier.id, -1)">↑</button>
+                <button class="btn btn-secondary btn-sm" @click="moveTier(tier.id, 1)">↓</button>
+                <button class="btn btn-secondary btn-sm" @click="openTierEdit(tier)">编辑</button>
+                <button class="btn btn-danger btn-sm" @click="deleteTier(tier.id)">删除</button>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <template x-if="$store.app.isAdmin">
+          <section class="untiered-section">
+            <h2 class="settings-section-title">未分类</h2>
+            <div
+              class="untiered-grid"
+              :class="{ 'drag-over': dragOverTierId === '__untiered__' }"
+              @dragover="onDragOver('__untiered__', $event)"
+              @dragleave="onDragLeave('__untiered__', $event)"
+              @drop="onDropToUntiered($event)"
+            >
+              <template x-for="(vn, index) in untieredVN" :key="vn.id">
+                <div class="tier-vn-slot">
+                  <div class="tier-drop-indicator" x-show="isDropBefore(null, index)"></div>
+                  <button
+                    type="button"
+                    class="tier-vn-card"
+                    :class="{ dragging: draggedVN?.id === vn.id }"
+                    draggable="true"
+                    @dragstart="onDragStart(vn, $event)"
+                    @dragend="onDragEnd()"
+                    @click="openDetail(vn)"
+                    :data-vn-id="vn.id"
+                  >
+                    <img
+                      :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                      :alt="vn.titleCn || vn.titleJa || vn.title"
+                      @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                    >
+                  </button>
+                </div>
+              </template>
+
+              <div class="tier-drop-indicator tier-drop-indicator-end" x-show="isDropAtEnd(null)"></div>
+
+              <template x-if="untieredVN.length === 0">
+                <div class="tier-empty">暂无未分类条目</div>
+              </template>
+            </div>
+          </section>
+        </template>
+      </div>
+    </template>
+  </main>
+
+  <!-- 详情模态框（复用首页结构） -->
+  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()">
+    <div class="modal" x-show="showDetail" x-transition>
+      <template x-if="selectedVN">
+        <div>
+          <div class="modal-header">
+            <h2 class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
+            <button class="modal-close" @click="closeDetail()">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <div class="detail-header">
+              <img
+                :src="selectedVN.vndb?.image || ''"
+                :alt="selectedVN.vndb?.title"
+                class="detail-image"
+                @error="$event.target.style.display='none'"
+              >
+              <div class="detail-info">
+                <h1 class="detail-title">
+                  <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
+                  <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" title="全年龄作品">全年龄</span>
+                </h1>
+                <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>
+                <p class="detail-company" x-text="selectedVN.vndb?.developers?.join(', ') || ''" x-show="selectedVN.vndb?.developers?.length"></p>
+
+                <div class="detail-stars-group" x-show="selectedVN.vndb?.rating">
+                  <span class="detail-stars-label">VNDB评分</span>
+                  <div class="detail-stars vndb-rating">
+                    <div class="stars-container">
+                      <template x-for="i in 10" :key="i">
+                        <span class="star" :class="{ empty: i > Math.round(selectedVN.vndb?.rating || 0) }">★</span>
+                      </template>
+                    </div>
+                    <span class="detail-rating-score" x-text="selectedVN.vndb?.rating?.toFixed(1) || '-'"></span>
+                  </div>
+                </div>
+
+                <div class="detail-stars-group" x-show="selectedVN.user?.personalRating">
+                  <span class="detail-stars-label">个人评分</span>
+                  <div class="detail-stars personal-rating">
+                    <div class="stars-container">
+                      <template x-for="i in 10" :key="i">
+                        <span class="star" :class="{ empty: i > Math.round(selectedVN.user?.personalRating || 0) }">★</span>
+                      </template>
+                    </div>
+                    <span class="detail-rating-score" x-text="selectedVN.user?.personalRating?.toFixed(1) || '-' "></span>
+                  </div>
+                </div>
+
+                <div class="detail-meta">
+                  <div class="detail-meta-item">
+                    <span class="detail-meta-label">游戏时长</span>
+                    <span class="detail-meta-value" x-text="selectedVN.vndb?.length || '未知'"></span>
+                  </div>
+                  <div class="detail-meta-item">
+                    <span class="detail-meta-label">我的游玩时长</span>
+                    <span class="detail-meta-value" x-text="formatUserPlayTime(selectedVN.user)"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-tags" x-show="getDetailTags(selectedVN).length">
+              <h4 class="detail-tags-title">标签</h4>
+              <div class="detail-tags-list">
+                <template x-for="tag in getDetailTags(selectedVN).slice(0, 15)" :key="tag">
+                  <span class="detail-tag" x-text="tag"></span>
+                </template>
+              </div>
+            </div>
+
+            <div class="detail-review" x-show="selectedVN.user?.review">
+              <h3 class="detail-review-title">简评</h3>
+              <div class="detail-review-content" x-html="renderMarkdown(selectedVN.user?.review || '')"></div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Tier 编辑模态框 -->
+  <div class="modal-overlay" :class="{ active: showTierEdit }" @click.self="closeTierEdit()">
+    <div class="modal tier-edit-modal" x-show="showTierEdit" x-transition>
+      <div class="modal-header">
+        <h2 class="modal-title" x-text="editingTier ? '编辑 Tier' : '创建 Tier'"></h2>
+        <button class="modal-close" @click="closeTierEdit()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form @submit.prevent="saveTier()">
+          <div class="form-group">
+            <label class="form-label">Tier 名称</label>
+            <input
+              type="text"
+              class="form-input"
+              x-model="tierForm.name"
+              placeholder="例如：S"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tier 颜色</label>
+            <input
+              type="color"
+              class="tier-color-input"
+              x-model="tierForm.color"
+            >
+            <input
+              type="text"
+              class="form-input mt-4"
+              x-model="tierForm.color"
+              placeholder="#ff4757"
+              pattern="^#[0-9a-fA-F]{6}$"
+              required
+            >
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeTierEdit()">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="isSavingTier" x-text="isSavingTier ? '保存中...' : '保存'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast通知 -->
+  <div class="toast-container">
+    <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
+      <div class="toast" :class="'toast-' + toast.type">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+</body>
+</html>

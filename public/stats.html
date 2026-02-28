@@ -13,10 +13,10 @@
    <div class="loading-progress-bar">
     <div class="progress-fill"></div>
   </div>
-  
+
   <!-- 背景-overlay -->
   <div class="background-overlay"></div>
-  
+
   <!-- 头部导航 -->
   <header class="main-header">
     <div class="banner">
@@ -24,6 +24,7 @@
       <div class="header-actions">
         <nav class="banner-nav desktop-only">
           <a href="/">首页</a>
+          <a href="/tier">Tier List</a>
           <a href="/stats" class="active">统计</a>
           <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
           <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
@@ -51,6 +52,7 @@
           </button>
           <div id="more-menu" class="more-menu">
             <a href="/">首页</a>
+            <a href="/tier">Tier List</a>
             <a href="/stats" class="active">统计</a>
             <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
             <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
@@ -59,18 +61,18 @@
       </div>
     </div>
   </header>
-  
+
   <!-- 主内容 -->
   <main class="container">
     <h1 class="page-title">📊 游玩统计</h1>
-    
+
     <!-- 加载状态 -->
     <template x-if="isLoading">
       <div class="loading">
         <div class="loading-spinner"></div>
       </div>
     </template>
-    
+
     <!-- 统计卡片 -->
     <template x-if="!isLoading && stats">
       <div>
@@ -79,23 +81,23 @@
             <div class="stat-value" x-text="stats.total || 0"></div>
             <div class="stat-label">总条目数</div>
           </div>
-          
+
           <div class="stat-card">
             <div class="stat-value" x-text="formatMinutes(stats.totalPlayTimeMinutes)"></div>
             <div class="stat-label">总游玩时长</div>
           </div>
-          
+
           <div class="stat-card">
             <div class="stat-value" x-text="formatRating(stats.avgRating)"></div>
             <div class="stat-label">平均VNDB评分</div>
           </div>
-          
+
           <div class="stat-card">
             <div class="stat-value" x-text="formatRating(stats.avgPersonalRating)"></div>
             <div class="stat-label">平均个人评分</div>
           </div>
         </div>
-        
+
         <div class="settings-section">
           <h2 class="settings-section-title">关于统计</h2>
           <p class="text-muted">
@@ -105,7 +107,7 @@
         </div>
       </div>
     </template>
-    
+
     <!-- 空状态 -->
     <template x-if="!isLoading && !stats">
       <div class="empty-state">
@@ -115,7 +117,7 @@
       </div>
     </template>
   </main>
-  
+
   <!-- Toast通知 -->
   <div class="toast-container">
     <template x-for="toast in $store.app?.toasts || []" :key="toast.id">

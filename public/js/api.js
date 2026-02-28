@@ -95,6 +95,7 @@ export const vnAPI = {
     const query = new URLSearchParams();
     if (params.sort) query.set('sort', params.sort);
     if (params.search) query.set('search', params.search);
+    if (params.untiered) query.set('untiered', 'true');
 
     const queryString = query.toString();
     return apiRequest(`/vn${queryString ? '?' + queryString : ''}`);
@@ -138,6 +139,90 @@ export const vnAPI = {
   async delete(id) {
     return apiRequest(`/vn/${id}`, {
       method: 'DELETE'
+    });
+  },
+
+  /**
+   * 更新 VN 的 Tier 归属
+   * @param {string} id - VNDB ID
+   * @param {string|null} tierId - Tier ID，null 表示移除分类
+   * @param {number|undefined} tierSort - Tier 内排序值（从 0 开始）
+   */
+  async updateTier(id, tierId, tierSort = undefined) {
+    const body = { tierId };
+    if (tierSort !== undefined) {
+      body.tierSort = tierSort;
+    }
+
+    return apiRequest(`/vn/${id}/tier`, {
+      method: 'PUT',
+      body
+    });
+  },
+
+  /**
+   * 批量更新 VN 的 Tier 归属
+   * @param {{id: string, tierId: string|null, tierSort?: number}[]} updates
+   */
+  async batchUpdateTier(updates) {
+    return apiRequest('/vn/tier/batch', {
+      method: 'PUT',
+      body: { updates }
+    });
+  }
+};
+
+// ============ Tier API ============
+
+export const tierAPI = {
+  /**
+   * 获取 Tier 列表
+   */
+  async getList() {
+    return apiRequest('/tier');
+  },
+
+  /**
+   * 创建 Tier
+   * @param {{name: string, color: string}} data
+   */
+  async create(data) {
+    return apiRequest('/tier', {
+      method: 'POST',
+      body: data
+    });
+  },
+
+  /**
+   * 更新 Tier
+   * @param {string} id - Tier ID
+   * @param {{name?: string, color?: string}} data
+   */
+  async update(id, data) {
+    return apiRequest(`/tier/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: data
+    });
+  },
+
+  /**
+   * 删除 Tier
+   * @param {string} id - Tier ID
+   */
+  async delete(id) {
+    return apiRequest(`/tier/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    });
+  },
+
+  /**
+   * 更新 Tier 排序
+   * @param {string[]} tierIds - 排序后的 Tier ID 数组
+   */
+  async updateOrder(tierIds) {
+    return apiRequest('/tier/order', {
+      method: 'PUT',
+      body: { tierIds }
     });
   }
 };
@@ -213,7 +298,11 @@ export const dataAPI = {
   async import(data, mode = 'merge') {
     return apiRequest('/import', {
       method: 'POST',
-      body: { entries: data.entries, mode }
+      body: {
+        entries: data.entries,
+        tierList: data.tierList,
+        mode
+      }
     });
   }
 };

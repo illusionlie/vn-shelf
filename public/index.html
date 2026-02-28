@@ -26,6 +26,7 @@
       <div class="header-actions">
         <nav class="banner-nav desktop-only">
           <a href="/" class="active">首页</a>
+          <a href="/tier">Tier List</a>
           <a href="/stats">统计</a>
           <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
           <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
@@ -53,6 +54,7 @@
           </button>
           <div id="more-menu" class="more-menu">
             <a href="/">首页</a>
+            <a href="/tier">Tier List</a>
             <a href="/stats">统计</a>
             <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
             <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
@@ -78,7 +80,7 @@
       </template>
     </div>
   </header>
-  
+
   <!-- 主内容 -->
   <main class="container">
     <!-- 加载状态 -->
@@ -87,7 +89,7 @@
         <div class="loading-spinner"></div>
       </div>
     </template>
-    
+
     <!-- 空状态 -->
     <template x-if="!isLoading && filteredList.length === 0">
       <div class="empty-state">
@@ -103,14 +105,14 @@
         </p>
       </div>
     </template>
-    
+
     <!-- 卡片网格 -->
     <div class="cards-grid" x-show="!isLoading && filteredList.length > 0">
       <template x-for="vn in filteredList" :key="vn.id">
         <div class="vn-card" @click="openDetail(vn)">
           <div class="vn-card-image-wrapper">
-            <img 
-              :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'" 
+            <img
+              :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
               :alt="vn.title"
               class="vn-card-image"
               @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
@@ -139,7 +141,7 @@
       </template>
     </div>
   </main>
-  
+
   <!-- 详情模态框 -->
   <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()">
     <div class="modal" x-show="showDetail" x-transition>
@@ -149,11 +151,11 @@
             <h2 class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
             <button class="modal-close" @click="closeDetail()">&times;</button>
           </div>
-          
+
           <div class="modal-body">
             <div class="detail-header">
-              <img 
-                :src="selectedVN.vndb?.image || ''" 
+              <img
+                :src="selectedVN.vndb?.image || ''"
                 :alt="selectedVN.vndb?.title"
                 class="detail-image"
                 @error="$event.target.style.display='none'"
@@ -165,7 +167,7 @@
                 </h1>
                 <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>
                 <p class="detail-company" x-text="selectedVN.vndb?.developers?.join(', ') || ''" x-show="selectedVN.vndb?.developers?.length"></p>
-                
+
                 <!-- VNDB评分 -->
                 <div class="detail-stars-group" x-show="selectedVN.vndb?.rating">
                   <span class="detail-stars-label">VNDB评分</span>
@@ -212,13 +214,13 @@
                 </template>
               </div>
             </div>
-            
+
             <div class="detail-review" x-show="selectedVN.user?.review">
               <h3 class="detail-review-title">简评</h3>
               <div class="detail-review-content" x-html="renderMarkdown(selectedVN.user?.review || '')"></div>
             </div>
           </div>
-          
+
           <div class="modal-footer" x-show="$store.app.isAdmin">
             <button class="btn btn-secondary" @click="openEdit(selectedVN)">编辑</button>
             <button class="btn btn-danger" @click="deleteVN()">删除</button>
@@ -227,7 +229,7 @@
       </template>
     </div>
   </div>
-  
+
   <!-- 编辑模态框 -->
   <div class="modal-overlay" :class="{ active: showEdit }" @click.self="closeEdit()">
     <div class="modal" x-show="showEdit" x-transition>
@@ -235,15 +237,15 @@
         <h2 class="modal-title" x-text="editForm.isNew ? '添加条目' : '编辑条目'"></h2>
         <button class="modal-close" @click="closeEdit()">&times;</button>
       </div>
-      
+
       <div class="modal-body">
         <form @submit.prevent="saveEdit()">
           <template x-if="editForm.isNew">
             <div class="form-group">
               <label class="form-label">VNDB ID *</label>
-              <input 
-                type="text" 
-                class="form-input" 
+              <input
+                type="text"
+                class="form-input"
                 x-model="editForm.vndbId"
                 placeholder="例如: v17"
                 required
@@ -251,22 +253,22 @@
               <p class="form-hint">在VNDB网站上找到视觉小说的ID，格式为v+数字</p>
             </div>
           </template>
-          
+
           <div class="form-group">
             <label class="form-label">中文标题</label>
-            <input 
-              type="text" 
-              class="form-input" 
+            <input
+              type="text"
+              class="form-input"
               x-model="editForm.titleCn"
               placeholder="游戏的中文译名"
             >
           </div>
-          
+
           <div class="form-group">
             <label class="form-label">个人评分</label>
-            <input 
-              type="number" 
-              class="form-input" 
+            <input
+              type="number"
+              class="form-input"
               x-model="editForm.personalRating"
               min="0"
               max="10"
@@ -274,7 +276,7 @@
               placeholder="0-10分"
             >
           </div>
-          
+
           <div class="form-group">
             <label class="form-label">游玩时长（小时 / 分钟）</label>
             <div style="display:flex; gap:10px;">
@@ -296,25 +298,25 @@
               >
             </div>
           </div>
-          
+
           <div class="form-group">
             <label class="form-label">简评 (支持Markdown)</label>
-            <textarea 
-              class="form-input form-textarea" 
+            <textarea
+              class="form-input form-textarea"
               x-model="editForm.review"
               placeholder="写下你的感想..."
             ></textarea>
           </div>
-          
+
           <div class="form-group">
             <label class="form-label">开始日期</label>
-            <input 
-              type="date" 
-              class="form-input" 
+            <input
+              type="date"
+              class="form-input"
               x-model="editForm.startDate"
             >
           </div>
-          
+
           <div class="form-group">
             <label class="form-label">完成日期</label>
             <input
@@ -323,7 +325,7 @@
               x-model="editForm.finishDate"
             >
           </div>
-          
+
           <div class="form-group" x-show="config.tagsMode === 'manual'">
             <label class="form-label">标签（手动模式）</label>
             <input
@@ -334,7 +336,7 @@
             >
             <p class="form-hint">当前为手动标签模式，请输入自定义标签。</p>
           </div>
-          
+
           <div class="form-group" x-show="config.tagsMode === 'vndb' && !editForm.isNew">
             <label class="form-label">标签</label>
             <div class="detail-tags-list static">
@@ -346,14 +348,14 @@
           </div>
         </form>
       </div>
-      
+
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="closeEdit()">取消</button>
         <button class="btn btn-primary" @click="saveEdit()">保存</button>
       </div>
     </div>
   </div>
-  
+
   <!-- Toast通知 -->
   <div class="toast-container">
     <template x-for="toast in $store.app.toasts" :key="toast.id">

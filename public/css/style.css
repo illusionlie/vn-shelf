@@ -12,7 +12,7 @@
   --border-radius-lg: 24px;
   --transition-fast: 0.2s ease-in-out;
   --transition-medium: 0.3s ease-in-out;
-  
+
   /* --- Light Mode (Default) - Frosted Silver --- */
   --primary-text-color: #1d1d1f;
   --secondary-text-color: #6e6e73;
@@ -149,23 +149,23 @@ body.login-page {
 }
 
 /* ===== Links ===== */
-a { 
-  color: var(--accent-color); 
-  text-decoration: none; 
-  transition: color var(--transition-fast); 
+a {
+  color: var(--accent-color);
+  text-decoration: none;
+  transition: color var(--transition-fast);
 }
-a:hover { 
-  color: var(--secondary-text-color); 
+a:hover {
+  color: var(--secondary-text-color);
 }
 
 /* ===== Images ===== */
 img { max-width: 100%; height: auto; display: block; }
 
 /* ===== Layout Container ===== */
-.container { 
-  max-width: 1500px; 
-  margin: 0 auto; 
-  padding: 0 5%; 
+.container {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 5%;
 }
 
 /* ===== Header - Liquid Glass ===== */
@@ -419,9 +419,9 @@ img { max-width: 100%; height: auto; display: block; }
   transform: translateY(-2px);
 }
 
-.btn-sm { 
-  padding: 6px 12px; 
-  font-size: 0.8rem; 
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 /* ===== Scrollbar ===== */
@@ -679,8 +679,8 @@ img { max-width: 100%; height: auto; display: block; }
   background: var(--input-focus-bg-color);
 }
 
-.modal-body { 
-  padding: 24px; 
+.modal-body {
+  padding: 24px;
 }
 
 .modal-footer {
@@ -695,8 +695,8 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 /* ===== Forms ===== */
-.form-group { 
-  margin-bottom: 20px; 
+.form-group {
+  margin-bottom: 20px;
 }
 
 .form-label {
@@ -725,8 +725,8 @@ img { max-width: 100%; height: auto; display: block; }
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
-.form-input::placeholder { 
-  color: var(--muted-text-color); 
+.form-input::placeholder {
+  color: var(--muted-text-color);
 }
 
 .form-textarea {
@@ -913,6 +913,164 @@ img { max-width: 100%; height: auto; display: block; }
 .detail-review-content {
   color: var(--secondary-text-color);
   line-height: 1.8;
+}
+
+/* ===== Tier List Page ===== */
+.tier-container {
+  padding-bottom: 36px;
+}
+
+.tier-controls {
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.tier-controls-title-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.tier-page-title {
+  margin-bottom: 0;
+}
+
+.tier-board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 0;
+}
+
+.tier-row {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.tier-label {
+  border-radius: var(--border-radius-sm);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.tier-items {
+  min-height: 110px;
+  background: var(--card-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  backdrop-filter: blur(10px);
+}
+
+.tier-items.drag-over,
+.untiered-grid.drag-over {
+  background: rgba(0, 122, 255, 0.12);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15) inset;
+}
+
+.tier-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+.tier-empty {
+  color: var(--muted-text-color);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 88px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.tier-vn-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tier-drop-indicator {
+  width: 3px;
+  height: 96px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #53a7ff, var(--accent-color));
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15), 0 0 12px rgba(0, 122, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.tier-drop-indicator-end {
+  align-self: center;
+}
+
+.tier-vn-card {
+  width: 80px;
+  height: 110px;
+  border: none;
+  padding: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: transparent;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.tier-vn-card:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-medium);
+}
+
+.tier-vn-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tier-vn-card.dragging {
+  opacity: 0.5;
+}
+
+.untiered-section {
+  margin-top: 10px;
+}
+
+.untiered-grid {
+  min-height: 120px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--border-radius-sm);
+  border: 1px dashed var(--border-color);
+  background: var(--card-bg-color);
+}
+
+.tier-edit-modal {
+  max-width: 480px;
+}
+
+.tier-color-input {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  cursor: pointer;
 }
 
 /* ===== Stats Page ===== */
@@ -1114,50 +1272,83 @@ img { max-width: 100%; height: auto; display: block; }
   body {
     padding-top: 140px;
   }
-  
+
   .main-header {
     padding: 10px 15px;
   }
-  
-  .banner-nav { 
-    display: none; 
+
+  .banner-nav {
+    display: none;
   }
-  
+
   .desktop-only {
     display: none;
   }
-  
+
   .mobile-only {
     display: block;
   }
-  
+
   .cards-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 14px;
   }
-  
+
+  .tier-controls {
+    align-items: stretch;
+  }
+
+  .tier-row {
+    grid-template-columns: 64px 1fr;
+    gap: 6px;
+  }
+
+  .tier-label {
+    font-size: 1.2rem;
+  }
+
+  .tier-items {
+    min-height: 96px;
+  }
+
+  .tier-drop-indicator {
+    height: 84px;
+  }
+
+  .tier-vn-card {
+    width: 70px;
+    height: 98px;
+  }
+
+  .tier-row-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
   .vn-card-image {
     height: 280px;
   }
-  
+
   .detail-header {
     flex-direction: column;
   }
-  
+
   .detail-image {
     width: 100%;
     max-height: 300px;
   }
-  
+
   .detail-meta {
     grid-template-columns: 1fr;
   }
-  
+
   .controls-bar {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-container {
     max-width: 100%;
   }

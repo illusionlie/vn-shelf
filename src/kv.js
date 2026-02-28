@@ -4,6 +4,97 @@
 
 // 索引条目结果保留 14 天，避免 KV 键无限增长
 const INDEX_ITEM_RESULT_TTL_SECONDS = 14 * 24 * 60 * 60;
+const TIER_COLOR_HEX_REGEX = /^#[0-9a-fA-F]{6}$/;
+const BATCH_UPDATE_TIER_CHUNK_SIZE = 25;
+
+const DEFAULT_TIERS = [
+  { id: 'tier-s', name: 'S', color: '#ff4757', order: 0 },
+  { id: 'tier-a', name: 'A', color: '#ffa502', order: 1 },
+  { id: 'tier-b', name: 'B', color: '#2ed573', order: 2 },
+  { id: 'tier-c', name: 'C', color: '#1e90ff', order: 3 },
+  { id: 'tier-d', name: 'D', color: '#a55eea', order: 4 }
+];
+
+function buildDefaultTierList() {
+  return {
+    tiers: DEFAULT_TIERS.map(tier => ({ ...tier })),
+    updatedAt: null
+  };
+}
+
+function normalizeTierList(tierList) {
+  const seenTierIds = new Set();
+
+  const tiers = Array.isArray(tierList?.tiers)
+    ? tierList.tiers
+      .map(item => {
+        const normalizedId = typeof item?.id === 'string' ? item.id.trim() : '';
+        if (!normalizedId || seenTierIds.has(normalizedId)) {
+          return null;
+        }
+        seenTierIds.add(normalizedId);
+
+        const normalizedName = typeof item?.name === 'string'
+          ? item.name.trim()
+          : '';
+        const normalizedColor = typeof item?.color === 'string' && TIER_COLOR_HEX_REGEX.test(item.color.trim())
+          ? item.color.trim()
+          : '#666666';
+
+        return {
+          id: normalizedId,
+          name: normalizedName || `Tier ${seenTierIds.size}`,
+          color: normalizedColor,
+          order: Number.isFinite(Number(item?.order)) ? Math.max(0, Math.floor(Number(item.order))) : seenTierIds.size - 1
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.order - b.order)
+      .map((item, index) => ({ ...item, order: index }))
+    : [];
+
+  return {
+    tiers,
+    updatedAt: tierList?.updatedAt || null
+  };
+}
+
+function isTierListObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeTierLists(currentTierList, incomingTierList) {
+  const normalizedCurrent = normalizeTierList(currentTierList);
+  const normalizedIncoming = normalizeTierList(incomingTierList);
+  const incomingTierMap = new Map(normalizedIncoming.tiers.map(tier => [tier.id, tier]));
+
+  const mergedTiers = normalizedCurrent.tiers.map(tier => {
+    const incomingTier = incomingTierMap.get(tier.id);
+    if (!incomingTier) {
+      return { ...tier };
+    }
+
+    incomingTierMap.delete(tier.id);
+
+    return {
+      ...tier,
+      name: incomingTier.name,
+      color: incomingTier.color
+    };
+  });
+
+  for (const tier of incomingTierMap.values()) {
+    mergedTiers.push({
+      ...tier,
+      order: mergedTiers.length
+    });
+  }
+
+  return normalizeTierList({
+    tiers: mergedTiers,
+    updatedAt: normalizedCurrent.updatedAt || normalizedIncoming.updatedAt || null
+  });
+}
 
 /**
  * 获取设置
@@ -60,6 +151,34 @@ export async function getVNList(env) {
 export async function saveVNList(env, list) {
   list.updatedAt = new Date().toISOString();
   await env.KV.put('vn:list', JSON.stringify(list));
+}
+
+/**
+ * 获取Tier列表
+ * @param {Object} env - 环境变量
+ * @returns {{tiers: Array, updatedAt: string|null}}
+ */
+export async function getTierList(env) {
+  const tierList = await env.KV.get('tier:list', 'json');
+
+  if (!tierList) {
+    return buildDefaultTierList();
+  }
+
+  return normalizeTierList(tierList);
+}
+
+/**
+ * 保存Tier列表
+ * @param {Object} env - 环境变量
+ * @param {Object} tierList - Tier 列表对象
+ * @returns {{tiers: Array, updatedAt: string}}
+ */
+export async function saveTierList(env, tierList) {
+  const normalized = normalizeTierList(tierList);
+  normalized.updatedAt = new Date().toISOString();
+  await env.KV.put('tier:list', JSON.stringify(normalized));
+  return normalized;
 }
 
 /**
@@ -122,6 +241,8 @@ function buildListItem(entry) {
     playTimeMinutes: toNonNegativeNumber(entry.user?.playTimeMinutes),
     developers: entry.vndb?.developers || [],
     allAge: entry.vndb?.allAge || false, // 全年龄标记
+    tierId: entry.user?.tierId || null,
+    tierSort: toNonNegativeNumber(entry.user?.tierSort),
     createdAt: entry.createdAt
   };
 }
@@ -371,6 +492,179 @@ async function updateListStats(env, list, delta) {
 }
 
 /**
+ * 规范化 Tier 归属参数
+ * @param {Object|null} userData - user 数据
+ * @param {string|null} tierId - Tier ID，null 表示移除分类
+ * @param {number|undefined} tierSort - Tier 内排序值（从 0 开始）
+ * @returns {{tierId: string|null, tierSort: number}}
+ */
+function normalizeTierAssignment(userData, tierId, tierSort = undefined) {
+  const normalizedTierId = tierId || null;
+  const currentTierSort = Number(userData?.tierSort);
+  const normalizedTierSort = Number.isFinite(Number(tierSort))
+    ? Math.max(0, Math.floor(Number(tierSort)))
+    : (Number.isFinite(currentTierSort) && currentTierSort >= 0 ? Math.floor(currentTierSort) : 0);
+
+  return {
+    tierId: normalizedTierId,
+    tierSort: normalizedTierId ? normalizedTierSort : 0
+  };
+}
+
+/**
+ * 更新VN条目的 Tier 归属
+ * @param {Object} env - 环境变量
+ * @param {string} id - VNDB ID
+ * @param {string|null} tierId - Tier ID，null 表示移除分类
+ * @param {number|undefined} tierSort - Tier 内排序值（从 0 开始）
+ * @returns {Object|null}
+ */
+export async function updateVNTier(env, id, tierId, tierSort = undefined) {
+  const entry = await getVNEntry(env, id);
+  if (!entry) {
+    return null;
+  }
+
+  const normalizedAssignment = normalizeTierAssignment(entry.user, tierId, tierSort);
+
+  entry.user = {
+    ...(entry.user || {}),
+    tierId: normalizedAssignment.tierId,
+    tierSort: normalizedAssignment.tierSort
+  };
+
+  await saveVNEntry(env, entry);
+  await addEntryToList(env, entry);
+
+  return entry;
+}
+
+/**
+ * 批量更新 VN 条目的 Tier 归属
+ *
+ * 性能策略：
+ * - 每个条目仍单独写回 `vn:{id}`（确保明细一致）
+ * - `vn:list` 仅在最后写回一次，避免循环中重复读改写
+ * - 若发现列表快照不完整，则回退到基于“列表快照 + 缺失条目ID”的 `rebuildVNListByIds()` 兜底校正
+ *
+ * @param {Object} env - 环境变量
+ * @param {{id: string, tierId: string|null, tierSort?: number}[]} updates - 批量更新数据
+ * @returns {Promise<Array<{id: string, tierId: string|null, tierSort: number}>>}
+ */
+export async function batchUpdateVNTiers(env, updates) {
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return [];
+  }
+
+  const list = await getVNList(env);
+  const listItems = Array.isArray(list.items) ? [...list.items] : [];
+  const listItemIndexMap = new Map();
+  for (let index = 0; index < listItems.length; index += 1) {
+    const itemId = listItems[index]?.id;
+    if (typeof itemId === 'string' && itemId) {
+      listItemIndexMap.set(itemId, index);
+    }
+  }
+
+  let requiresRebuild = !Array.isArray(list.items);
+  const rebuildSnapshotIds = new Set(
+    Array.isArray(list.items)
+      ? list.items.map(item => item?.id).filter(id => typeof id === 'string' && id)
+      : []
+  );
+
+  // 两阶段处理：
+  // 1) 先完整校验并构造所有更新，避免中途遇到 404 导致“已写入部分明细但未更新聚合列表”
+  // 2) 再统一写入明细并更新聚合快照
+  const preparedUpdates = [];
+
+  for (const update of updates) {
+    const entry = await getVNEntry(env, update.id);
+    if (!entry) {
+      const notFoundError = new Error(`条目不存在: ${update.id}`);
+      notFoundError.status = 404;
+      throw notFoundError;
+    }
+
+    const normalizedAssignment = normalizeTierAssignment(entry.user, update.tierId, update.tierSort);
+    const nextEntry = {
+      ...entry,
+      user: {
+        ...(entry.user || {}),
+        tierId: normalizedAssignment.tierId,
+        tierSort: normalizedAssignment.tierSort
+      }
+    };
+
+    preparedUpdates.push({
+      entry: nextEntry,
+      normalizedAssignment
+    });
+  }
+
+  const updatedItems = [];
+
+  for (let index = 0; index < preparedUpdates.length; index += BATCH_UPDATE_TIER_CHUNK_SIZE) {
+    const chunk = preparedUpdates.slice(index, index + BATCH_UPDATE_TIER_CHUNK_SIZE);
+
+    await Promise.all(chunk.map(async (prepared) => {
+      const { entry, normalizedAssignment } = prepared;
+
+      await saveVNEntry(env, entry);
+
+      const itemIndex = listItemIndexMap.get(entry.id);
+      if (itemIndex === undefined) {
+        requiresRebuild = true;
+        rebuildSnapshotIds.add(entry.id);
+      } else {
+        listItems[itemIndex] = buildListItem(entry);
+      }
+
+      updatedItems.push({
+        id: entry.id,
+        tierId: normalizedAssignment.tierId,
+        tierSort: normalizedAssignment.tierSort
+      });
+    }));
+  }
+
+  if (requiresRebuild) {
+    await rebuildVNListByIds(env, Array.from(rebuildSnapshotIds));
+  } else {
+    list.items = listItems;
+    await saveVNList(env, list);
+  }
+
+  return updatedItems;
+}
+
+/**
+ * 清空指定 Tier 下所有 VN 的 tierId
+ * @param {Object} env - 环境变量
+ * @param {string} tierId - Tier ID
+ * @returns {number} 更新条目数
+ */
+export async function clearTierAssignments(env, tierId) {
+  if (!tierId) return 0;
+
+  const list = await getVNList(env);
+  const targets = Array.isArray(list.items)
+    ? list.items.filter(item => item?.tierId === tierId)
+    : [];
+
+  if (targets.length === 0) {
+    return 0;
+  }
+
+  await batchUpdateVNTiers(env, targets.map(item => ({
+    id: item.id,
+    tierId: null
+  })));
+
+  return targets.length;
+}
+
+/**
  * 获取索引状态
  * @param {Object} env - 环境变量
  * @returns {Object}
@@ -564,6 +858,7 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
  */
 export async function exportData(env) {
   const list = await getVNList(env);
+  const tierList = await getTierList(env);
   const entries = [];
 
   for (const item of list.items) {
@@ -576,7 +871,8 @@ export async function exportData(env) {
   return {
     version: '1.0',
     exportedAt: new Date().toISOString(),
-    entries
+    entries,
+    tierList
   };
 }
 
@@ -587,17 +883,39 @@ export async function exportData(env) {
  * @param {string} mode - 导入模式 (merge | replace)
  */
 export async function importData(env, data, mode = 'merge') {
+  const hasIncomingTierList = isTierListObject(data?.tierList);
+
   if (mode === 'replace') {
     // 获取并删除现有数据
     const oldList = await getVNList(env);
     for (const item of oldList.items) {
       await deleteVNEntry(env, item.id);
     }
+
+    // replace 语义下，若未提供 tierList 则清空旧 Tier 数据
+    if (!hasIncomingTierList) {
+      await env.KV.delete('tier:list');
+    }
   }
 
   // 写入新数据
   for (const entry of data.entries) {
     await saveVNEntry(env, entry);
+  }
+
+  if (hasIncomingTierList) {
+    if (mode === 'merge') {
+      // merge 语义下保留现有 Tier，并按 ID 合并导入 Tier
+      const persistedTierList = await env.KV.get('tier:list', 'json');
+      const currentTierList = isTierListObject(persistedTierList)
+        ? persistedTierList
+        : { tiers: [], updatedAt: null };
+
+      const mergedTierList = mergeTierLists(currentTierList, data.tierList);
+      await saveTierList(env, mergedTierList);
+    } else {
+      await saveTierList(env, data.tierList);
+    }
   }
 
   // 重建列表

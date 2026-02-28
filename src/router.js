@@ -23,10 +23,17 @@ import {
   exportData,
   importData,
   getIndexStatus,
-  saveIndexStatus
+  saveIndexStatus,
+  getTierList,
+  saveTierList,
+  updateVNTier,
+  batchUpdateVNTiers,
+  clearTierAssignments
 } from './kv.js';
 import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
+
+const MAX_BATCH_TIER_UPDATES = 200;
 
 /**
  * 路由处理器
@@ -97,11 +104,24 @@ async function handleAPI(request, env, path, method) {
     return handleGetStats(request, env);
   }
 
+  if (path === '/api/tier' && method === 'GET') {
+    return handleGetTierList(request, env);
+  }
+
   // 需要认证的接口
   const auth = await authMiddleware(request, env);
 
   if (path === '/api/vn' && method === 'POST') {
     return handleCreateVN(request, env, auth);
+  }
+
+  if (path === '/api/vn/tier/batch' && method === 'PUT') {
+    return handleBatchUpdateVNTier(request, env, auth);
+  }
+
+  if (path.match(/^\/api\/vn\/v\d+\/tier$/) && method === 'PUT') {
+    const id = path.split('/')[3];
+    return handleUpdateVNTier(request, env, id, auth);
   }
 
   if (path.match(/^\/api\/vn\/v\d+$/) && method === 'PUT') {
@@ -128,6 +148,34 @@ async function handleAPI(request, env, path, method) {
 
   if (path === '/api/config' && method === 'PUT') {
     return handleUpdateConfig(request, env, auth);
+  }
+
+  if (path === '/api/tier' && method === 'POST') {
+    return handleCreateTier(request, env, auth);
+  }
+
+  if (path === '/api/tier/order' && method === 'PUT') {
+    return handleUpdateTierOrder(request, env, auth);
+  }
+
+  if (path.match(/^\/api\/tier\/[^/]+$/) && method === 'PUT') {
+    const rawId = path.split('/').pop();
+    const decodedId = decodePathParam(rawId);
+    const id = normalizeTierId(decodedId);
+    if (!id) {
+      return errorResponse('Tier ID 无效', 400);
+    }
+    return handleUpdateTier(request, env, id, auth);
+  }
+
+  if (path.match(/^\/api\/tier\/[^/]+$/) && method === 'DELETE') {
+    const rawId = path.split('/').pop();
+    const decodedId = decodePathParam(rawId);
+    const id = normalizeTierId(decodedId);
+    if (!id) {
+      return errorResponse('Tier ID 无效', 400);
+    }
+    return handleDeleteTier(request, env, id, auth);
   }
 
   if (path === '/api/export' && method === 'GET') {
@@ -221,9 +269,14 @@ async function handleGetVNList(request, env) {
   const url = new URL(request.url);
   const sort = url.searchParams.get('sort') || 'created_desc';
   const search = url.searchParams.get('search') || '';
+  const untieredOnly = url.searchParams.get('untiered') === 'true';
 
   const list = await getVNList(env);
-  let items = list.items;
+  let items = Array.isArray(list.items) ? [...list.items] : [];
+
+  if (untieredOnly) {
+    items = items.filter(item => !item?.tierId);
+  }
 
   // 搜索过滤
   if (search) {
@@ -334,6 +387,94 @@ function normalizePlayTimeInput({
   };
 }
 
+function createTierId() {
+  return `tier-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeTierId(id) {
+  return typeof id === 'string' ? id.trim() : '';
+}
+
+function decodePathParam(value) {
+  if (typeof value !== 'string') return null;
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTierName(name) {
+  if (typeof name !== 'string') return '';
+  return name.trim();
+}
+
+function isValidTierColor(color) {
+  return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateTierListPayload(tierList) {
+  if (!isPlainObject(tierList)) {
+    return '导入数据 tierList 必须是对象';
+  }
+
+  if (!Array.isArray(tierList.tiers)) {
+    return '导入数据 tierList.tiers 必须是数组';
+  }
+
+  const seenIds = new Set();
+
+  for (let index = 0; index < tierList.tiers.length; index += 1) {
+    const item = tierList.tiers[index];
+    const field = `tierList.tiers[${index}]`;
+
+    if (!isPlainObject(item)) {
+      return `${field} 必须是对象`;
+    }
+
+    const id = normalizeTierId(item.id);
+    if (!id) {
+      return `${field}.id 必须是非空字符串`;
+    }
+
+    if (seenIds.has(id)) {
+      return `${field}.id 重复: ${id}`;
+    }
+    seenIds.add(id);
+
+    const name = normalizeTierName(item.name);
+    if (!name) {
+      return `${field}.name 必须是非空字符串`;
+    }
+
+    if (!isValidTierColor(item.color)) {
+      return `${field}.color 必须是 #RRGGBB 格式`;
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(item, 'order') &&
+      (!Number.isFinite(Number(item.order)) || Number(item.order) < 0)
+    ) {
+      return `${field}.order 必须是非负数字`;
+    }
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(tierList, 'updatedAt') &&
+    tierList.updatedAt !== null &&
+    typeof tierList.updatedAt !== 'string'
+  ) {
+    return '导入数据 tierList.updatedAt 必须是字符串或 null';
+  }
+
+  return null;
+}
+
 async function handleCreateVN(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
@@ -409,7 +550,8 @@ async function handleCreateVN(request, env, auth) {
       review: review || '',
       startDate: startDate || null,
       finishDate: finishDate || null,
-      tags: Array.isArray(tags) ? tags : [] // 用户手动 tags
+      tags: Array.isArray(tags) ? tags : [], // 用户手动 tags
+      tierId: null
     }
   };
 
@@ -527,6 +669,320 @@ async function handleDeleteVN(request, env, id, auth) {
   await removeEntryFromList(env, id);
 
   return successResponse(null, '删除成功');
+}
+
+// ============ Tier接口 ============
+
+async function handleGetTierList(request, env) {
+  const tierList = await getTierList(env);
+  return jsonResponse({
+    data: tierList.tiers,
+    total: tierList.tiers.length,
+    updatedAt: tierList.updatedAt
+  });
+}
+
+async function handleCreateTier(request, env, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+
+  const name = normalizeTierName(bodyResult.data?.name);
+  const color = typeof bodyResult.data?.color === 'string'
+    ? bodyResult.data.color.trim()
+    : '#666666';
+
+  if (!name) {
+    return errorResponse('Tier 名称不能为空', 400);
+  }
+
+  if (!isValidTierColor(color)) {
+    return errorResponse('Tier 颜色必须是 #RRGGBB 格式', 400);
+  }
+
+  const tierList = await getTierList(env);
+  const tier = {
+    id: createTierId(),
+    name,
+    color,
+    order: tierList.tiers.length
+  };
+
+  const savedTierList = await saveTierList(env, {
+    ...tierList,
+    tiers: [...tierList.tiers, tier]
+  });
+
+  const createdTier = savedTierList.tiers.find(item => item.id === tier.id) || tier;
+  return successResponse(createdTier, '创建成功');
+}
+
+async function handleUpdateTier(request, env, id, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+
+  const body = bodyResult.data;
+  if (!isPlainObject(body)) {
+    return errorResponse('请求体必须是对象', 400);
+  }
+
+  const tierList = await getTierList(env);
+  const index = tierList.tiers.findIndex(item => item.id === id);
+  if (index < 0) {
+    return errorResponse('Tier 不存在', 404);
+  }
+
+  const nextTier = { ...tierList.tiers[index] };
+
+  if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+    const name = normalizeTierName(body.name);
+    if (!name) {
+      return errorResponse('Tier 名称不能为空', 400);
+    }
+    nextTier.name = name;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'color')) {
+    const color = typeof body.color === 'string'
+      ? body.color.trim()
+      : '';
+    if (!isValidTierColor(color)) {
+      return errorResponse('Tier 颜色必须是 #RRGGBB 格式', 400);
+    }
+    nextTier.color = color;
+  }
+
+  tierList.tiers[index] = nextTier;
+  const savedTierList = await saveTierList(env, tierList);
+
+  const updatedTier = savedTierList.tiers.find(item => item.id === id) || nextTier;
+  return successResponse(updatedTier, '更新成功');
+}
+
+async function handleDeleteTier(request, env, id, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const tierList = await getTierList(env);
+  const index = tierList.tiers.findIndex(item => item.id === id);
+  if (index < 0) {
+    return errorResponse('Tier 不存在', 404);
+  }
+
+  const [deletedTier] = tierList.tiers.splice(index, 1);
+
+  // 先清理归属再删除 Tier，避免清理失败导致 Tier 已删但条目仍引用旧 tierId
+  const clearedCount = await clearTierAssignments(env, id);
+  await saveTierList(env, tierList);
+
+  return successResponse({ deletedTier, clearedCount }, '删除成功');
+}
+
+async function handleUpdateTierOrder(request, env, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+
+  const tierIds = bodyResult.data?.tierIds;
+  if (!Array.isArray(tierIds)) {
+    return errorResponse('tierIds 必须是数组', 400);
+  }
+
+  const normalizedIds = tierIds
+    .map(id => (typeof id === 'string' ? id.trim() : ''))
+    .filter(Boolean);
+
+  if (normalizedIds.length !== tierIds.length) {
+    return errorResponse('tierIds 必须为非空字符串数组', 400);
+  }
+
+  const uniqueIds = new Set(normalizedIds);
+  if (uniqueIds.size !== normalizedIds.length) {
+    return errorResponse('tierIds 不能包含重复值', 400);
+  }
+
+  const tierList = await getTierList(env);
+  const existingIds = tierList.tiers.map(item => item.id);
+
+  if (normalizedIds.length !== existingIds.length) {
+    return errorResponse('tierIds 数量与现有 Tier 数量不一致', 400);
+  }
+
+  for (const idItem of normalizedIds) {
+    if (!existingIds.includes(idItem)) {
+      return errorResponse(`Tier 不存在: ${idItem}`, 404);
+    }
+  }
+
+  const orderMap = new Map(normalizedIds.map((idItem, index) => [idItem, index]));
+  const nextTierList = {
+    ...tierList,
+    tiers: tierList.tiers.map(item => ({
+      ...item,
+      order: orderMap.get(item.id)
+    }))
+  };
+
+  const savedTierList = await saveTierList(env, nextTierList);
+  return successResponse(savedTierList.tiers, '排序更新成功');
+}
+
+async function handleBatchUpdateVNTier(request, env, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+
+  const body = bodyResult.data;
+  if (!isPlainObject(body)) {
+    return errorResponse('请求体必须是对象', 400);
+  }
+
+  const updates = body.updates;
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return errorResponse('updates 必须是非空数组', 400);
+  }
+
+  if (updates.length > MAX_BATCH_TIER_UPDATES) {
+    return errorResponse(`updates 数量不能超过 ${MAX_BATCH_TIER_UPDATES}`, 400);
+  }
+
+  const tierList = await getTierList(env);
+  const tierIdSet = new Set(tierList.tiers.map(item => item.id));
+  const seenIds = new Set();
+  const normalizedUpdates = [];
+
+  for (let index = 0; index < updates.length; index += 1) {
+    const item = updates[index];
+    if (!isPlainObject(item)) {
+      return errorResponse(`updates[${index}] 必须是对象`, 400);
+    }
+
+    const idValue = typeof item.id === 'string' ? item.id.trim() : '';
+    if (!isValidVNDBId(idValue)) {
+      return errorResponse(`updates[${index}].id 必须是合法 VNDB ID`, 400);
+    }
+
+    if (seenIds.has(idValue)) {
+      return errorResponse(`updates[${index}].id 重复: ${idValue}`, 400);
+    }
+    seenIds.add(idValue);
+
+    if (!Object.prototype.hasOwnProperty.call(item, 'tierId')) {
+      return errorResponse(`updates[${index}] 缺少 tierId 字段`, 400);
+    }
+
+    const rawTierId = item.tierId;
+    const rawTierSort = item.tierSort;
+    let tierId = null;
+    let tierSort = undefined;
+
+    if (rawTierId !== null) {
+      if (typeof rawTierId !== 'string') {
+        return errorResponse(`updates[${index}].tierId 必须为字符串或 null`, 400);
+      }
+
+      const normalizedTierId = rawTierId.trim();
+      tierId = normalizedTierId || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(item, 'tierSort')) {
+      const parsedTierSort = Number(rawTierSort);
+      if (!Number.isFinite(parsedTierSort) || parsedTierSort < 0) {
+        return errorResponse(`updates[${index}].tierSort 必须是非负数字`, 400);
+      }
+      tierSort = Math.floor(parsedTierSort);
+    }
+
+    if (tierId && !tierIdSet.has(tierId)) {
+      return errorResponse(`Tier 不存在: ${tierId}`, 404);
+    }
+
+    normalizedUpdates.push({ id: idValue, tierId, tierSort });
+  }
+
+  let updatedItems;
+  try {
+    updatedItems = await batchUpdateVNTiers(env, normalizedUpdates);
+  } catch (error) {
+    if (Number(error?.status) === 404) {
+      return errorResponse(error.message || '条目不存在', 404);
+    }
+    throw error;
+  }
+
+  return successResponse({
+    updated: updatedItems.length,
+    items: updatedItems
+  }, 'Tier 批量更新成功');
+}
+
+async function handleUpdateVNTier(request, env, id, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const bodyResult = await parseRequestBody(request);
+  if (!bodyResult.success) return bodyResult.error;
+
+  const body = bodyResult.data;
+  if (!isPlainObject(body)) {
+    return errorResponse('请求体必须是对象', 400);
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(body, 'tierId')) {
+    return errorResponse('缺少 tierId 字段', 400);
+  }
+
+  const rawTierId = body.tierId;
+  const rawTierSort = body.tierSort;
+  let tierId = null;
+  let tierSort = undefined;
+
+  if (rawTierId !== null) {
+    if (typeof rawTierId !== 'string') {
+      return errorResponse('tierId 必须为字符串或 null', 400);
+    }
+
+    const normalizedTierId = rawTierId.trim();
+    tierId = normalizedTierId || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'tierSort')) {
+    const parsedTierSort = Number(rawTierSort);
+    if (!Number.isFinite(parsedTierSort) || parsedTierSort < 0) {
+      return errorResponse('tierSort 必须是非负数字', 400);
+    }
+    tierSort = Math.floor(parsedTierSort);
+  }
+
+  if (tierId) {
+    const tierList = await getTierList(env);
+    const exists = tierList.tiers.some(item => item.id === tierId);
+    if (!exists) {
+      return errorResponse('Tier 不存在', 404);
+    }
+  }
+
+  const entry = await updateVNTier(env, id, tierId, tierSort);
+  if (!entry) {
+    return errorResponse('条目不存在', 404);
+  }
+
+  return successResponse(entry, 'Tier 更新成功');
 }
 
 // ============ 统计接口 ============
@@ -666,8 +1122,15 @@ async function handleImport(request, env, auth) {
 
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) return bodyResult.error;
-  const { entries, mode } = bodyResult.data;
+  const { entries, tierList, mode } = bodyResult.data;
   const importMode = mode || 'merge';
+
+  if (tierList !== undefined) {
+    const tierListError = validateTierListPayload(tierList);
+    if (tierListError) {
+      return errorResponse(tierListError, 400);
+    }
+  }
 
   if (!['merge', 'replace'].includes(importMode)) {
     return errorResponse(`无效的导入模式: ${importMode}，仅支持 merge 或 replace`, 400);
@@ -714,7 +1177,7 @@ async function handleImport(request, env, auth) {
     }
   }
 
-  await importData(env, { entries }, importMode);
+  await importData(env, { entries, tierList }, importMode);
 
   return successResponse({ count: entries.length }, '导入成功');
 }
