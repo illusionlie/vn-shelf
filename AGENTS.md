@@ -270,7 +270,8 @@ tests/
   - 覆盖重试补发、ack/retry 分支、失败结果写入异常分支
 - CI（[`ci.yml`](.github/workflows/ci.yml)）
   - ESLint
-  - Wrangler deploy dry-run（基于 `wrangler.toml.example` 生成临时配置）
+  - Node 内置测试（`npm run test`）
+  - Wrangler deploy dry-run（依赖 lint + test，基于 `wrangler.toml.example` 生成临时配置）
 
 ## 开发注意事项
 

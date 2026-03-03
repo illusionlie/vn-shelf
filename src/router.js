@@ -34,6 +34,26 @@ import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseReque
 import { fetchVNDB } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
+const INDEX_START_QUEUE_BATCH_SIZE = 25;
+
+let startIndexRequestLockTail = Promise.resolve();
+
+async function runWithStartIndexLock(fn) {
+  const previousLock = startIndexRequestLockTail;
+  let releaseCurrentLock;
+
+  startIndexRequestLockTail = new Promise(resolve => {
+    releaseCurrentLock = resolve;
+  });
+
+  await previousLock;
+
+  try {
+    return await fn();
+  } finally {
+    releaseCurrentLock();
+  }
+}
 
 async function parseJsonBodyOr400(request) {
   try {
@@ -1040,38 +1060,59 @@ async function handleStartIndex(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const list = await getVNList(env);
+  return runWithStartIndexLock(async () => {
+    const currentStatus = await getIndexStatus(env);
+    if (currentStatus.status === 'running') {
+      return errorResponse('已有索引任务正在运行', 409);
+    }
 
-  if (list.items.length === 0) {
-    return errorResponse('没有需要索引的条目', 400);
-  }
+    const list = await getVNList(env);
+    const total = list.items.length;
 
-  // 创建索引状态
-  const taskId = `idx_${Date.now()}`;
-  const status = {
-    status: 'running',
-    taskId,
-    total: list.items.length,
-    processed: 0,
-    failed: [],
-    startedAt: new Date().toISOString(),
-    completedAt: null,
-    error: null,
-    lastReconciledAt: null
-  };
+    if (total === 0) {
+      return errorResponse('没有需要索引的条目', 400);
+    }
 
-  await saveIndexStatus(env, status);
-
-  // 发送所有ID到Queue（同一批次共享同一个 taskId）
-  for (const item of list.items) {
-    await env.VN_INDEX_QUEUE.send({
-      vndbId: item.id,
+    // 创建索引状态
+    const taskId = `idx_${Date.now()}`;
+    const status = {
+      status: 'running',
       taskId,
-      retryCount: 0
-    });
-  }
+      total,
+      processed: 0,
+      failed: [],
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      error: null,
+      lastReconciledAt: null
+    };
 
-  return successResponse({ total: list.items.length }, '索引任务已启动');
+    await saveIndexStatus(env, status);
+
+    try {
+      // 分片并发发送（同一批次共享同一个 taskId）
+      for (let i = 0; i < list.items.length; i += INDEX_START_QUEUE_BATCH_SIZE) {
+        const chunk = list.items.slice(i, i + INDEX_START_QUEUE_BATCH_SIZE);
+        await Promise.all(chunk.map(item => env.VN_INDEX_QUEUE.send({
+          vndbId: item.id,
+          taskId,
+          retryCount: 0
+        })));
+      }
+    } catch (error) {
+      const failedStatus = {
+        ...status,
+        status: 'failed',
+        completedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error)
+      };
+
+      await saveIndexStatus(env, failedStatus);
+      return errorResponse('索引任务启动失败，请稍后重试', 500);
+    }
+
+    return successResponse({ total }, '索引任务已启动');
+  });
 }
 
 async function handleGetIndexStatus(request, env, auth) {
@@ -1115,17 +1156,18 @@ async function handleUpdateConfig(request, env, auth) {
   } catch (response) {
     return response;
   }
-  const settings = await getSettings(env);
-
-  if (body.vndbApiToken !== undefined) {
-    settings.vndbApiToken = body.vndbApiToken;
-  }
+  let settings = await getSettings(env);
 
   if (body.newPassword) {
     if (body.newPassword.length < 6) {
       return errorResponse('密码长度至少6位', 400);
     }
     await initAdminPassword(env, body.newPassword);
+    settings = await getSettings(env);
+  }
+
+  if (body.vndbApiToken !== undefined) {
+    settings.vndbApiToken = body.vndbApiToken;
   }
 
   // Tags 相关配置

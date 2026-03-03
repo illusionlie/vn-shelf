@@ -125,6 +125,32 @@ function parseLines(text) {
   return text.split('\n');
 }
 
+const CODE_BLOCK_LANG_PATTERN = /^[A-Za-z0-9_-]+$/;
+const CODE_BLOCK_LANG_MAX_LENGTH = 32;
+
+/**
+ * 安全净化代码块语言名（用于 class 拼接）
+ * 仅允许字母、数字、下划线、短横线，超长或非法输入降级为空。
+ * @param {string} lang - 原始语言名
+ * @returns {string} 安全语言名或空字符串
+ */
+function sanitizeCodeBlockLanguage(lang) {
+  if (typeof lang !== 'string') return '';
+
+  const normalizedLang = lang.trim();
+  if (!normalizedLang) return '';
+
+  if (normalizedLang.length > CODE_BLOCK_LANG_MAX_LENGTH) {
+    return '';
+  }
+
+  if (!CODE_BLOCK_LANG_PATTERN.test(normalizedLang)) {
+    return '';
+  }
+
+  return normalizedLang;
+}
+
 /**
  * 渲染 Markdown 文本
  * @param {string} text - Markdown 文本
@@ -173,7 +199,7 @@ export function renderMarkdown(text, options = {}) {
       if (!inCodeBlock) {
         // 开始代码块
         inCodeBlock = true;
-        codeBlockLang = trimmedLine.slice(3).trim();
+        codeBlockLang = sanitizeCodeBlockLanguage(trimmedLine.slice(3));
         codeBlockContent = [];
       } else {
         // 结束代码块

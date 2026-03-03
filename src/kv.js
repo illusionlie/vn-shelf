@@ -286,6 +286,18 @@ function buildListItem(entry) {
   };
 }
 
+function normalizeSnapshotIds(ids) {
+  if (!Array.isArray(ids)) {
+    return [];
+  }
+
+  return Array.from(new Set(
+    ids
+      .map(id => (typeof id === 'string' ? id.trim() : ''))
+      .filter(Boolean)
+  ));
+}
+
 /**
  * 按给定 ID 快照重建 VN 列表聚合数据
  * @param {Object} env - 环境变量
@@ -293,9 +305,7 @@ function buildListItem(entry) {
  * @returns {Object}
  */
 async function rebuildVNListByIds(env, ids) {
-  const normalizedIds = Array.isArray(ids)
-    ? Array.from(new Set(ids.filter(id => typeof id === 'string' && id)))
-    : [];
+  const normalizedIds = normalizeSnapshotIds(ids);
 
   // 批量获取所有条目
   const entries = [];
@@ -768,7 +778,20 @@ export async function exportData(env) {
  * @param {string} mode - 导入模式 (merge | replace)
  */
 export async function importData(env, data, mode = 'merge') {
+  const incomingEntries = Array.isArray(data?.entries) ? data.entries : [];
+  const incomingEntryIds = normalizeSnapshotIds(incomingEntries.map(entry => entry?.id));
   const hasIncomingTierList = isTierListObject(data?.tierList);
+
+  let rebuildSnapshotIds = incomingEntryIds;
+
+  if (mode === 'merge') {
+    const oldList = await getVNList(env);
+    const oldListIds = Array.isArray(oldList.items)
+      ? oldList.items.map(item => item?.id)
+      : [];
+
+    rebuildSnapshotIds = normalizeSnapshotIds([...oldListIds, ...incomingEntryIds]);
+  }
 
   if (mode === 'replace') {
     // 获取并删除现有数据
@@ -784,7 +807,7 @@ export async function importData(env, data, mode = 'merge') {
   }
 
   // 写入新数据
-  for (const entry of data.entries) {
+  for (const entry of incomingEntries) {
     await saveVNEntry(env, entry);
   }
 
@@ -803,6 +826,6 @@ export async function importData(env, data, mode = 'merge') {
     }
   }
 
-  // 重建列表
-  await rebuildVNList(env);
+  // 按导入模式重建列表：replace=导入ID集合，merge=旧列表ID∪导入ID
+  await rebuildVNListByIds(env, rebuildSnapshotIds);
 }
