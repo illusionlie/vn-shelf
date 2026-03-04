@@ -21,6 +21,15 @@ queue = "vn-index-queue"
 max_batch_size = 1
 max_batch_timeout = 1
 
+# Durable Object 绑定（索引启动原子锁）
+[[durable_objects.bindings]]
+name = "INDEX_START_LOCK" # 不要修改此项
+class_name = "IndexStartLockDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["IndexStartLockDurableObject"]
+
 # Worker Assets 配置（静态资源）
 [assets]
 directory = "./public"

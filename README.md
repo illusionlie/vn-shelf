@@ -88,6 +88,7 @@ cp wrangler.toml.example wrangler.toml
 
 - KV 绑定：`KV`
 - Queue 绑定：`VN_INDEX_QUEUE`（队列名 `vn-index-queue`）
+- Durable Object 绑定：`INDEX_START_LOCK`（类名 `IndexStartLockDurableObject`）
 - 静态资源绑定：`ASSETS`（目录 `./public`）
 
 ### 3) Cloudflare 资源准备
@@ -96,6 +97,7 @@ cp wrangler.toml.example wrangler.toml
 
 - 1 个 KV 命名空间
 - 1 个 Queue
+- 1 个 Durable Object（`IndexStartLockDurableObject`）
 
 ### 4) 启动本地开发
 

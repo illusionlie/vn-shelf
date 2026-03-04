@@ -123,6 +123,8 @@ export async function exportData() {
 export async function importData() {}
 export async function getIndexStatus() { return {}; }
 export async function saveIndexStatus() {}
+export async function tryAcquireIndexStartLock() { return true; }
+export async function releaseIndexStartLock() {}
 export async function getTierList() { return { tiers: [], updatedAt: null }; }
 export async function saveTierList(env, tierList) { return tierList; }
 export async function updateVNTier() {}

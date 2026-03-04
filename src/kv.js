@@ -6,6 +6,12 @@
 const INDEX_ITEM_RESULT_TTL_SECONDS = 14 * 24 * 60 * 60;
 const TIER_COLOR_HEX_REGEX = /^#[0-9a-fA-F]{6}$/;
 const BATCH_UPDATE_TIER_CHUNK_SIZE = 25;
+const INDEX_START_LOCK_DO_NAME = 'global';
+// 兼容旧配置时的回退锁键：仅用于 best-effort 互斥（KV 无原子 CAS，极端并发下可能双成功）
+const INDEX_START_LOCK_KEY = 'index:start-lock';
+const INDEX_START_LOCK_TTL_SECONDS = 30;
+const INDEX_START_LOCK_TTL_MS = INDEX_START_LOCK_TTL_SECONDS * 1000;
+let hasWarnedIndexStartLockKVFallback = false;
 
 const DEFAULT_TIERS = [
   { id: 'tier-s', name: 'S', color: '#ff4757', order: 0 },
@@ -498,11 +504,12 @@ export async function batchUpdateVNTiers(env, updates) {
   }
 
   const updatedItems = [];
+  let writeError = null;
 
   for (let index = 0; index < preparedUpdates.length; index += BATCH_UPDATE_TIER_CHUNK_SIZE) {
     const chunk = preparedUpdates.slice(index, index + BATCH_UPDATE_TIER_CHUNK_SIZE);
 
-    await Promise.all(chunk.map(async (prepared) => {
+    const writeResults = await Promise.allSettled(chunk.map(async (prepared) => {
       const { entry, normalizedAssignment } = prepared;
 
       await saveVNEntry(env, entry);
@@ -521,13 +528,27 @@ export async function batchUpdateVNTiers(env, updates) {
         tierSort: normalizedAssignment.tierSort
       });
     }));
+
+    const rejected = writeResults.find(result => result.status === 'rejected');
+    if (rejected) {
+      writeError = rejected.reason instanceof Error
+        ? rejected.reason
+        : new Error(String(rejected.reason));
+      break;
+    }
   }
 
-  if (requiresRebuild) {
+  const shouldForceRebuild = writeError !== null;
+
+  if (requiresRebuild || shouldForceRebuild) {
     await rebuildVNListByIds(env, Array.from(rebuildSnapshotIds));
   } else {
     list.items = listItems;
     await saveVNList(env, list);
+  }
+
+  if (writeError) {
+    throw writeError;
   }
 
   return updatedItems;
@@ -586,6 +607,114 @@ export async function getIndexStatus(env) {
  */
 export async function saveIndexStatus(env, status) {
   await env.KV.put('index:status', JSON.stringify(status));
+}
+
+function hasIndexStartLockDurableObjectBinding(env) {
+  return Boolean(
+    env?.INDEX_START_LOCK
+    && typeof env.INDEX_START_LOCK.idFromName === 'function'
+    && typeof env.INDEX_START_LOCK.get === 'function'
+  );
+}
+
+async function callIndexStartLockDurableObject(env, path, payload = {}) {
+  const durableId = env.INDEX_START_LOCK.idFromName(INDEX_START_LOCK_DO_NAME);
+  const durableStub = env.INDEX_START_LOCK.get(durableId);
+
+  const response = await durableStub.fetch(`https://index-start-lock${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`索引启动锁请求失败: ${response.status}`);
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function warnIndexStartLockKVFallbackOnce(operation) {
+  if (hasWarnedIndexStartLockKVFallback) {
+    return;
+  }
+
+  hasWarnedIndexStartLockKVFallback = true;
+  console.warn('[index][start-lock] INDEX_START_LOCK Durable Object binding not found; fallback to KV lock (best-effort, non-atomic under high concurrency)', {
+    operation,
+    key: INDEX_START_LOCK_KEY,
+    ttlSeconds: INDEX_START_LOCK_TTL_SECONDS
+  });
+}
+
+/**
+ * 尝试获取索引启动分布式锁
+ * 优先使用 Durable Object 提供原子互斥；未配置时回退到 KV 兼容逻辑（best-effort，非强一致互斥）。
+ * @param {Object} env - 环境变量
+ * @param {string} holder - 持有者标识
+ * @returns {Promise<boolean>} true=获取成功，false=获取失败
+ */
+export async function tryAcquireIndexStartLock(env, holder) {
+  if (!holder) return false;
+
+  if (hasIndexStartLockDurableObjectBinding(env)) {
+    const result = await callIndexStartLockDurableObject(env, '/acquire', {
+      holder,
+      ttlMs: INDEX_START_LOCK_TTL_MS
+    });
+    return result?.acquired === true;
+  }
+
+  warnIndexStartLockKVFallbackOnce('acquire');
+
+  const now = Date.now();
+
+  const existing = await env.KV.get(INDEX_START_LOCK_KEY, 'json');
+
+  if (existing?.expiresAt && Number(existing.expiresAt) > now) {
+    return false;
+  }
+
+  const nextLock = {
+    holder,
+    expiresAt: now + INDEX_START_LOCK_TTL_MS,
+    acquiredAt: new Date(now).toISOString()
+  };
+
+  await env.KV.put(INDEX_START_LOCK_KEY, JSON.stringify(nextLock), {
+    expirationTtl: INDEX_START_LOCK_TTL_SECONDS
+  });
+
+  const confirmed = await env.KV.get(INDEX_START_LOCK_KEY, 'json');
+  return confirmed?.holder === holder;
+}
+
+/**
+ * 释放索引启动分布式锁（仅持有者可释放）
+ * 未配置 Durable Object 时回退为 KV best-effort 释放。
+ * @param {Object} env - 环境变量
+ * @param {string} holder - 持有者标识
+ */
+export async function releaseIndexStartLock(env, holder) {
+  if (!holder) return;
+
+  if (hasIndexStartLockDurableObjectBinding(env)) {
+    await callIndexStartLockDurableObject(env, '/release', { holder });
+    return;
+  }
+
+  warnIndexStartLockKVFallbackOnce('release');
+
+  const existing = await env.KV.get(INDEX_START_LOCK_KEY, 'json');
+  if (existing?.holder === holder) {
+    await env.KV.delete(INDEX_START_LOCK_KEY);
+  }
 }
 
 /**

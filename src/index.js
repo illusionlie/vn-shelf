@@ -16,6 +16,118 @@ import { fetchVNDB } from './vndb.js';
 const INDEX_MAX_RETRY = 3;
 const INDEX_RETRY_DELAY_SECONDS = 60;
 const INDEX_RECONCILE_INTERVAL_MS = 5000;
+const INDEX_START_LOCK_STORAGE_KEY = 'index:start-lock';
+const INDEX_START_LOCK_DEFAULT_TTL_MS = 30 * 1000;
+
+/**
+ * 索引启动分布式锁 Durable Object（全局单例）
+ */
+export class IndexStartLockDurableObject {
+  constructor(state) {
+    this.state = state;
+  }
+
+  async fetch(request) {
+    if (request.method !== 'POST') {
+      return this.jsonResponse({ success: false, error: 'Method Not Allowed' }, 405);
+    }
+
+    const url = new URL(request.url);
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    if (url.pathname === '/acquire') {
+      return this.handleAcquire(body);
+    }
+
+    if (url.pathname === '/release') {
+      return this.handleRelease(body);
+    }
+
+    if (url.pathname === '/status') {
+      return this.handleStatus();
+    }
+
+    return this.jsonResponse({ success: false, error: 'Not Found' }, 404);
+  }
+
+  async handleAcquire(body) {
+    const holder = typeof body?.holder === 'string' ? body.holder.trim() : '';
+    const requestedTtlMs = Number(body?.ttlMs);
+    const ttlMs = Number.isFinite(requestedTtlMs) && requestedTtlMs > 0
+      ? Math.floor(requestedTtlMs)
+      : INDEX_START_LOCK_DEFAULT_TTL_MS;
+
+    if (!holder) {
+      return this.jsonResponse({ acquired: false, error: 'holder required' }, 400);
+    }
+
+    const now = Date.now();
+    const existing = await this.state.storage.get(INDEX_START_LOCK_STORAGE_KEY);
+
+    if (existing?.expiresAt && Number(existing.expiresAt) > now && existing.holder !== holder) {
+      return this.jsonResponse({
+        acquired: false,
+        holder: existing.holder,
+        expiresAt: existing.expiresAt
+      });
+    }
+
+    const nextLock = {
+      holder,
+      acquiredAt: existing?.holder === holder && existing?.acquiredAt
+        ? existing.acquiredAt
+        : new Date(now).toISOString(),
+      expiresAt: now + ttlMs
+    };
+
+    await this.state.storage.put(INDEX_START_LOCK_STORAGE_KEY, nextLock);
+
+    return this.jsonResponse({
+      acquired: true,
+      holder,
+      expiresAt: nextLock.expiresAt
+    });
+  }
+
+  async handleRelease(body) {
+    const holder = typeof body?.holder === 'string' ? body.holder.trim() : '';
+
+    if (!holder) {
+      return this.jsonResponse({ released: false, error: 'holder required' }, 400);
+    }
+
+    const existing = await this.state.storage.get(INDEX_START_LOCK_STORAGE_KEY);
+
+    if (existing?.holder === holder) {
+      await this.state.storage.delete(INDEX_START_LOCK_STORAGE_KEY);
+      return this.jsonResponse({ released: true });
+    }
+
+    return this.jsonResponse({ released: false });
+  }
+
+  async handleStatus() {
+    const existing = await this.state.storage.get(INDEX_START_LOCK_STORAGE_KEY);
+    return this.jsonResponse({
+      lock: existing || null
+    });
+  }
+
+  jsonResponse(data, status = 200) {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+}
 
 export default {
   /**

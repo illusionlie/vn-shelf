@@ -28,7 +28,9 @@ import {
   saveTierList,
   updateVNTier,
   batchUpdateVNTiers,
-  clearTierAssignments
+  clearTierAssignments,
+  tryAcquireIndexStartLock,
+  releaseIndexStartLock
 } from './kv.js';
 import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
@@ -1060,60 +1062,79 @@ async function handleStartIndex(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
+  const startLockHolder = `start_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
   return runWithStartIndexLock(async () => {
-    const currentStatus = await getIndexStatus(env);
-    if (currentStatus.status === 'running') {
+    const acquired = await tryAcquireIndexStartLock(env, startLockHolder);
+    if (!acquired) {
       return errorResponse('已有索引任务正在运行', 409);
     }
 
-    const list = await getVNList(env);
-    const total = list.items.length;
-
-    if (total === 0) {
-      return errorResponse('没有需要索引的条目', 400);
-    }
-
-    // 创建索引状态
-    const taskId = `idx_${Date.now()}`;
-    const status = {
-      status: 'running',
-      taskId,
-      total,
-      processed: 0,
-      failed: [],
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-      error: null,
-      lastReconciledAt: null
-    };
-
-    await saveIndexStatus(env, status);
-
     try {
-      // 分片并发发送（同一批次共享同一个 taskId）
-      for (let i = 0; i < list.items.length; i += INDEX_START_QUEUE_BATCH_SIZE) {
-        const chunk = list.items.slice(i, i + INDEX_START_QUEUE_BATCH_SIZE);
-        await Promise.all(chunk.map(item => env.VN_INDEX_QUEUE.send({
-          vndbId: item.id,
-          taskId,
-          retryCount: 0
-        })));
+      const currentStatus = await getIndexStatus(env);
+      if (currentStatus.status === 'running') {
+        return errorResponse('已有索引任务正在运行', 409);
       }
-    } catch (error) {
-      const failedStatus = {
-        ...status,
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        error: error instanceof Error ? error.message : String(error)
+
+      const list = await getVNList(env);
+      const total = list.items.length;
+
+      if (total === 0) {
+        return errorResponse('没有需要索引的条目', 400);
+      }
+
+      // 创建索引状态
+      const taskId = `idx_${Date.now()}`;
+      const status = {
+        status: 'running',
+        taskId,
+        total,
+        processed: 0,
+        failed: [],
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+        error: null,
+        lastReconciledAt: null
       };
 
-      await saveIndexStatus(env, failedStatus);
-      return errorResponse('索引任务启动失败，请稍后重试', 500);
-    }
+      await saveIndexStatus(env, status);
 
-    return successResponse({ total }, '索引任务已启动');
+      try {
+        // 分片并发发送（同一批次共享同一个 taskId）
+        for (let i = 0; i < list.items.length; i += INDEX_START_QUEUE_BATCH_SIZE) {
+          const chunk = list.items.slice(i, i + INDEX_START_QUEUE_BATCH_SIZE);
+          await Promise.all(chunk.map(item => env.VN_INDEX_QUEUE.send({
+            vndbId: item.id,
+            taskId,
+            retryCount: 0
+          })));
+        }
+      } catch (error) {
+        const failedStatus = {
+          ...status,
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+          error: error instanceof Error ? error.message : String(error)
+        };
+
+        await saveIndexStatus(env, failedStatus);
+        return errorResponse('索引任务启动失败，请稍后重试', 500);
+      }
+
+      return successResponse({ total }, '索引任务已启动');
+    } finally {
+      try {
+        await releaseIndexStartLock(env, startLockHolder);
+      } catch (releaseError) {
+        console.error('[index][start] release lock failed', {
+          holder: startLockHolder,
+          error: releaseError instanceof Error ? releaseError.message : String(releaseError)
+        });
+      }
+    }
   });
 }
+
 
 async function handleGetIndexStatus(request, env, auth) {
   if (!auth.authenticated) {

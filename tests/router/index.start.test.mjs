@@ -48,7 +48,22 @@ function createIndexStatus(overrides = {}) {
   };
 }
 
-async function loadRouterModule({ authenticated = true, indexStatus = {}, vnItems = [] } = {}) {
+function createSharedKvState({ indexStatus = {}, vnItems = [] } = {}) {
+  return {
+    indexStatus: createIndexStatus(indexStatus),
+    vnList: createVNList(vnItems),
+    getIndexStatusCalls: 0,
+    getVNListCalls: 0,
+    saveIndexStatusCalls: [],
+    startLock: null,
+    tryAcquireCalls: 0,
+    releaseCalls: 0,
+    forceAcquireConflict: false,
+    throwOnRelease: false
+  };
+}
+
+async function loadRouterModule({ authenticated = true, indexStatus = {}, vnItems = [], sharedKvState = null } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-router-index-start-test-'));
   const routerPath = path.join(tempDir, 'router.module.mjs');
@@ -61,11 +76,7 @@ async function loadRouterModule({ authenticated = true, indexStatus = {}, vnItem
   globalThis.__routerIndexStartTestRegistry = globalThis.__routerIndexStartTestRegistry || new Map();
   const state = {
     authenticated,
-    indexStatus: createIndexStatus(indexStatus),
-    vnList: createVNList(vnItems),
-    getIndexStatusCalls: 0,
-    getVNListCalls: 0,
-    saveIndexStatusCalls: []
+    sharedKvState: sharedKvState || createSharedKvState({ indexStatus, vnItems })
   };
   globalThis.__routerIndexStartTestRegistry.set(testId, state);
 
@@ -89,22 +100,53 @@ export async function isInitialized() { return true; }
 
   const kvStubCode = `
 const state = globalThis.__routerIndexStartTestRegistry?.get('${testId}');
+const kv = state.sharedKvState;
 const clone = value => JSON.parse(JSON.stringify(value));
 
 export async function getVNList() {
-  state.getVNListCalls += 1;
-  return clone(state.vnList);
+  kv.getVNListCalls += 1;
+  return clone(kv.vnList);
 }
 
 export async function getIndexStatus() {
-  state.getIndexStatusCalls += 1;
-  return clone(state.indexStatus);
+  kv.getIndexStatusCalls += 1;
+  return clone(kv.indexStatus);
 }
 
 export async function saveIndexStatus(env, status) {
   const next = clone(status);
-  state.indexStatus = next;
-  state.saveIndexStatusCalls.push(next);
+  kv.indexStatus = next;
+  kv.saveIndexStatusCalls.push(next);
+}
+
+export async function tryAcquireIndexStartLock(_env, holder) {
+  kv.tryAcquireCalls = (kv.tryAcquireCalls || 0) + 1;
+
+  if (kv.forceAcquireConflict) {
+    return false;
+  }
+
+  const now = Date.now();
+  const lock = kv.startLock;
+  if (lock && lock.expiresAt > now) {
+    return false;
+  }
+
+  kv.startLock = {
+    holder,
+    expiresAt: now + 30 * 1000
+  };
+  return true;
+}
+
+export async function releaseIndexStartLock(_env, holder) {
+  kv.releaseCalls = (kv.releaseCalls || 0) + 1;
+  if (kv.throwOnRelease) {
+    throw new Error('release lock failed');
+  }
+  if (kv.startLock?.holder === holder) {
+    kv.startLock = null;
+  }
 }
 
 export async function getVNEntry() { return null; }
@@ -222,7 +264,7 @@ async function sendStartIndexRequest(routerModule, envOverrides = {}) {
   return { response, payload };
 }
 
-test('并发启动时仅允许一个请求成功，另一个返回冲突', async () => {
+test('并发启动时仅允许一个请求成功，另一个返回冲突（同实例内锁）', async () => {
   const vnItems = createVNItems(5);
   const sendCalls = [];
 
@@ -265,9 +307,9 @@ test('并发启动时仅允许一个请求成功，另一个返回冲突', async
       error: '已有索引任务正在运行'
     });
 
-    assert.equal(state.saveIndexStatusCalls.length, 1);
-    assert.equal(state.getVNListCalls, 1);
-    assert.equal(state.getIndexStatusCalls, 2);
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
+    assert.equal(state.sharedKvState.getVNListCalls, 1);
+    assert.equal(state.sharedKvState.getIndexStatusCalls, 2);
 
     assert.equal(sendCalls.length, 5);
     const taskIds = Array.from(new Set(sendCalls.map(item => item.taskId)));
@@ -305,9 +347,9 @@ test('running 状态下重复启动会被拒绝', async () => {
       success: false,
       error: '已有索引任务正在运行'
     });
-    assert.equal(state.getIndexStatusCalls, 1);
-    assert.equal(state.getVNListCalls, 0);
-    assert.equal(state.saveIndexStatusCalls.length, 0);
+    assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
+    assert.equal(state.sharedKvState.getVNListCalls, 0);
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 0);
     assert.equal(sendCalls.length, 0);
   } finally {
     await cleanup();
@@ -340,8 +382,8 @@ test('正常启动会创建任务状态并发送全部消息', async () => {
       data: { total: 3 }
     });
 
-    assert.equal(state.saveIndexStatusCalls.length, 1);
-    const savedStatus = state.saveIndexStatusCalls[0];
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
+    const savedStatus = state.sharedKvState.saveIndexStatusCalls[0];
     assert.equal(savedStatus.status, 'running');
     assert.equal(savedStatus.total, 3);
     assert.equal(savedStatus.processed, 0);
@@ -433,9 +475,9 @@ test('发送失败会写入 failed 状态，并允许后续再次启动', async 
       error: '索引任务启动失败，请稍后重试'
     });
 
-    assert.equal(state.saveIndexStatusCalls.length, 2);
-    const runningStatus = state.saveIndexStatusCalls[0];
-    const failedStatus = state.saveIndexStatusCalls[1];
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+    const runningStatus = state.sharedKvState.saveIndexStatusCalls[0];
+    const failedStatus = state.sharedKvState.saveIndexStatusCalls[1];
     assert.equal(runningStatus.status, 'running');
     assert.equal(failedStatus.status, 'failed');
     assert.equal(failedStatus.taskId, runningStatus.taskId);
@@ -450,13 +492,112 @@ test('发送失败会写入 failed 状态，并允许后续再次启动', async 
       data: { total: 3 }
     });
 
-    assert.equal(state.saveIndexStatusCalls.length, 3);
-    const restartedStatus = state.saveIndexStatusCalls[2];
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 3);
+    const restartedStatus = state.sharedKvState.saveIndexStatusCalls[2];
     assert.equal(restartedStatus.status, 'running');
     assert.match(restartedStatus.taskId, /^idx_\d+$/);
 
     assert.equal(sendCalls, 6);
+    assert.equal(state.sharedKvState.releaseCalls, 2);
   } finally {
     await cleanup();
   }
 });
+
+test('释放锁失败不会覆盖已成功启动的响应', async () => {
+  const vnItems = createVNItems(2);
+  const sendCalls = [];
+
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    indexStatus: {
+      status: 'idle'
+    },
+    vnItems
+  });
+
+  state.sharedKvState.throwOnRelease = true;
+
+  try {
+    const { response, payload } = await sendStartIndexRequest(routerModule, {
+      VN_INDEX_QUEUE: {
+        async send(message) {
+          sendCalls.push(deepClone(message));
+        }
+      }
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, {
+      success: true,
+      message: '索引任务已启动',
+      data: { total: 2 }
+    });
+
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
+    assert.equal(state.sharedKvState.saveIndexStatusCalls[0].status, 'running');
+    assert.equal(sendCalls.length, 2);
+    assert.equal(state.sharedKvState.releaseCalls, 1);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('跨实例并发启动会被分布式锁拦截为一个成功一个冲突', async () => {
+  const sharedKvState = createSharedKvState({
+    indexStatus: { status: 'idle' },
+    vnItems: createVNItems(4)
+  });
+
+  const first = await loadRouterModule({ sharedKvState });
+  const second = await loadRouterModule({ sharedKvState });
+
+  const sendCalls = [];
+
+  try {
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send(message) {
+          sendCalls.push(deepClone(message));
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+      }
+    };
+
+    const [firstResult, secondResult] = await Promise.all([
+      sendStartIndexRequest(first.routerModule, env),
+      sendStartIndexRequest(second.routerModule, env)
+    ]);
+
+    const statuses = [firstResult.response.status, secondResult.response.status].sort((a, b) => a - b);
+    assert.deepEqual(statuses, [200, 409]);
+
+    const successResult = firstResult.response.status === 200 ? firstResult : secondResult;
+    const conflictResult = firstResult.response.status === 409 ? firstResult : secondResult;
+
+    assert.deepEqual(successResult.payload, {
+      success: true,
+      message: '索引任务已启动',
+      data: { total: 4 }
+    });
+    assert.deepEqual(conflictResult.payload, {
+      success: false,
+      error: '已有索引任务正在运行'
+    });
+
+    assert.equal(sendCalls.length, 4);
+
+    const taskIds = Array.from(new Set(sendCalls.map(item => item.taskId)));
+    assert.equal(taskIds.length, 1);
+
+    assert.equal(sharedKvState.saveIndexStatusCalls.length, 1);
+    assert.equal(sharedKvState.getIndexStatusCalls, 1);
+    assert.equal(sharedKvState.getVNListCalls, 1);
+    assert.equal(sharedKvState.tryAcquireCalls, 2);
+    assert.equal(sharedKvState.releaseCalls, 1);
+    assert.equal(sharedKvState.startLock, null);
+  } finally {
+    await first.cleanup();
+    await second.cleanup();
+  }
+});
+

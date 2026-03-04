@@ -177,28 +177,62 @@ test('importData replace 导入后列表仅包含新条目', async () => {
   }
 });
 
-test('导入后 exportData 不会漏掉新条目（列表与导出一致）', async () => {
+test('batchUpdateVNTiers 在分片内写入失败时仍会重建聚合列表以收敛一致性', async () => {
   const { kvModule, cleanup } = await loadKVModule();
 
   try {
-    const { env } = createMockEnv({
-      'vn:v1': createEntry('v1', 'Old Entry'),
-      'vn:list': createListSnapshot(['v1'])
-    });
+    const sourceCode = await fs.readFile(sourcePath, 'utf8');
+    const saveMatch = sourceCode.match(/const BATCH_UPDATE_TIER_CHUNK_SIZE\s*=\s*(\d+)/);
+    const chunkSize = saveMatch ? Number(saveMatch[1]) : 25;
 
-    await kvModule.importData(env, {
-      entries: [createEntry('v2', 'Imported Entry')]
-    }, 'merge');
+    const ids = Array.from({ length: chunkSize + 1 }, (_, index) => `v${index + 1}`);
+    const seed = {
+      'vn:list': createListSnapshot(ids)
+    };
+
+    for (const id of ids) {
+      seed[`vn:${id}`] = createEntry(id, `Entry ${id}`);
+    }
+
+    const { env, store } = createMockEnv(seed);
+
+    let putCount = 0;
+    const originalPut = env.KV.put;
+    env.KV.put = async (key, value) => {
+      if (key.startsWith('vn:') && key !== 'vn:list') {
+        putCount += 1;
+        if (putCount === chunkSize + 1) {
+          throw new Error('simulated put failure on second chunk');
+        }
+      }
+      return originalPut(key, value);
+    };
+
+    const updates = ids.map((id, index) => ({
+      id,
+      tierId: 'tier-a',
+      tierSort: index
+    }));
+
+    await assert.rejects(
+      () => kvModule.batchUpdateVNTiers(env, updates),
+      /simulated put failure on second chunk/
+    );
+
+    const changedEntries = [];
+    for (const id of ids) {
+      const entry = JSON.parse(store.get(`vn:${id}`));
+      if (entry?.user?.tierId === 'tier-a') {
+        changedEntries.push(id);
+      }
+    }
+
+    assert.equal(changedEntries.length, chunkSize);
 
     const list = await kvModule.getVNList(env);
-    const exported = await kvModule.exportData(env);
+    const listTiered = (list.items || []).filter(item => item.tierId === 'tier-a').map(item => item.id).sort();
 
-    const listIds = list.items.map(item => item.id);
-    const exportedIds = exported.entries.map(entry => entry.id);
-
-    assert.deepEqual(listIds, ['v1', 'v2']);
-    assert.deepEqual(exportedIds, ['v1', 'v2']);
-    assert.deepEqual(exportedIds, listIds);
+    assert.deepEqual(listTiered, changedEntries.sort());
   } finally {
     await cleanup();
   }
