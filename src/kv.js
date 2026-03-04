@@ -9,7 +9,7 @@ const BATCH_UPDATE_TIER_CHUNK_SIZE = 25;
 const INDEX_START_LOCK_DO_NAME = 'global';
 // 兼容旧配置时的回退锁键：仅用于 best-effort 互斥（KV 无原子 CAS，极端并发下可能双成功）
 const INDEX_START_LOCK_KEY = 'index:start-lock';
-const INDEX_START_LOCK_TTL_SECONDS = 30;
+const INDEX_START_LOCK_TTL_SECONDS = 60;
 const INDEX_START_LOCK_TTL_MS = INDEX_START_LOCK_TTL_SECONDS * 1000;
 let hasWarnedIndexStartLockKVFallback = false;
 
