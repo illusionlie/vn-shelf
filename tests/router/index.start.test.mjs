@@ -403,6 +403,50 @@ test('正常启动会创建任务状态并发送全部消息', async () => {
   }
 });
 
+test('启动索引时会去重重复 VN ID，并按去重后 total 入队', async () => {
+  const vnItems = [
+    { id: 'v17' },
+    { id: 'v17' },
+    { id: 'v19' },
+    { id: 'v19' },
+    { id: 'v23' }
+  ];
+  const sendCalls = [];
+
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    indexStatus: {
+      status: 'idle'
+    },
+    vnItems
+  });
+
+  try {
+    const { response, payload } = await sendStartIndexRequest(routerModule, {
+      VN_INDEX_QUEUE: {
+        async send(message) {
+          sendCalls.push(deepClone(message));
+        }
+      }
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, {
+      success: true,
+      message: '索引任务已启动',
+      data: { total: 3 }
+    });
+
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
+    const savedStatus = state.sharedKvState.saveIndexStatusCalls[0];
+    assert.equal(savedStatus.total, 3);
+
+    assert.equal(sendCalls.length, 3);
+    assert.deepEqual(sendCalls.map(item => item.vndbId).sort(), ['v17', 'v19', 'v23']);
+  } finally {
+    await cleanup();
+  }
+});
+
 test('批量发送使用分片并发并限制并发上界', async () => {
   const vnItems = createVNItems(60);
   let active = 0;

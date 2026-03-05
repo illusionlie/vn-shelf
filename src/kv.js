@@ -846,8 +846,7 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
   const summary = await summarizeIndexTaskResults(env, taskId);
   const total = status.total || 0;
   const summarizedProcessed = Math.min(total, summary.processed);
-
-  const nextStatus = {
+  const candidateStatus = {
     ...status,
     // 维持单调上升（在同一状态视图内），并且不超过 total
     processed: Math.min(total, Math.max(status.processed || 0, summarizedProcessed)),
@@ -855,24 +854,75 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
     lastReconciledAt: new Date().toISOString()
   };
 
-  let transitionedToTerminal = false;
-  if (nextStatus.status === 'running' && nextStatus.processed >= total) {
-    nextStatus.status = nextStatus.failed.length > 0 ? 'partial' : 'completed';
-    nextStatus.completedAt = nextStatus.completedAt || new Date().toISOString();
-    transitionedToTerminal = true;
+  if (candidateStatus.status === 'running' && candidateStatus.processed >= total) {
+    candidateStatus.status = candidateStatus.failed.length > 0 ? 'partial' : 'completed';
+    candidateStatus.completedAt = candidateStatus.completedAt || new Date().toISOString();
   }
 
-  await saveIndexStatus(env, nextStatus);
+  const latest = await getIndexStatus(env);
+
+  // 若状态已切到其他任务，不做回写
+  if (!latest.taskId || latest.taskId !== taskId) {
+    return latest;
+  }
+
+  // 终态保护：避免并发陈旧写把终态回滚为 running
+  if (latest.status === 'completed' || latest.status === 'partial' || latest.status === 'failed') {
+    console.log('[index][reconcile] skip stale write because latest status already terminal', {
+      taskId,
+      latestStatus: latest.status,
+      candidateStatus: candidateStatus.status,
+      latestProcessed: latest.processed,
+      candidateProcessed: candidateStatus.processed
+    });
+    return latest;
+  }
+
+  const mergedTotal = Number.isFinite(Number(latest.total))
+    ? Math.max(0, Math.floor(Number(latest.total)))
+    : total;
+
+  const mergedStatus = {
+    ...latest,
+    failed: candidateStatus.failed,
+    lastReconciledAt: candidateStatus.lastReconciledAt,
+    processed: Math.min(mergedTotal, Math.max(
+      latest.processed || 0,
+      status.processed || 0,
+      candidateStatus.processed || 0
+    ))
+  };
+
+  if (mergedStatus.status === 'running' && mergedStatus.processed >= mergedTotal) {
+    mergedStatus.status = mergedStatus.failed.length > 0 ? 'partial' : 'completed';
+    mergedStatus.completedAt = mergedStatus.completedAt || new Date().toISOString();
+  }
+
+  const transitionedToTerminal =
+    latest.status === 'running' &&
+    (mergedStatus.status === 'completed' || mergedStatus.status === 'partial');
+
+  if ((latest.processed || 0) > (candidateStatus.processed || 0)) {
+    console.log('[index][reconcile] monotonic merge prevented processed rollback', {
+      taskId,
+      latestProcessed: latest.processed,
+      candidateProcessed: candidateStatus.processed,
+      mergedProcessed: mergedStatus.processed
+    });
+  }
+
+  await saveIndexStatus(env, mergedStatus);
 
   if (transitionedToTerminal) {
     try {
-      await cleanupIndexTaskResults(env, taskId);
+      const cleaned = await cleanupIndexTaskResults(env, taskId);
+      console.log('[index][cleanup] cleaned task item results', { taskId, cleaned });
     } catch (error) {
       console.warn('[index][cleanup] failed to cleanup task items', { taskId, error });
     }
   }
 
-  return nextStatus;
+  return mergedStatus;
 }
 
 /**

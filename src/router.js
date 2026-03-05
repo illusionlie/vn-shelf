@@ -1077,7 +1077,20 @@ async function handleStartIndex(request, env, auth) {
       }
 
       const list = await getVNList(env);
-      const total = list.items.length;
+      const rawIds = Array.isArray(list.items)
+        ? list.items.map(item => (typeof item?.id === 'string' ? item.id.trim() : '')).filter(Boolean)
+        : [];
+      const uniqueIds = Array.from(new Set(rawIds));
+      const duplicateCount = rawIds.length - uniqueIds.length;
+      const total = uniqueIds.length;
+
+      if (duplicateCount > 0) {
+        console.warn('[index][start] duplicate vn ids detected and deduplicated before queue enqueue', {
+          rawCount: rawIds.length,
+          deduplicatedCount: total,
+          duplicateCount
+        });
+      }
 
       if (total === 0) {
         return errorResponse('没有需要索引的条目', 400);
@@ -1101,10 +1114,10 @@ async function handleStartIndex(request, env, auth) {
 
       try {
         // 分片并发发送（同一批次共享同一个 taskId）
-        for (let i = 0; i < list.items.length; i += INDEX_START_QUEUE_BATCH_SIZE) {
-          const chunk = list.items.slice(i, i + INDEX_START_QUEUE_BATCH_SIZE);
-          await Promise.all(chunk.map(item => env.VN_INDEX_QUEUE.send({
-            vndbId: item.id,
+        for (let i = 0; i < uniqueIds.length; i += INDEX_START_QUEUE_BATCH_SIZE) {
+          const chunk = uniqueIds.slice(i, i + INDEX_START_QUEUE_BATCH_SIZE);
+          await Promise.all(chunk.map(vndbId => env.VN_INDEX_QUEUE.send({
+            vndbId,
             taskId,
             retryCount: 0
           })));

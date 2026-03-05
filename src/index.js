@@ -174,6 +174,87 @@ export default {
    */
   async queue(batch, env, ctx) {
     const touchedTasks = new Map();
+    const canUseWaitUntil = Boolean(ctx && typeof ctx.waitUntil === 'function');
+
+    function getDelayedReconcileDelayMs(lastReconciledAtMs) {
+      if (!Number.isFinite(lastReconciledAtMs)) {
+        return INDEX_RECONCILE_INTERVAL_MS;
+      }
+
+      return Math.max(0, INDEX_RECONCILE_INTERVAL_MS - (Date.now() - lastReconciledAtMs));
+    }
+
+    function scheduleDelayedReconcile(taskId, taskMeta, delayMs, reason) {
+      if (!taskMeta?.settledCount) {
+        return false;
+      }
+
+      if (taskMeta.delayedReconcileScheduled) {
+        return false;
+      }
+
+      if (!canUseWaitUntil) {
+        console.warn('[index][queue-reconcile-delayed] skip scheduling because waitUntil unavailable', {
+          taskId,
+          reason,
+          settledInBatch: taskMeta.settledCount
+        });
+        return false;
+      }
+
+      const normalizedDelayMs = Math.max(0, Math.floor(delayMs || 0));
+      taskMeta.delayedReconcileScheduled = true;
+
+      console.log('[index][queue-reconcile-delayed] scheduled', {
+        taskId,
+        reason,
+        delayMs: normalizedDelayMs,
+        settledInBatch: taskMeta.settledCount
+      });
+
+      ctx.waitUntil((async () => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, normalizedDelayMs));
+
+          const delayedBefore = await getIndexStatus(env);
+          if (delayedBefore.taskId !== taskId || delayedBefore.status !== 'running') {
+            console.log('[index][queue-reconcile-delayed] skipped', {
+              taskId,
+              reason,
+              status: delayedBefore.status,
+              activeTaskId: delayedBefore.taskId
+            });
+            return;
+          }
+
+          const delayedNext = await reconcileIndexStatusFromItems(env, taskId);
+
+          console.log('[index][queue-reconcile-delayed]', {
+            taskId,
+            reason,
+            status: delayedNext.status,
+            processed: delayedNext.processed,
+            total: delayedNext.total,
+            failedCount: delayedNext.failed?.length || 0
+          });
+
+          if (
+            delayedBefore.status === 'running' &&
+            (delayedNext.status === 'completed' || delayedNext.status === 'partial')
+          ) {
+            await rebuildVNList(env);
+          }
+        } catch (error) {
+          console.error('[index][queue-reconcile-delayed] failed', {
+            taskId,
+            reason,
+            error: error?.message || String(error)
+          });
+        }
+      })());
+
+      return true;
+    }
 
     for (const message of batch.messages) {
       const { vndbId, taskId, retryCount = 0 } = message.body || {};
@@ -184,7 +265,10 @@ export default {
         continue;
       }
 
-      const taskMeta = touchedTasks.get(taskId) || { settledCount: 0 };
+      const taskMeta = touchedTasks.get(taskId) || {
+        settledCount: 0,
+        delayedReconcileScheduled: false
+      };
       touchedTasks.set(taskId, taskMeta);
 
       try {
@@ -272,38 +356,19 @@ export default {
         continue;
       }
 
+      const hasSettledInBatch = taskMeta.settledCount > 0;
       const nowMs = Date.now();
       const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : Number.NaN;
       const shouldReconcileByInterval =
         !Number.isFinite(lastReconciledAtMs) || (nowMs - lastReconciledAtMs) >= INDEX_RECONCILE_INTERVAL_MS;
 
       const remaining = Math.max(0, (before.total || 0) - (before.processed || 0));
-      const shouldReconcileNearCompletion = taskMeta.settledCount > 0 && remaining <= taskMeta.settledCount;
+      const shouldReconcileNearCompletion = hasSettledInBatch && remaining <= taskMeta.settledCount;
+      const shouldReconcileNow = shouldReconcileByInterval || shouldReconcileNearCompletion;
 
-      if (!shouldReconcileByInterval && !shouldReconcileNearCompletion) {
-        // 若本批次被节流，注册一次延迟汇总，保证任务可收敛到终态
-        if (ctx && typeof ctx.waitUntil === 'function' && Number.isFinite(lastReconciledAtMs)) {
-          const delayMs = Math.max(0, INDEX_RECONCILE_INTERVAL_MS - (nowMs - lastReconciledAtMs));
-
-          ctx.waitUntil((async () => {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-
-            const delayedBefore = await getIndexStatus(env);
-            if (delayedBefore.taskId !== taskId || delayedBefore.status !== 'running') {
-              return;
-            }
-
-            const delayedNext = await reconcileIndexStatusFromItems(env, taskId);
-
-            if (
-              delayedBefore.status === 'running' &&
-              (delayedNext.status === 'completed' || delayedNext.status === 'partial')
-            ) {
-              await rebuildVNList(env);
-            }
-          })());
-        }
-
+      if (!shouldReconcileNow) {
+        const delayedByMs = getDelayedReconcileDelayMs(lastReconciledAtMs);
+        scheduleDelayedReconcile(taskId, taskMeta, delayedByMs, 'throttled');
         continue;
       }
 
@@ -325,6 +390,12 @@ export default {
         (next.status === 'completed' || next.status === 'partial')
       ) {
         await rebuildVNList(env);
+        continue;
+      }
+
+      // 即时汇总后仍是 running，则兜底注册一次延迟汇总，保证最终可收敛
+      if (hasSettledInBatch && next.status === 'running') {
+        scheduleDelayedReconcile(taskId, taskMeta, INDEX_RECONCILE_INTERVAL_MS, 'post-immediate-running');
       }
     }
   }
