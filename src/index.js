@@ -357,18 +357,14 @@ export default {
       }
 
       const hasSettledInBatch = taskMeta.settledCount > 0;
-      const nowMs = Date.now();
       const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : Number.NaN;
-      const shouldReconcileByInterval =
-        !Number.isFinite(lastReconciledAtMs) || (nowMs - lastReconciledAtMs) >= INDEX_RECONCILE_INTERVAL_MS;
-
       const remaining = Math.max(0, (before.total || 0) - (before.processed || 0));
       const shouldReconcileNearCompletion = hasSettledInBatch && remaining <= taskMeta.settledCount;
-      const shouldReconcileNow = shouldReconcileByInterval || shouldReconcileNearCompletion;
 
-      if (!shouldReconcileNow) {
+      // 高频批次下仅在临近完成时即时汇总，其余路径统一延迟汇总降载
+      if (!shouldReconcileNearCompletion) {
         const delayedByMs = getDelayedReconcileDelayMs(lastReconciledAtMs);
-        scheduleDelayedReconcile(taskId, taskMeta, delayedByMs, 'throttled');
+        scheduleDelayedReconcile(taskId, taskMeta, delayedByMs, 'throttled-window');
         continue;
       }
 

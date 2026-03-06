@@ -4,8 +4,12 @@
 
 // 索引条目结果保留 14 天，避免 KV 键无限增长
 const INDEX_ITEM_RESULT_TTL_SECONDS = 14 * 24 * 60 * 60;
+const INDEX_TASK_RESULT_GET_CHUNK_SIZE = 25;
 const TIER_COLOR_HEX_REGEX = /^#[0-9a-fA-F]{6}$/;
 const BATCH_UPDATE_TIER_CHUNK_SIZE = 25;
+const VN_KEY_PREFIX = 'vn:';
+const VN_LIST_KEY = 'vn:list';
+const VNDB_ID_REGEX = /^v\d+$/;
 const INDEX_START_LOCK_DO_NAME = 'global';
 // 兼容旧配置时的回退锁键：仅用于 best-effort 互斥（KV 无原子 CAS，极端并发下可能双成功）
 const INDEX_START_LOCK_KEY = 'index:start-lock';
@@ -304,6 +308,66 @@ function normalizeSnapshotIds(ids) {
   ));
 }
 
+function normalizeVNDBId(id) {
+  if (typeof id !== 'string') {
+    return null;
+  }
+
+  const normalized = id.trim();
+  return VNDB_ID_REGEX.test(normalized) ? normalized : null;
+}
+
+function compareVNDBId(a, b) {
+  const aNumeric = Number.parseInt(a.slice(1), 10);
+  const bNumeric = Number.parseInt(b.slice(1), 10);
+
+  if (aNumeric !== bNumeric) {
+    return aNumeric - bNumeric;
+  }
+
+  return a.localeCompare(b);
+}
+
+async function listStoredVNEntryIds(env) {
+  const ids = new Set();
+  let cursor = undefined;
+
+  do {
+    const page = await env.KV.list({ prefix: VN_KEY_PREFIX, cursor });
+
+    if (!page || !Array.isArray(page.keys)) {
+      throw new Error('KV.list 返回格式非法：keys 必须为数组');
+    }
+
+    for (const keyMeta of page.keys) {
+      const keyName = keyMeta?.name;
+      if (typeof keyName !== 'string' || keyName === VN_LIST_KEY) {
+        continue;
+      }
+
+      const keySuffix = keyName.startsWith(VN_KEY_PREFIX)
+        ? keyName.slice(VN_KEY_PREFIX.length)
+        : '';
+      const normalizedId = normalizeVNDBId(keySuffix);
+
+      if (normalizedId) {
+        ids.add(normalizedId);
+      }
+    }
+
+    if (page.list_complete === true) {
+      cursor = undefined;
+    } else {
+      if (!page.cursor) {
+        throw new Error('KV.list 分页不完整但缺少 cursor');
+      }
+      cursor = page.cursor;
+    }
+  } while (cursor);
+
+  return Array.from(ids).sort(compareVNDBId);
+}
+
 /**
  * 按给定 ID 快照重建 VN 列表聚合数据
  * @param {Object} env - 环境变量
@@ -340,11 +404,7 @@ async function rebuildVNListByIds(env, ids) {
  * @param {Object} env - 环境变量
  */
 export async function rebuildVNList(env) {
-  const oldList = await getVNList(env);
-  const ids = Array.isArray(oldList.items)
-    ? oldList.items.map(item => item?.id).filter(id => typeof id === 'string' && id)
-    : [];
-
+  const ids = await listStoredVNEntryIds(env);
   return rebuildVNListByIds(env, ids);
 }
 
@@ -763,37 +823,38 @@ export async function summarizeIndexTaskResults(env, taskId) {
   }
 
   const prefix = `index:item:${taskId}:`;
-  const keyNames = [];
+  const failedSet = new Set();
+  let processed = 0;
   let cursor = undefined;
 
   do {
     const page = await env.KV.list({ prefix, cursor });
-    for (const item of page.keys) {
-      keyNames.push(item.name);
+    const pageKeys = page.keys || [];
+
+    processed += pageKeys.length;
+
+    for (let i = 0; i < pageKeys.length; i += INDEX_TASK_RESULT_GET_CHUNK_SIZE) {
+      const keyChunk = pageKeys.slice(i, i + INDEX_TASK_RESULT_GET_CHUNK_SIZE);
+      const keyNames = keyChunk.map(item => item.name);
+      const values = await Promise.all(keyNames.map(name => env.KV.get(name, 'json')));
+
+      for (let j = 0; j < keyNames.length; j++) {
+        const keyName = keyNames[j];
+        const value = values[j];
+        const fallbackId = keyName.startsWith(prefix) ? keyName.slice(prefix.length) : keyName;
+        const id = value?.vndbId || fallbackId;
+
+        if (value?.state === 'failed') {
+          failedSet.add(id);
+        }
+      }
     }
+
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
 
-  if (keyNames.length === 0) {
-    return { processed: 0, failed: [] };
-  }
-
-  const values = await Promise.all(keyNames.map(name => env.KV.get(name, 'json')));
-  const failedSet = new Set();
-
-  for (let i = 0; i < keyNames.length; i++) {
-    const keyName = keyNames[i];
-    const value = values[i];
-    const fallbackId = keyName.slice(prefix.length);
-    const id = value?.vndbId || fallbackId;
-
-    if (value?.state === 'failed') {
-      failedSet.add(id);
-    }
-  }
-
   return {
-    processed: keyNames.length,
+    processed,
     failed: Array.from(failedSet)
   };
 }
@@ -973,10 +1034,10 @@ export async function importData(env, data, mode = 'merge') {
   }
 
   if (mode === 'replace') {
-    // 获取并删除现有数据
-    const oldList = await getVNList(env);
-    for (const item of oldList.items) {
-      await deleteVNEntry(env, item.id);
+    // 基于真实键扫描删除，避免依赖 vn:list 快照导致残留
+    const existingEntryIds = await listStoredVNEntryIds(env);
+    for (const id of existingEntryIds) {
+      await deleteVNEntry(env, id);
     }
 
     // replace 语义下，若未提供 tierList 则清空旧 Tier 数据

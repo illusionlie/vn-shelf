@@ -114,6 +114,237 @@ export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
   };
 }
 
+test('queue 在节流时间窗内不做即时 reconcile，仅注册延迟 reconcile', async () => {
+  const reconcileCalls = [];
+  const nowIso = new Date().toISOString();
+
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    kvImpl: {
+      getVNEntry: async id => ({ id, vndb: {}, user: {} }),
+      recordIndexItemResult: async () => {},
+      getIndexStatus: async () => ({
+        status: 'running',
+        taskId: 'idx_throttle_window',
+        total: 50,
+        processed: 1,
+        failed: [],
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: null,
+        error: null,
+        lastReconciledAt: nowIso
+      }),
+      reconcileIndexStatusFromItems: async (_env, taskId) => {
+        reconcileCalls.push(taskId);
+        return {
+          status: 'running',
+          processed: 2,
+          total: 50,
+          failed: []
+        };
+      }
+    }
+  });
+
+  const originalSetTimeout = globalThis.setTimeout;
+  const scheduledTimers = [];
+  globalThis.setTimeout = (fn, ms, ...args) => {
+    scheduledTimers.push({ fn, ms, args });
+    return scheduledTimers.length;
+  };
+
+  try {
+    const message = createQueueMessage({
+      vndbId: 'v17',
+      taskId: 'idx_throttle_window',
+      retryCount: 0
+    });
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(Promise.resolve(promise));
+      }
+    };
+
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not retry for success path');
+        }
+      }
+    };
+
+    await worker.queue({ messages: [message] }, env, ctx);
+
+    assert.equal(message.ackCalled, true);
+    assert.equal(reconcileCalls.length, 0);
+    assert.equal(waitUntilPromises.length, 1);
+    assert.equal(scheduledTimers.length, 1);
+    assert.ok(Number.isFinite(scheduledTimers[0].ms));
+
+    scheduledTimers[0].fn(...scheduledTimers[0].args);
+    await Promise.all(waitUntilPromises);
+
+    assert.equal(reconcileCalls.length, 1);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    await cleanup();
+  }
+});
+
+test('queue 临近完成时即使在时间窗内也会即时 reconcile', async () => {
+  const reconcileCalls = [];
+  const rebuildCalls = [];
+  const nowIso = new Date().toISOString();
+
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    kvImpl: {
+      getVNEntry: async id => ({ id, vndb: {}, user: {} }),
+      recordIndexItemResult: async () => {},
+      getIndexStatus: async () => ({
+        status: 'running',
+        taskId: 'idx_near_completion',
+        total: 2,
+        processed: 1,
+        failed: [],
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: null,
+        error: null,
+        lastReconciledAt: nowIso
+      }),
+      reconcileIndexStatusFromItems: async (_env, taskId) => {
+        reconcileCalls.push(taskId);
+        return {
+          status: 'completed',
+          processed: 2,
+          total: 2,
+          failed: []
+        };
+      },
+      rebuildVNList: async () => {
+        rebuildCalls.push('rebuild');
+      }
+    }
+  });
+
+  try {
+    const message = createQueueMessage({
+      vndbId: 'v18',
+      taskId: 'idx_near_completion',
+      retryCount: 0
+    });
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(Promise.resolve(promise));
+      }
+    };
+
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not retry for success path');
+        }
+      }
+    };
+
+    await worker.queue({ messages: [message] }, env, ctx);
+
+    assert.equal(message.ackCalled, true);
+    assert.equal(reconcileCalls.length, 1);
+    assert.equal(rebuildCalls.length, 1);
+    assert.equal(waitUntilPromises.length, 0);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('queue 延迟 reconcile 仍可收敛到终态并触发 rebuild', async () => {
+  const reconcileCalls = [];
+  const rebuildCalls = [];
+  const nowIso = new Date().toISOString();
+
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    kvImpl: {
+      getVNEntry: async id => ({ id, vndb: {}, user: {} }),
+      recordIndexItemResult: async () => {},
+      getIndexStatus: async () => ({
+        status: 'running',
+        taskId: 'idx_delayed_terminal',
+        total: 50,
+        processed: 1,
+        failed: [],
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: null,
+        error: null,
+        lastReconciledAt: nowIso
+      }),
+      reconcileIndexStatusFromItems: async (_env, taskId) => {
+        reconcileCalls.push(taskId);
+        return {
+          status: 'completed',
+          processed: 50,
+          total: 50,
+          failed: []
+        };
+      },
+      rebuildVNList: async () => {
+        rebuildCalls.push('rebuild');
+      }
+    }
+  });
+
+  const originalSetTimeout = globalThis.setTimeout;
+  const scheduledTimers = [];
+  globalThis.setTimeout = (fn, ms, ...args) => {
+    scheduledTimers.push({ fn, ms, args });
+    return scheduledTimers.length;
+  };
+
+  try {
+    const message = createQueueMessage({
+      vndbId: 'v19',
+      taskId: 'idx_delayed_terminal',
+      retryCount: 0
+    });
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(Promise.resolve(promise));
+      }
+    };
+
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not retry for success path');
+        }
+      }
+    };
+
+    await worker.queue({ messages: [message] }, env, ctx);
+
+    assert.equal(message.ackCalled, true);
+    assert.equal(reconcileCalls.length, 0);
+    assert.equal(waitUntilPromises.length, 1);
+    assert.equal(scheduledTimers.length, 1);
+
+    scheduledTimers[0].fn(...scheduledTimers[0].args);
+    await Promise.all(waitUntilPromises);
+
+    assert.equal(reconcileCalls.length, 1);
+    assert.equal(rebuildCalls.length, 1);
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    await cleanup();
+  }
+});
+
 test('queue schedules delayed reconcile fallback when immediate reconcile remains running', async () => {
   const reconcileCalls = [];
   const rebuildCalls = [];

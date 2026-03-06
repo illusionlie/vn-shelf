@@ -151,14 +151,38 @@ test('importData merge 导入新增条目后列表可见，并去重过滤空ID'
   }
 });
 
-test('importData replace 导入后列表仅包含新条目', async () => {
+test('rebuildVNList 在 vn:list 缺项时仍基于真实键重建，并过滤非法 vn:* 键', async () => {
   const { kvModule, cleanup } = await loadKVModule();
 
   try {
     const { env } = createMockEnv({
+      'vn:v2': createEntry('v2', 'Real Entry 2'),
+      'vn:v1': createEntry('v1', 'Real Entry 1'),
+      'vn:vx': createEntry('vx', 'Invalid Id Entry'),
+      'vn:v3:shadow': createEntry('v3', 'Shadow Entry'),
+      'vn:list': createListSnapshot(['v999'])
+    });
+
+    await kvModule.rebuildVNList(env);
+
+    const list = await kvModule.getVNList(env);
+    assert.deepEqual(list.items.map(item => item.id), ['v1', 'v2']);
+    assert.equal(list.stats.total, 2);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('importData replace 基于真实键删除旧条目，且不会删除非法 vn:* 键', async () => {
+  const { kvModule, cleanup } = await loadKVModule();
+
+  try {
+    const { env, store } = createMockEnv({
       'vn:v1': createEntry('v1', 'Old Entry 1'),
       'vn:v2': createEntry('v2', 'Old Entry 2'),
-      'vn:list': createListSnapshot(['v1', 'v2'])
+      'vn:legacy-meta': { note: 'keep me' },
+      'vn:v5:meta': { note: 'keep me too' },
+      'vn:list': createListSnapshot(['v1'])
     });
 
     await kvModule.importData(env, {
@@ -172,6 +196,9 @@ test('importData replace 导入后列表仅包含新条目', async () => {
     const oldEntry2 = await kvModule.getVNEntry(env, 'v2');
     assert.equal(oldEntry1, null);
     assert.equal(oldEntry2, null);
+
+    assert.equal(store.has('vn:legacy-meta'), true);
+    assert.equal(store.has('vn:v5:meta'), true);
   } finally {
     await cleanup();
   }
