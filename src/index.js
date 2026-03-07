@@ -16,6 +16,8 @@ import { fetchVNDB } from './vndb.js';
 const INDEX_MAX_RETRY = 3;
 const INDEX_RETRY_DELAY_SECONDS = 60;
 const INDEX_RECONCILE_INTERVAL_MS = 5000;
+const INDEX_RECONCILE_MAX_ATTEMPTS = 6;
+const INDEX_RECONCILE_RETRY_INTERVAL_MS = INDEX_RECONCILE_INTERVAL_MS;
 const INDEX_START_LOCK_STORAGE_KEY = 'index:start-lock';
 const INDEX_START_LOCK_DEFAULT_TTL_MS = 30 * 1000;
 
@@ -213,43 +215,77 @@ export default {
       });
 
       ctx.waitUntil((async () => {
-        try {
-          await new Promise(resolve => setTimeout(resolve, normalizedDelayMs));
+        for (let attempt = 1; attempt <= INDEX_RECONCILE_MAX_ATTEMPTS; attempt += 1) {
+          const waitMs = attempt === 1
+            ? normalizedDelayMs
+            : INDEX_RECONCILE_RETRY_INTERVAL_MS;
 
-          const delayedBefore = await getIndexStatus(env);
-          if (delayedBefore.taskId !== taskId || delayedBefore.status !== 'running') {
-            console.log('[index][queue-reconcile-delayed] skipped', {
+          try {
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+
+            const delayedBefore = await getIndexStatus(env);
+            if (delayedBefore.taskId !== taskId || delayedBefore.status !== 'running') {
+              console.log('[index][queue-reconcile-delayed] skipped', {
+                taskId,
+                reason,
+                attempt,
+                status: delayedBefore.status,
+                activeTaskId: delayedBefore.taskId
+              });
+              return;
+            }
+
+            const delayedNext = await reconcileIndexStatusFromItems(env, taskId);
+
+            console.log('[index][queue-reconcile-delayed]', {
               taskId,
               reason,
-              status: delayedBefore.status,
-              activeTaskId: delayedBefore.taskId
+              attempt,
+              status: delayedNext.status,
+              processed: delayedNext.processed,
+              total: delayedNext.total,
+              failedCount: delayedNext.failed?.length || 0
             });
-            return;
+
+            if (
+              delayedBefore.status === 'running' &&
+              (delayedNext.status === 'completed' || delayedNext.status === 'partial')
+            ) {
+              await rebuildVNList(env);
+              return;
+            }
+
+            if (delayedNext.status !== 'running') {
+              return;
+            }
+
+            if (attempt >= INDEX_RECONCILE_MAX_ATTEMPTS) {
+              console.warn('[index][queue-reconcile-delayed] max attempts reached while still running', {
+                taskId,
+                reason,
+                attempt,
+                processed: delayedNext.processed,
+                total: delayedNext.total
+              });
+              return;
+            }
+          } catch (error) {
+            console.error('[index][queue-reconcile-delayed] failed', {
+              taskId,
+              reason,
+              attempt,
+              error: error?.message || String(error)
+            });
+
+            if (attempt >= INDEX_RECONCILE_MAX_ATTEMPTS) {
+              console.warn('[index][queue-reconcile-delayed] max attempts reached after repeated failures', {
+                taskId,
+                reason,
+                attempt
+              });
+              return;
+            }
           }
-
-          const delayedNext = await reconcileIndexStatusFromItems(env, taskId);
-
-          console.log('[index][queue-reconcile-delayed]', {
-            taskId,
-            reason,
-            status: delayedNext.status,
-            processed: delayedNext.processed,
-            total: delayedNext.total,
-            failedCount: delayedNext.failed?.length || 0
-          });
-
-          if (
-            delayedBefore.status === 'running' &&
-            (delayedNext.status === 'completed' || delayedNext.status === 'partial')
-          ) {
-            await rebuildVNList(env);
-          }
-        } catch (error) {
-          console.error('[index][queue-reconcile-delayed] failed', {
-            taskId,
-            reason,
-            error: error?.message || String(error)
-          });
         }
       })());
 

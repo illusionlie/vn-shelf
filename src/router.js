@@ -24,6 +24,7 @@ import {
   importData,
   getIndexStatus,
   saveIndexStatus,
+  reconcileIndexStatusFromItems,
   getTierList,
   saveTierList,
   updateVNTier,
@@ -1155,6 +1156,20 @@ async function handleGetIndexStatus(request, env, auth) {
   }
 
   const status = await getIndexStatus(env);
+
+  if (status.status === 'running' && status.taskId) {
+    try {
+      const reconciled = await reconcileIndexStatusFromItems(env, status.taskId);
+      return jsonResponse(reconciled);
+    } catch (error) {
+      console.warn('[index][status] reconcile failed, fallback to current status', {
+        taskId: status.taskId,
+        error: error?.message || String(error)
+      });
+      return jsonResponse(status);
+    }
+  }
+
   return jsonResponse(status);
 }
 

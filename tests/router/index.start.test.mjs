@@ -119,6 +119,20 @@ export async function saveIndexStatus(env, status) {
   kv.saveIndexStatusCalls.push(next);
 }
 
+export async function reconcileIndexStatusFromItems(_env, taskId) {
+  kv.reconcileCalls = (kv.reconcileCalls || 0) + 1;
+  kv.reconcileTaskIds = kv.reconcileTaskIds || [];
+  kv.reconcileTaskIds.push(taskId);
+
+  if (typeof kv.reconcileResultFactory === 'function') {
+    const next = clone(kv.reconcileResultFactory(clone(kv.indexStatus), taskId));
+    kv.indexStatus = next;
+    return clone(next);
+  }
+
+  return clone(kv.indexStatus);
+}
+
 export async function tryAcquireIndexStartLock(_env, holder) {
   kv.tryAcquireCalls = (kv.tryAcquireCalls || 0) + 1;
 
@@ -351,6 +365,112 @@ test('running 状态下重复启动会被拒绝', async () => {
     assert.equal(state.sharedKvState.getVNListCalls, 0);
     assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 0);
     assert.equal(sendCalls.length, 0);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('查询索引状态时，running 任务会触发一次兜底 reconcile', async () => {
+  const sharedKvState = createSharedKvState({
+    indexStatus: {
+      status: 'running',
+      taskId: 'idx_running_1',
+      total: 8,
+      processed: 1,
+      failed: []
+    }
+  });
+
+  sharedKvState.reconcileResultFactory = status => ({
+    ...status,
+    processed: 8,
+    status: 'completed',
+    completedAt: '2026-01-01T00:00:10.000Z',
+    failed: []
+  });
+
+  const { routerModule, state, cleanup } = await loadRouterModule({ sharedKvState });
+
+  try {
+    const request = new Request('https://example.com/api/index/status', {
+      method: 'GET'
+    });
+
+    const response = await routerModule.handleRequest(request, {});
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, 'completed');
+    assert.equal(payload.processed, 8);
+    assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
+    assert.equal(state.sharedKvState.reconcileCalls, 1);
+    assert.deepEqual(state.sharedKvState.reconcileTaskIds, ['idx_running_1']);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('查询索引状态时，非 running 任务不会触发 reconcile', async () => {
+  const sharedKvState = createSharedKvState({
+    indexStatus: {
+      status: 'completed',
+      taskId: 'idx_completed_1',
+      total: 8,
+      processed: 8,
+      failed: []
+    }
+  });
+
+  const { routerModule, state, cleanup } = await loadRouterModule({ sharedKvState });
+
+  try {
+    const request = new Request('https://example.com/api/index/status', {
+      method: 'GET'
+    });
+
+    const response = await routerModule.handleRequest(request, {});
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, 'completed');
+    assert.equal(payload.processed, 8);
+    assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
+    assert.equal(state.sharedKvState.reconcileCalls || 0, 0);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('查询索引状态时，reconcile 失败会回退返回当前状态', async () => {
+  const sharedKvState = createSharedKvState({
+    indexStatus: {
+      status: 'running',
+      taskId: 'idx_running_fallback',
+      total: 6,
+      processed: 2,
+      failed: []
+    }
+  });
+
+  sharedKvState.reconcileResultFactory = () => {
+    throw new Error('kv unavailable');
+  };
+
+  const { routerModule, state, cleanup } = await loadRouterModule({ sharedKvState });
+
+  try {
+    const request = new Request('https://example.com/api/index/status', {
+      method: 'GET'
+    });
+
+    const response = await routerModule.handleRequest(request, {});
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, 'running');
+    assert.equal(payload.processed, 2);
+    assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
+    assert.equal(state.sharedKvState.reconcileCalls, 1);
   } finally {
     await cleanup();
   }
