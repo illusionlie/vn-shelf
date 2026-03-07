@@ -175,7 +175,10 @@ document.addEventListener('alpine:init', () => {
     isAdmin: false,
     isLoading: false,
     toasts: [],
+    _initialized: false,
     init() {
+      if (this._initialized) return;
+      this._initialized = true;
       this.checkAuth();
       initTheme();
       initProgressBar();
@@ -228,8 +231,11 @@ function vnShelf() {
     // 翻译相关状态
     config: null,
     translations: null,
+    _initialized: false,
 
     async init() {
+      if (this._initialized) return;
+      this._initialized = true;
       await this.loadConfig();
       await this.initTranslations();
       await this.loadVNList();
@@ -483,8 +489,11 @@ function loginPage() {
     vndbApiToken: '',
     error: '',
     isLoading: false,
+    _initialized: false,
 
     async init() {
+      if (this._initialized) return;
+      this._initialized = true;
       try {
         // 这里只检查初始化
         // 因为全局会 checkAuth
@@ -541,8 +550,11 @@ function settingsPage() {
     indexStatus: null,
     translationCacheStatus: null,
     isLoading: false,
+    _initialized: false,
 
     async init() {
+      if (this._initialized) return;
+      this._initialized = true;
       await this.loadConfig();
       await this.loadIndexStatus();
       await this.loadTranslationCacheStatus();
@@ -775,12 +787,15 @@ function tierlistPage() {
     dropIndicatorIndex: null,
 
     MAX_BATCH_TIER_UPDATES: 200,
+    _initialized: false,
 
     getErrorMessage(error) {
       return error?.message || '未知错误';
     },
 
     async init() {
+      if (this._initialized) return;
+      this._initialized = true;
       this.isLoading = true;
       try {
         const [tierLoaded, vnLoaded] = await Promise.all([
@@ -1227,8 +1242,11 @@ function statsPage() {
   return {
     stats: null,
     isLoading: true,
+    _initialized: false,
 
     async init() {
+      if (this._initialized) return;
+      this._initialized = true;
       await this.loadStats();
     },
 
