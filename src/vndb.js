@@ -6,7 +6,7 @@
 import { getSettings } from './kv.js';
 
 const VNDB_API_URL = 'https://api.vndb.org/kana';
-const UserAgent = 'vn-shelf/1.0 (+https://github.com/illusionlie/vn-shelf)';
+const UserAgent = 'vn-shelf/1.1 (+https://github.com/illusionlie/vn-shelf)';
 
 /**
  * VNDB API客户端
