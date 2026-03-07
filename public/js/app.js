@@ -45,6 +45,20 @@ function formatUserPlayTime(user) {
   return `${displayPartMinutes}分钟`;
 }
 
+let modalOpenCount = 0;
+
+function lockPageScroll() {
+  modalOpenCount += 1;
+  document.body.classList.add('modal-open');
+}
+
+function unlockPageScroll() {
+  modalOpenCount = Math.max(0, modalOpenCount - 1);
+  if (modalOpenCount === 0) {
+    document.body.classList.remove('modal-open');
+  }
+}
+
 // =========== 进度条 ============
 
 function initProgressBar() {
@@ -334,6 +348,9 @@ function vnShelf() {
       try {
         const res = await vnAPI.get(vn.id);
         this.selectedVN = res;
+        if (!this.showDetail) {
+          lockPageScroll();
+        }
         this.showDetail = true;
       } catch (error) {
         this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
@@ -341,8 +358,10 @@ function vnShelf() {
     },
 
     closeDetail() {
+      if (!this.showDetail) return;
       this.showDetail = false;
       this.selectedVN = null;
+      unlockPageScroll();
     },
 
     openEdit(vn = null) {
@@ -383,13 +402,22 @@ function vnShelf() {
           isNew: true
         };
       }
+      if (!this.showEdit) {
+        lockPageScroll();
+      }
       this.showEdit = true;
-      this.showDetail = false;
+
+      if (this.showDetail) {
+        this.showDetail = false;
+        unlockPageScroll();
+      }
     },
 
     closeEdit() {
+      if (!this.showEdit) return;
       this.showEdit = false;
       this.editForm = {};
+      unlockPageScroll();
     },
 
     formatUserPlayTime,
@@ -941,6 +969,9 @@ function tierlistPage() {
         name: '',
         color: '#ff4757'
       };
+      if (!this.showTierEdit) {
+        lockPageScroll();
+      }
       this.showTierEdit = true;
     },
 
@@ -950,12 +981,17 @@ function tierlistPage() {
         name: tier?.name || '',
         color: tier?.color || '#ff4757'
       };
+      if (!this.showTierEdit) {
+        lockPageScroll();
+      }
       this.showTierEdit = true;
     },
 
     closeTierEdit() {
+      if (!this.showTierEdit) return;
       this.showTierEdit = false;
       this.editingTier = null;
+      unlockPageScroll();
     },
 
     async saveTier() {
@@ -1212,6 +1248,9 @@ function tierlistPage() {
       try {
         const res = await vnAPI.get(vn.id);
         this.selectedVN = res;
+        if (!this.showDetail) {
+          lockPageScroll();
+        }
         this.showDetail = true;
       } catch (error) {
         this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
@@ -1219,8 +1258,10 @@ function tierlistPage() {
     },
 
     closeDetail() {
+      if (!this.showDetail) return;
       this.showDetail = false;
       this.selectedVN = null;
+      unlockPageScroll();
     },
 
     getDetailTags(vn) {
