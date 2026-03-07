@@ -196,11 +196,44 @@ img { max-width: 100%; height: auto; display: block; }
   height: 40px;
 }
 
+.banner-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .banner-title {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
   color: var(--primary-text-color);
+}
+
+.banner-github-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--secondary-text-color);
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.banner-github-link:hover {
+  color: var(--accent-color);
+  background: var(--tag-bg-color);
+  transform: translateY(-1px);
+}
+
+.banner-github-link svg {
+  width: 18px;
+  height: 18px;
+}
+
+.banner-github-link:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .banner-title:hover {
