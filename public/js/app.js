@@ -811,6 +811,14 @@ function tierlistPage() {
     untieredVN: [],
     isLoading: true,
 
+    // 翻译相关状态
+    config: {
+      tagsMode: 'vndb',
+      translateTags: true,
+      translationUrl: ''
+    },
+    translations: null,
+
     selectedVN: null,
     showDetail: false,
 
@@ -834,11 +842,46 @@ function tierlistPage() {
       return error?.message || '未知错误';
     },
 
+    async loadConfig() {
+      try {
+        const res = await configAPI.get();
+        this.config = res.data || {
+          tagsMode: 'vndb',
+          translateTags: true,
+          translationUrl: ''
+        };
+      } catch (error) {
+        console.warn('[tierlistPage] load config fallback to defaults', {
+          error: error?.message || String(error)
+        });
+        this.config = {
+          tagsMode: 'vndb',
+          translateTags: true,
+          translationUrl: ''
+        };
+      }
+    },
+
+    async initTranslations() {
+      if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
+        const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
+        try {
+          this.translations = await initTranslations(url);
+        } catch (error) {
+          console.error('[tierlistPage] Failed to load translations:', error);
+          this.translations = null;
+        }
+      }
+    },
+
     async init() {
       if (this._initialized) return;
       this._initialized = true;
       this.isLoading = true;
       try {
+        await this.loadConfig();
+        await this.initTranslations();
+
         const [tierLoaded, vnLoaded] = await Promise.all([
           this.loadTiers({ silent: true }),
           this.loadVNList({ silent: true })
@@ -1278,10 +1321,19 @@ function tierlistPage() {
     },
 
     getDetailTags(vn) {
-      if (Array.isArray(vn?.user?.tags) && vn.user.tags.length > 0) {
-        return vn.user.tags;
+      if (!vn) return [];
+
+      if (this.config.tagsMode === 'manual') {
+        return Array.isArray(vn?.user?.tags) ? vn.user.tags : [];
       }
-      return Array.isArray(vn?.vndb?.tags) ? vn.vndb.tags : [];
+
+      const vndbTags = Array.isArray(vn?.vndb?.tags) ? vn.vndb.tags : [];
+
+      if (this.config.translateTags && this.translations) {
+        return translateTags(vndbTags, this.translations);
+      }
+
+      return vndbTags;
     },
 
     formatUserPlayTime,
