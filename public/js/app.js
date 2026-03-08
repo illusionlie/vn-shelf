@@ -583,6 +583,19 @@ function settingsPage() {
     async init() {
       if (this._initialized) return;
       this._initialized = true;
+      try {
+        const status = await authAPI.status();
+        if (!status.authenticated) {
+          window.location.href = '/login';
+          return;
+        }
+      } catch (error) {
+        console.warn('[settings] auth status failed', {
+          error: error?.message || String(error)
+        });
+        window.location.href = '/login';
+        return;
+      }
       await this.loadConfig();
       await this.loadIndexStatus();
       await this.loadTranslationCacheStatus();
