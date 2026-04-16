@@ -1,5 +1,9 @@
 # VN Shelf
 
+<p align="center">
+  <img src="public/cover.webp" alt="VN Shelf cover image" height="200">
+</p>
+
 一个部署在 Cloudflare Workers 上的视觉小说（Visual Novel）书架管理应用，支持 VNDB 数据拉取、分级 Tier 管理、批量索引、导入导出与基础统计。
 
 ## 功能特性
