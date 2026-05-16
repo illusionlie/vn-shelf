@@ -1,6 +1,6 @@
 {
   "name": "vn-shelf",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "视觉小说书架 - 部署于Cloudflare Worker",
   "main": "src/index.js",
   "scripts": {
@@ -14,15 +14,16 @@
   "keywords": [
     "visual-novel",
     "vndb",
-    "cloudflare-worker"
+    "cloudflare-worker",
+    "vnshelf"
   ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "^9.39.3",
-    "eslint": "^9.39.3",
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
     "eslint-plugin-import": "^2.32.0",
-    "globals": "^15.15.0",
-    "wrangler": "^4.76.0"
+    "globals": "^17.6.0",
+    "wrangler": "^4.92.0"
   }
 }
