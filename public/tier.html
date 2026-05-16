@@ -74,15 +74,6 @@
         </div>
       </div>
     </div>
-
-    <div class="controls-bar tier-controls">
-      <div class="tier-controls-title-wrap">
-        <h1 class="page-title tier-page-title">🏆 Tier List</h1>
-      </div>
-      <template x-if="$store.app.isAdmin">
-        <button class="btn btn-primary" @click="openCreateTier()">+ 添加 Tier</button>
-      </template>
-    </div>
   </header>
 
   <!-- 主内容 -->
@@ -154,6 +145,13 @@
               </div>
             </template>
           </section>
+        </template>
+
+        <template x-if="$store.app.isAdmin">
+          <button class="tier-add-placeholder" @click="openCreateTier()" title="新建 Tier">
+            <span class="tier-add-placeholder-icon">+</span>
+            <span class="tier-add-placeholder-text">新建 Tier</span>
+          </button>
         </template>
 
         <template x-if="$store.app.isAdmin">
