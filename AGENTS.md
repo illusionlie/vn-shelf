@@ -35,10 +35,18 @@ public/
 ├── css/
 │   └── style.css
 └── js/
-    ├── api.js
-    ├── app.js
-    ├── markdown.js
-    └── translations.js
+    ├── app.js            # Alpine.js 入口：全局 Store + 组件注册
+    ├── api.js            # API 封装
+    ├── utils.js          # 工具函数（formatUserPlayTime, scroll lock, toggleMobileMenu, progress bar）
+    ├── theme.js          # 主题切换 + 自定义背景
+    ├── markdown.js       # Markdown 渲染
+    ├── translations.js   # Tags 翻译与缓存
+    └── components/
+        ├── vnShelf.js      # 主页书架组件
+        ├── tierlistPage.js # Tier List 页组件
+        ├── settingsPage.js # 设置页组件
+        ├── loginPage.js    # 登录页组件
+        └── statsPage.js    # 统计页组件
 
 tests/
 └── queue/
@@ -248,19 +256,30 @@ tests/
 
 ## 前端架构
 
+- 入口：[`public/js/app.js`](public/js/app.js) — Alpine.js 全局 Store 注册 + 组件注册（胶水层）
 - API 封装：[`public/js/api.js`](public/js/api.js)
-- 页面状态管理：[`public/js/app.js`](public/js/app.js)
-  - 组件：`vnShelf` / `loginPage` / `settingsPage` / `statsPage` / `tierlistPage`
+- 工具函数：[`public/js/utils.js`](public/js/utils.js) — `formatUserPlayTime`, scroll lock, `toggleMobileMenu`, progress bar
+- 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换、自定义背景 overlay
 - Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js:136)（带安全 URL 校验）
 - Tags 翻译：[`initTranslations()`](public/js/translations.js:240)
   - IndexedDB 缓存：`vn-shelf-translations`
   - 缓存键：`tagTranslations`
   - 策略：缓存优先 + 后台版本检查 + 自动更新事件 `translations-updated`
 
+### 页面组件（`public/js/components/`）
+
+| 组件 | 文件 | 说明 |
+|------|------|------|
+| `vnShelf` | [`vnShelf.js`](public/js/components/vnShelf.js) | 主页书架：列表加载、搜索、排序、详情/编辑弹窗 |
+| `tierlistPage` | [`tierlistPage.js`](public/js/components/tierlistPage.js) | Tier List：拖拽排序、跨 Tier 移动、批量更新 |
+| `settingsPage` | [`settingsPage.js`](public/js/components/settingsPage.js) | 设置：VNDB Token、密码、索引、导入导出、外观 |
+| `loginPage` | [`loginPage.js`](public/js/components/loginPage.js) | 登录/初始化 |
+| `statsPage` | [`statsPage.js`](public/js/components/statsPage.js) | 统计数据展示 |
+
 ### Tier List 前端行为
 
 - 页面：[`public/tier.html`](public/tier.html)
-- 逻辑：[`tierlistPage`](public/js/app.js:689)
+- 逻辑：[`tierlistPage`](public/js/components/tierlistPage.js)
 - 支持拖拽排序与跨 Tier 移动，调用批量接口 `/api/vn/tier/batch`
 - 前端分片提交批量更新，单批上限与后端一致为 200
 

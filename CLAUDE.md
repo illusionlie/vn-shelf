@@ -1,100 +1,62 @@
-# CLAUDE.md
+# Claude.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude 提供项目上下文指导。
 
-## Project overview
+## 项目概述
 
-VN Shelf is a Cloudflare Workers app for managing a visual novel shelf. The backend is an ES module Worker under `src/`, the frontend is plain HTML/CSS/JavaScript under `public/`, and persistent data lives in Cloudflare KV. There is no frontend build step, bundler, SQL database, or ORM.
+VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项目无构建步骤，直接部署 ES Modules 与 `public/` 静态资源。
 
-## Common commands
+## 常用命令
 
-Use npm; the repository has a `package-lock.json`.
+- `npm run dev` - 本地开发服务器（`wrangler dev`）
+- `npm run lint` - ESLint 检查（`src/**/*.js` + `public/js/**/*.js`）
+- `npm run lint:fix` - 自动修复 lint 问题
+- `npm run test` - 运行 Node 内置测试（`node --test`）
+- `npm run deploy` - 部署到 Cloudflare Workers
 
-```bash
-npm ci
-npm run dev
-npm run lint
-npm run lint:fix
-npm run test
-npm run tail
-npm run deploy
+## 项目架构
+
+```text
+src/
+├── index.js      # Worker 入口（fetch + queue）
+├── router.js     # API 路由分发与处理
+├── kv.js         # KV 存储与聚合/索引状态逻辑
+├── auth.js       # JWT + 密码哈希认证
+├── vndb.js       # VNDB API 客户端
+└── utils.js      # 通用工具函数
+
+public/js/
+├── app.js            # Alpine.js 入口：全局 Store + 组件注册
+├── api.js            # API 封装
+├── utils.js          # 工具函数（formatUserPlayTime, scroll lock, toggleMobileMenu, progress bar）
+├── theme.js          # 主题切换 + 自定义背景
+├── markdown.js       # Markdown 渲染
+├── translations.js   # Tags 翻译与缓存
+└── components/
+    ├── vnShelf.js      # 主页书架组件
+    ├── tierlistPage.js # Tier List 页组件
+    ├── settingsPage.js # 设置页组件
+    ├── loginPage.js    # 登录页组件
+    └── statsPage.js    # 统计页组件
+
+tests/
+└── queue/
+    └── index.queue.test.mjs
 ```
 
-- `npm run dev` starts `wrangler dev` for local Workers development.
-- `npm run lint` runs ESLint over `src/**/*.js` and `public/js/**/*.js`.
-- `npm run test` runs all tests with Node's built-in test runner (`node --test`).
-- To run one test file, use `node --test tests/path/to/file.test.mjs`.
-- CI uses stricter linting: `npx eslint "src/**/*.js" "public/js/**/*.js" --max-warnings 0`.
-- CI also generates `wrangler.toml` from `wrangler.toml.example` and runs `npx wrangler deploy --dry-run --config wrangler.toml`.
+## 前端模块关系
 
-## Cloudflare setup
+- `app.js` 是唯一入口，负责注册 Alpine.js 全局 Store 和所有页面组件
+- `components/` 下每个文件导出一个 Alpine component factory function
+- `utils.js` 提供跨组件共享的工具函数（scroll lock、格式化等）
+- `theme.js` 管理主题切换和自定义背景状态
+- 组件通过 `../api.js`、`../utils.js`、`../theme.js` 等相对路径导入依赖
 
-`wrangler.toml` is local/generated configuration; `wrangler.toml.example` is the template used by CI and deploy workflows. For local setup, copy the example and replace the placeholders for the Worker name and KV namespace ID.
+## 开发注意事项
 
-Required runtime bindings:
-
-- `KV`: Cloudflare KV namespace for all JSON persistence.
-- `VN_INDEX_QUEUE`: queue producer/consumer for VNDB batch indexing.
-- `INDEX_START_LOCK`: Durable Object namespace for index-start locking.
-- `ASSETS`: Worker Assets binding serving `./public`.
-
-`src/index.js` is the Worker entrypoint. It serves non-API requests via `env.ASSETS.fetch(request)` and routes `/api/*` to `src/router.js`. It also exports the Queue consumer and `IndexStartLockDurableObject`.
-
-## Backend architecture
-
-- `src/router.js` is the central manual API router. There is no framework router.
-- `src/kv.js` is the KV data access layer and owns aggregate list maintenance, tier operations, import/export behavior, and index-status reconciliation.
-- `src/auth.js` handles PBKDF2 password hashing, HMAC JWT creation/verification, and HttpOnly cookie helpers.
-- `src/vndb.js` calls the VNDB Kana API and normalizes VN metadata.
-- `src/utils.js` contains shared utilities used by backend modules.
-
-Important API groups:
-
-- Auth: `/api/auth/status`, `/api/auth/init`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/verify`.
-- VN reads/writes: `/api/vn`, `/api/vn/{id}`, `/api/vn/{id}/tier`, `/api/vn/tier/batch`.
-- Tiers: `/api/tier`, `/api/tier/order`, `/api/tier/{id}`.
-- Indexing: `/api/index/start`, `/api/index/status`.
-- Config/import/export: `/api/config`, `/api/export`, `/api/import`.
-
-Authenticated routes use `authMiddleware()` from `src/auth.js`; public reads and auth setup/login routes are intentionally available without an admin cookie.
-
-## Data model
-
-There is no separate schema file. KV keys and JSON structures are the schema, mainly implemented in `src/kv.js` and `src/router.js`.
-
-Primary KV keys:
-
-- `config:settings`: VNDB token, admin password hash, JWT secret, index timestamp, tag mode, tag translation settings.
-- `vn:{id}`: full VN entry with normalized `vndb` metadata and user-managed fields such as ratings, dates, review, tags, and tier assignment.
-- `vn:list`: pre-aggregated compact VN cards plus stats for fast list reads.
-- `tier:list`: tier definitions, defaulting to S/A/B/C/D when missing.
-- `index:status`: batch indexing state.
-- `index:item:{taskId}:{vndbId}`: per-item Queue indexing result with TTL.
-- `index:start-lock`: Durable Object storage key, with KV fallback behavior when the DO binding is unavailable.
-
-When changing VN create/update/delete or tier assignment behavior, update the full `vn:{id}` entry and keep `vn:list` consistent by using the existing helpers in `src/kv.js` rather than hand-editing aggregate data.
-
-## Queue and indexing flow
-
-Batch VNDB indexing starts from `POST /api/index/start`. The router obtains an in-process, Durable Object, or KV fallback lock, writes `index:status`, and enqueues one message per unique VN ID to `VN_INDEX_QUEUE`. The Queue consumer in `src/index.js` fetches VNDB metadata, updates the full VN entry, records `index:item:*`, reconciles `index:status`, and rebuilds `vn:list` when the job reaches a terminal state. Cloudflare Queues are at-least-once delivery, so indexing code must remain idempotent.
-
-## Frontend architecture
-
-The frontend is static, browser-native JavaScript:
-
-- `public/index.html`, `login.html`, `settings.html`, `stats.html`, and `tier.html` load Alpine.js from CDN and use components registered in `public/js/app.js`.
-- `public/js/app.js` contains the shared Alpine store and page components: home shelf, login, settings, stats, and tier list.
-- `public/js/api.js` is the browser API facade for `/api/*`.
-- `public/js/translations.js` manages the IndexedDB-backed VNDB tag translation cache and background version checks.
-- `public/js/markdown.js` renders review Markdown and escapes HTML before applying Markdown-like formatting.
-- `public/css/style.css` contains global styling.
-
-Because there is no build step, changes to frontend behavior should be made directly in `public/js/*.js` and validated in the browser through `npm run dev`.
-
-## Tests
-
-Tests live in `tests/` and use Node's built-in test runner with `.mjs` files. Current coverage includes KV import/rebuild and index reconciliation, Queue indexing behavior, router config/index-start paths, and Markdown security. Prefer focused tests near the relevant area, then run `npm run test` before claiming completion.
-
-## CI and deploy
-
-GitHub Actions run on Node 22.x. CI installs with `npm ci`, lints with zero warnings, runs tests, generates `wrangler.toml` from the example template, and performs a Wrangler dry-run deploy. Production deployment is manual via `workflow_dispatch` and uses repository secrets for the Worker name, Cloudflare API token, KV namespace, optional account ID, and optional custom domain.
+1. **无构建步骤**：直接修改 `src/` 与 `public/` 文件即可，浏览器原生 ES Modules。
+2. **前端组件拆分**：每个页面组件独立一个文件，通过 `app.js` 统一注册到 Alpine.js。
+3. **游玩时长字段**：后端仅接受 `playTimeHours` + `playTimePartMinutes`。
+4. **Tier 一致性**：删除 Tier 时先清理条目归属，再落库 Tier 列表。
+5. **敏感信息**：VNDB Token、密码哈希、JWT Secret 存储于 KV，不暴露给前端。
+6. **ESLint**：修改前端 JS 后务必运行 `npm run lint` 确认无错误。
