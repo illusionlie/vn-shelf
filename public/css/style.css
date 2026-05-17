@@ -785,6 +785,44 @@ img { max-width: 100%; height: auto; display: block; }
   margin-top: 6px;
 }
 
+.form-range {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--input-bg-color);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  margin: 8px 0;
+}
+
+.form-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.form-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 有背景图时让 body 背景色透明，使图片可见 */
+body.has-bg-image {
+  background-color: transparent;
+}
+
 /* ===== Detail Page ===== */
 .detail-header {
   display: flex;

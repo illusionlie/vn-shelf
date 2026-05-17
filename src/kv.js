@@ -121,7 +121,11 @@ export async function getSettings(env) {
     // Tags 显示配置
     tagsMode: 'vndb',           // 'vndb' | 'manual'
     translateTags: true,         // 是否启用前端翻译
-    translationUrl: ''           // 翻译文件 URL（空则使用默认）
+    translationUrl: '',          // 翻译文件 URL（空则使用默认）
+    // 外观配置
+    backgroundUrl: '',           // 背景图 URL（空则不使用背景图）
+    backgroundOverlay: 0.5,      // overlay 不透明度 0-1
+    backgroundBlur: 4            // 背景模糊度 px，0-20
   };
 }
 

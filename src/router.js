@@ -139,6 +139,10 @@ async function handleAPI(request, env, path, method) {
     return handleGetTierList(request, env);
   }
 
+  if (path === '/api/config/appearance' && method === 'GET') {
+    return handleGetAppearance(request, env);
+  }
+
   // 需要认证的接口
   const auth = await authMiddleware(request, env);
 
@@ -1175,6 +1179,20 @@ async function handleGetIndexStatus(request, env, auth) {
 
 // ============ 配置接口 ============
 
+async function handleGetAppearance(request, env) {
+  const settings = await getSettings(env);
+
+  const response = successResponse({
+    backgroundUrl: settings.backgroundUrl || '',
+    backgroundOverlay: settings.backgroundOverlay ?? 0.5,
+    backgroundBlur: settings.backgroundBlur ?? 4
+  });
+
+  // 公开端点设置缓存
+  response.headers.set('Cache-Control', 'public, max-age=300');
+  return response;
+}
+
 async function handleGetConfig(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
@@ -1190,7 +1208,11 @@ async function handleGetConfig(request, env, auth) {
     // Tags 相关配置
     tagsMode: settings.tagsMode || 'vndb',
     translateTags: settings.translateTags !== false,
-    translationUrl: settings.translationUrl || ''
+    translationUrl: settings.translationUrl || '',
+    // 外观配置
+    backgroundUrl: settings.backgroundUrl || '',
+    backgroundOverlay: settings.backgroundOverlay ?? 0.5,
+    backgroundBlur: settings.backgroundBlur ?? 4
   });
 }
 
@@ -1232,6 +1254,25 @@ async function handleUpdateConfig(request, env, auth) {
 
   if (body.translationUrl !== undefined) {
     settings.translationUrl = body.translationUrl;
+  }
+
+  // 外观配置
+  if (body.backgroundUrl !== undefined) {
+    settings.backgroundUrl = String(body.backgroundUrl);
+  }
+
+  if (body.backgroundOverlay !== undefined) {
+    const overlay = Number(body.backgroundOverlay);
+    if (Number.isFinite(overlay)) {
+      settings.backgroundOverlay = Math.max(0, Math.min(1, overlay));
+    }
+  }
+
+  if (body.backgroundBlur !== undefined) {
+    const blur = Number(body.backgroundBlur);
+    if (Number.isFinite(blur)) {
+      settings.backgroundBlur = Math.max(0, Math.min(20, blur));
+    }
   }
 
   await saveSettings(env, settings);

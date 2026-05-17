@@ -173,6 +173,62 @@ function toggleTheme() {
   const isDark = document.body.classList.contains('dark-mode');
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
   updateThemeToggleButtons();
+  applyBackgroundOverlay();
+}
+
+// ========== 自定义背景 ===========
+
+let _backgroundConfig = null;
+
+async function initBackground() {
+  try {
+    const res = await configAPI.getAppearance();
+    _backgroundConfig = res.data || null;
+    applyBackground(_backgroundConfig);
+  } catch (error) {
+    console.warn('[app] load appearance config failed', {
+      error: error?.message || String(error)
+    });
+  }
+}
+
+function applyBackground(config) {
+  if (!config || !config.backgroundUrl) {
+    document.body.style.backgroundImage = '';
+    document.body.classList.remove('has-bg-image');
+    applyBackgroundOverlay();
+    return;
+  }
+
+  const safeUrl = config.backgroundUrl.replace(/["\\]/g, '\\$&');
+  document.body.style.backgroundImage = `url("${safeUrl}")`;
+  document.body.classList.add('has-bg-image');
+  applyBackgroundOverlay();
+}
+
+function applyBackgroundOverlay() {
+  const overlay = document.querySelector('.background-overlay');
+  if (!overlay) return;
+
+  if (!_backgroundConfig || !_backgroundConfig.backgroundUrl) {
+    overlay.style.backgroundColor = '';
+    overlay.style.backdropFilter = '';
+    overlay.style.webkitBackdropFilter = '';
+    return;
+  }
+
+  const opacity = _backgroundConfig.backgroundOverlay ?? 0.5;
+  const blur = _backgroundConfig.backgroundBlur ?? 4;
+  const isDark = document.body.classList.contains('dark-mode');
+
+  if (isDark) {
+    overlay.style.backgroundColor = `rgba(18, 18, 18, ${opacity})`;
+  } else {
+    overlay.style.backgroundColor = `rgba(237, 238, 240, ${opacity})`;
+  }
+
+  overlay.style.backdropFilter = `blur(${blur}px)`;
+  overlay.style.webkitBackdropFilter = `blur(${blur}px)`;
 }
 
 // Mobile Menu Toggle
@@ -195,6 +251,7 @@ document.addEventListener('alpine:init', () => {
       this._initialized = true;
       this.checkAuth();
       initTheme();
+      initBackground();
       initProgressBar();
     },
 
@@ -570,7 +627,10 @@ function settingsPage() {
     config: {
       tagsMode: 'vndb',
       translateTags: true,
-      translationUrl: ''
+      translationUrl: '',
+      backgroundUrl: '',
+      backgroundOverlay: 0.5,
+      backgroundBlur: 4
     },
     vndbApiToken: '',
     newPassword: '',
@@ -607,7 +667,10 @@ function settingsPage() {
         this.config = res.data || {
           tagsMode: 'vndb',
           translateTags: true,
-          translationUrl: ''
+          translationUrl: '',
+          backgroundUrl: '',
+          backgroundOverlay: 0.5,
+          backgroundBlur: 4
         };
       } catch (error) {
         this.$store.app.addToast('加载配置失败: ' + error.message, 'error');
@@ -796,6 +859,32 @@ function settingsPage() {
         this.$store.app.addToast('翻译缓存已清除');
       } catch (error) {
         this.$store.app.addToast('清除缓存失败: ' + error.message, 'error');
+      }
+    },
+
+    previewBackground() {
+      const config = {
+        backgroundUrl: this.config.backgroundUrl || '',
+        backgroundOverlay: this.config.backgroundOverlay ?? 0.5,
+        backgroundBlur: this.config.backgroundBlur ?? 4
+      };
+      _backgroundConfig = config;
+      applyBackground(config);
+    },
+
+    async saveAppearanceConfig() {
+      this.isLoading = true;
+      try {
+        await configAPI.update({
+          backgroundUrl: this.config.backgroundUrl || '',
+          backgroundOverlay: this.config.backgroundOverlay ?? 0.5,
+          backgroundBlur: this.config.backgroundBlur ?? 4
+        });
+        this.$store.app.addToast('外观设置已保存');
+      } catch (error) {
+        this.$store.app.addToast('保存失败: ' + error.message, 'error');
+      } finally {
+        this.isLoading = false;
       }
     }
   };

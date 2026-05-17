@@ -297,6 +297,13 @@ export const configAPI = {
       method: 'PUT',
       body: data
     });
+  },
+
+  /**
+   * 获取外观配置（公开接口，无需认证）
+   */
+  async getAppearance() {
+    return apiRequest('/config/appearance');
   }
 };
 

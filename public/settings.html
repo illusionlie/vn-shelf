@@ -237,6 +237,67 @@
       </template>
     </section>
 
+    <!-- 外观设置 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">外观设置</h2>
+
+      <div class="form-group">
+        <label class="form-label">背景图片 URL</label>
+        <div style="display: flex; gap: 12px;">
+          <input
+            type="url"
+            class="form-input"
+            x-model="config.backgroundUrl"
+            placeholder="输入背景图片链接，留空则不使用背景图"
+          >
+          <button
+            class="btn btn-secondary"
+            @click="config.backgroundUrl = ''; previewBackground()"
+            :disabled="!config.backgroundUrl"
+          >
+            清除
+          </button>
+        </div>
+        <p class="form-hint">支持任意图片直链，推荐使用高分辨率图片以获得最佳效果。</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          遮罩透明度: <span x-text="Math.round((config.backgroundOverlay ?? 0.5) * 100) + '%'"></span>
+        </label>
+        <input
+          type="range"
+          class="form-range"
+          min="0"
+          max="1"
+          step="0.05"
+          x-model.number="config.backgroundOverlay"
+          @input="previewBackground()"
+        >
+        <p class="form-hint">控制背景图上方遮罩层的不透明度，数值越高文字越清晰。</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          模糊度: <span x-text="(config.backgroundBlur ?? 4) + 'px'"></span>
+        </label>
+        <input
+          type="range"
+          class="form-range"
+          min="0"
+          max="20"
+          step="1"
+          x-model.number="config.backgroundBlur"
+          @input="previewBackground()"
+        >
+        <p class="form-hint">控制背景图的模糊程度，0 为不模糊。</p>
+      </div>
+
+      <button class="btn btn-primary" @click="saveAppearanceConfig()" :disabled="isLoading">
+        保存外观设置
+      </button>
+    </section>
+
     <!-- 数据导入导出 -->
     <section class="settings-section">
       <h2 class="settings-section-title">数据管理</h2>
