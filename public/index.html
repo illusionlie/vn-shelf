@@ -175,7 +175,28 @@
               >
               <div class="detail-info">
                 <h1 class="detail-title">
-                  <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
+                  <a
+                    :href="'https://vndb.org/' + selectedVN.id"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="detail-title-link"
+                    title="在 VNDB 中查看"
+                  >
+                    <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
+                  </a>
+                  <a
+                    :href="'https://vndb.org/' + selectedVN.id"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="vndb-link-btn"
+                    title="跳转到 VNDB 条目"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                  </a>
                   <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" title="全年龄作品">全年龄</span>
                 </h1>
                 <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>

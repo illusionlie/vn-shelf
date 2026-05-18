@@ -857,6 +857,38 @@ body.has-bg-image {
   padding: 3px 8px;
 }
 
+.detail-title-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.detail-title-link:hover {
+  color: var(--accent-color, #6366f1);
+}
+
+.vndb-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--secondary-text-color);
+  border-radius: 4px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.vndb-link-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.vndb-link-btn:hover {
+  color: var(--accent-color, #6366f1);
+  background-color: var(--hover-bg-color, rgba(99, 102, 241, 0.1));
+}
+
 .detail-subtitle {
   font-size: 1.1rem;
   color: var(--secondary-text-color);
