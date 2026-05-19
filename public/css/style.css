@@ -503,12 +503,36 @@ img { max-width: 100%; height: auto; display: block; }
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border-color);
   cursor: pointer;
+  position: relative;
 }
 
 .vn-card:hover {
   transform: translateY(-8px);
   box-shadow: var(--shadow-medium);
   border-color: var(--border-glow);
+}
+
+/* 光扫效果 */
+.vn-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    315deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 58%
+  );
+  background-size: 300% 300%;
+  background-position: 0% 0%;
+  transition: background-position 0.7s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vn-card:hover::before {
+  background-position: 100% 100%;
 }
 
 .vn-card-image-wrapper {
