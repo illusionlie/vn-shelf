@@ -123,7 +123,7 @@
     <div class="cards-grid" x-show="!isLoading && filteredList.length > 0">
       <template x-for="vn in filteredList" :key="vn.id">
         <div class="vn-card" @click="openDetail(vn)">
-          <div class="vn-card-image-wrapper" x-data="{ showNsfw: false }" @click.stop>
+          <div class="vn-card-image-wrapper" x-data="{ showNsfw: false }">
             <img
               :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
               :alt="vn.title"
