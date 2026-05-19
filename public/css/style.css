@@ -1160,6 +1160,7 @@ body.has-bg-image {
 .tier-vn-card {
   width: 80px;
   height: 110px;
+  position: relative;
   border: none;
   padding: 0;
   border-radius: 6px;
@@ -1542,6 +1543,51 @@ body.has-bg-image {
   .search-container {
     max-width: 100%;
   }
+}
+
+/* ===== NSFW Cover Overlay ===== */
+.nsfw-blur {
+  filter: blur(24px) brightness(0.5);
+  transition: filter var(--transition-medium);
+}
+
+.nsfw-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: inherit;
+  transition: background var(--transition-fast);
+}
+
+.nsfw-overlay:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.nsfw-overlay svg {
+  width: 36px;
+  height: 36px;
+  color: rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+}
+
+/* Tier page NSFW adjustments */
+.tier-vn-card .nsfw-overlay {
+  border-radius: 6px;
+}
+
+.tier-vn-card .nsfw-overlay svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Detail page NSFW adjustments */
+.detail-image.nsfw-blur {
+  filter: blur(32px) brightness(0.5);
 }
 
 /* ===== Utility Classes ===== */

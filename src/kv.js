@@ -289,6 +289,7 @@ function buildListItem(entry) {
     titleJa: entry.vndb?.titleJa || entry.vndb?.title || '', // 日文标题，没有则使用英文
     titleCn: entry.user?.titleCn || entry.vndb?.titleCn || '', // 中文标题，优先用户设置
     image: entry.vndb?.image || '',
+    imageNsfw: entry.vndb?.imageNsfw || false,
     rating: toNonNegativeNumber(entry.vndb?.rating),
     personalRating: toNonNegativeNumber(entry.user?.personalRating),
     playTimeMinutes: toNonNegativeNumber(entry.user?.playTimeMinutes),

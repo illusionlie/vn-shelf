@@ -119,12 +119,17 @@
                     @dragend="onDragEnd()"
                     @click="openDetail(vn)"
                     :data-vn-id="vn.id"
+                    x-data="{ showNsfw: false }"
                   >
                     <img
                       :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                       :alt="vn.titleCn || vn.titleJa || vn.title"
+                      :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
                       @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                     >
+                    <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" title="点击显示">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                    </div>
                   </button>
                 </div>
               </template>
@@ -176,12 +181,17 @@
                     @dragend="onDragEnd()"
                     @click="openDetail(vn)"
                     :data-vn-id="vn.id"
+                    x-data="{ showNsfw: false }"
                   >
                     <img
                       :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                       :alt="vn.titleCn || vn.titleJa || vn.title"
+                      :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
                       @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                     >
+                    <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" title="点击显示">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                    </div>
                   </button>
                 </div>
               </template>
@@ -210,12 +220,24 @@
 
           <div class="modal-body">
             <div class="detail-header">
-              <img
-                :src="selectedVN.vndb?.image || ''"
-                :alt="selectedVN.vndb?.title"
-                class="detail-image"
-                @error="$event.target.style.display='none'"
-              >
+              <div style="position:relative;flex-shrink:0;" x-data="{ showNsfw: false }">
+                <img
+                  :src="selectedVN.vndb?.image || ''"
+                  :alt="selectedVN.vndb?.title"
+                  class="detail-image"
+                  :class="{ 'nsfw-blur': selectedVN.vndb?.imageNsfw && !showNsfw }"
+                  @error="$event.target.style.display='none'"
+                >
+                <div
+                  class="nsfw-overlay"
+                  x-show="selectedVN.vndb?.imageNsfw && !showNsfw"
+                  @click.stop="showNsfw = true"
+                  style="border-radius:var(--border-radius-md);"
+                  title="点击显示"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                </div>
+              </div>
               <div class="detail-info">
                 <h1 class="detail-title">
                   <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
