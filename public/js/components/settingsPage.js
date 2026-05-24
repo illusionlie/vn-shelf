@@ -13,6 +13,7 @@ import {
 
 export function settingsPage() {
   return {
+    INDEX_STATUS_POLL_INTERVAL_MS: 5000,
     config: {
       tagsMode: 'vndb',
       translateTags: true,
@@ -28,10 +29,18 @@ export function settingsPage() {
     translationCacheStatus: null,
     isLoading: false,
     _initialized: false,
+    _indexStatusPollTimer: null,
+    _beforeUnloadHandler: null,
 
     async init() {
       if (this._initialized) return;
       this._initialized = true;
+
+      this._beforeUnloadHandler = () => {
+        this.stopIndexStatusPolling();
+      };
+      window.addEventListener('beforeunload', this._beforeUnloadHandler);
+
       try {
         const status = await authAPI.status();
         if (!status.authenticated) {
@@ -69,12 +78,46 @@ export function settingsPage() {
     async loadIndexStatus() {
       try {
         this.indexStatus = await indexAPI.getStatus();
+        this.syncIndexStatusPolling();
       } catch (error) {
         console.warn('[settings] load index status failed', {
           error: error?.message || String(error)
         });
         this.indexStatus = null;
+        this.stopIndexStatusPolling();
       }
+    },
+
+    isIndexTaskActive(status = this.indexStatus?.status) {
+      return status === 'starting' || status === 'running';
+    },
+
+    syncIndexStatusPolling() {
+      if (this.isIndexTaskActive()) {
+        this.startIndexStatusPolling();
+        return;
+      }
+
+      this.stopIndexStatusPolling();
+    },
+
+    startIndexStatusPolling() {
+      if (this._indexStatusPollTimer) {
+        return;
+      }
+
+      this._indexStatusPollTimer = window.setInterval(() => {
+        this.loadIndexStatus();
+      }, this.INDEX_STATUS_POLL_INTERVAL_MS);
+    },
+
+    stopIndexStatusPolling() {
+      if (!this._indexStatusPollTimer) {
+        return;
+      }
+
+      window.clearInterval(this._indexStatusPollTimer);
+      this._indexStatusPollTimer = null;
     },
 
     async saveVndbToken() {
@@ -182,12 +225,33 @@ export function settingsPage() {
     formatStatus(status) {
       const map = {
         idle: '空闲',
+        starting: '启动中',
         running: '运行中',
         completed: '已完成',
         failed: '失败',
-        partial: '部分完成'
+        partial: '部分完成',
+        start_failed: '启动失败'
       };
       return map[status] || status;
+    },
+
+    formatDateTime(dateStr) {
+      if (!dateStr) return '未知';
+      const date = new Date(dateStr);
+      if (Number.isNaN(date.getTime())) {
+        console.warn('[settings] formatDateTime received invalid date', { dateStr });
+        return dateStr;
+      }
+
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
     },
 
     formatDate(dateStr) {

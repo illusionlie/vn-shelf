@@ -11,11 +11,8 @@ const VN_KEY_PREFIX = 'vn:';
 const VN_LIST_KEY = 'vn:list';
 const VNDB_ID_REGEX = /^v\d+$/;
 const INDEX_START_LOCK_DO_NAME = 'global';
-// 兼容旧配置时的回退锁键：仅用于 best-effort 互斥（KV 无原子 CAS，极端并发下可能双成功）
-const INDEX_START_LOCK_KEY = 'index:start-lock';
 const INDEX_START_LOCK_TTL_SECONDS = 60;
 const INDEX_START_LOCK_TTL_MS = INDEX_START_LOCK_TTL_SECONDS * 1000;
-let hasWarnedIndexStartLockKVFallback = false;
 
 const DEFAULT_TIERS = [
   { id: 'tier-s', name: 'S', color: '#ff4757', order: 0 },
@@ -413,6 +410,10 @@ export async function rebuildVNList(env) {
   return rebuildVNListByIds(env, ids);
 }
 
+export async function listIndexableVNIds(env) {
+  return listStoredVNEntryIds(env);
+}
+
 /**
  * 添加条目到列表
  * @param {Object} env - 环境变量
@@ -705,22 +706,9 @@ async function callIndexStartLockDurableObject(env, path, payload = {}) {
   }
 }
 
-function warnIndexStartLockKVFallbackOnce(operation) {
-  if (hasWarnedIndexStartLockKVFallback) {
-    return;
-  }
-
-  hasWarnedIndexStartLockKVFallback = true;
-  console.warn('[index][start-lock] INDEX_START_LOCK Durable Object binding not found; fallback to KV lock (best-effort, non-atomic under high concurrency)', {
-    operation,
-    key: INDEX_START_LOCK_KEY,
-    ttlSeconds: INDEX_START_LOCK_TTL_SECONDS
-  });
-}
-
 /**
  * 尝试获取索引启动分布式锁
- * 优先使用 Durable Object 提供原子互斥；未配置时回退到 KV 兼容逻辑（best-effort，非强一致互斥）。
+ * 依赖 Durable Object 提供原子互斥，缺失绑定时直接失败。
  * @param {Object} env - 环境变量
  * @param {string} holder - 持有者标识
  * @returns {Promise<boolean>} true=获取成功，false=获取失败
@@ -728,36 +716,15 @@ function warnIndexStartLockKVFallbackOnce(operation) {
 export async function tryAcquireIndexStartLock(env, holder) {
   if (!holder) return false;
 
-  if (hasIndexStartLockDurableObjectBinding(env)) {
-    const result = await callIndexStartLockDurableObject(env, '/acquire', {
-      holder,
-      ttlMs: INDEX_START_LOCK_TTL_MS
-    });
-    return result?.acquired === true;
+  if (!hasIndexStartLockDurableObjectBinding(env)) {
+    throw new Error('INDEX_START_LOCK Durable Object binding is required');
   }
 
-  warnIndexStartLockKVFallbackOnce('acquire');
-
-  const now = Date.now();
-
-  const existing = await env.KV.get(INDEX_START_LOCK_KEY, 'json');
-
-  if (existing?.expiresAt && Number(existing.expiresAt) > now) {
-    return false;
-  }
-
-  const nextLock = {
+  const result = await callIndexStartLockDurableObject(env, '/acquire', {
     holder,
-    expiresAt: now + INDEX_START_LOCK_TTL_MS,
-    acquiredAt: new Date(now).toISOString()
-  };
-
-  await env.KV.put(INDEX_START_LOCK_KEY, JSON.stringify(nextLock), {
-    expirationTtl: INDEX_START_LOCK_TTL_SECONDS
+    ttlMs: INDEX_START_LOCK_TTL_MS
   });
-
-  const confirmed = await env.KV.get(INDEX_START_LOCK_KEY, 'json');
-  return confirmed?.holder === holder;
+  return result?.acquired === true;
 }
 
 /**
@@ -769,17 +736,11 @@ export async function tryAcquireIndexStartLock(env, holder) {
 export async function releaseIndexStartLock(env, holder) {
   if (!holder) return;
 
-  if (hasIndexStartLockDurableObjectBinding(env)) {
-    await callIndexStartLockDurableObject(env, '/release', { holder });
-    return;
+  if (!hasIndexStartLockDurableObjectBinding(env)) {
+    throw new Error('INDEX_START_LOCK Durable Object binding is required');
   }
 
-  warnIndexStartLockKVFallbackOnce('release');
-
-  const existing = await env.KV.get(INDEX_START_LOCK_KEY, 'json');
-  if (existing?.holder === holder) {
-    await env.KV.delete(INDEX_START_LOCK_KEY);
-  }
+  await callIndexStartLockDurableObject(env, '/release', { holder });
 }
 
 /**
@@ -824,11 +785,12 @@ export async function recordIndexItemResult(env, { taskId, vndbId, state, retryC
  */
 export async function summarizeIndexTaskResults(env, taskId) {
   if (!taskId) {
-    return { processed: 0, failed: [] };
+    return { processed: 0, failed: [], settledIds: [] };
   }
 
   const prefix = `index:item:${taskId}:`;
   const failedSet = new Set();
+  const settledIdSet = new Set();
   let processed = 0;
   let cursor = undefined;
 
@@ -849,6 +811,10 @@ export async function summarizeIndexTaskResults(env, taskId) {
         const fallbackId = keyName.startsWith(prefix) ? keyName.slice(prefix.length) : keyName;
         const id = value?.vndbId || fallbackId;
 
+        if (id) {
+          settledIdSet.add(id);
+        }
+
         if (value?.state === 'failed') {
           failedSet.add(id);
         }
@@ -860,7 +826,8 @@ export async function summarizeIndexTaskResults(env, taskId) {
 
   return {
     processed,
-    failed: Array.from(failedSet)
+    failed: Array.from(failedSet),
+    settledIds: Array.from(settledIdSet)
   };
 }
 
@@ -905,22 +872,26 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
   }
 
   // 终态任务不再重复汇总，避免清理后把 failed 覆写为空
-  if (status.status === 'completed' || status.status === 'partial' || status.status === 'failed') {
+  if (status.status === 'completed' || status.status === 'partial' || status.status === 'failed' || status.status === 'start_failed') {
     return status;
   }
 
   const summary = await summarizeIndexTaskResults(env, taskId);
   const total = status.total || 0;
   const summarizedProcessed = Math.min(total, summary.processed);
+  const settledProcessed = Math.min(
+    total,
+    new Set([...(summary.settledIds || []), ...(status.failed || [])]).size
+  );
   const candidateStatus = {
     ...status,
     // 维持单调上升（在同一状态视图内），并且不超过 total
-    processed: Math.min(total, Math.max(status.processed || 0, summarizedProcessed)),
-    failed: summary.failed,
+    processed: Math.min(total, Math.max(status.processed || 0, summarizedProcessed, settledProcessed)),
+    failed: Array.from(new Set([...(status.failed || []), ...summary.failed])),
     lastReconciledAt: new Date().toISOString()
   };
 
-  if (candidateStatus.status === 'running' && candidateStatus.processed >= total) {
+  if ((candidateStatus.status === 'running' || candidateStatus.status === 'starting') && candidateStatus.processed >= total) {
     candidateStatus.status = candidateStatus.failed.length > 0 ? 'partial' : 'completed';
     candidateStatus.completedAt = candidateStatus.completedAt || new Date().toISOString();
   }
@@ -933,7 +904,7 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
   }
 
   // 终态保护：避免并发陈旧写把终态回滚为 running
-  if (latest.status === 'completed' || latest.status === 'partial' || latest.status === 'failed') {
+  if (latest.status === 'completed' || latest.status === 'partial' || latest.status === 'failed' || latest.status === 'start_failed') {
     console.log('[index][reconcile] skip stale write because latest status already terminal', {
       taskId,
       latestStatus: latest.status,
@@ -947,25 +918,30 @@ export async function reconcileIndexStatusFromItems(env, taskId) {
   const mergedTotal = Number.isFinite(Number(latest.total))
     ? Math.max(0, Math.floor(Number(latest.total)))
     : total;
+  const mergedSettledProcessed = Math.min(
+    mergedTotal,
+    new Set([...(summary.settledIds || []), ...(latest.failed || []), ...(candidateStatus.failed || [])]).size
+  );
 
   const mergedStatus = {
     ...latest,
-    failed: candidateStatus.failed,
+    failed: Array.from(new Set([...(latest.failed || []), ...(candidateStatus.failed || [])])),
     lastReconciledAt: candidateStatus.lastReconciledAt,
     processed: Math.min(mergedTotal, Math.max(
       latest.processed || 0,
       status.processed || 0,
-      candidateStatus.processed || 0
+      candidateStatus.processed || 0,
+      mergedSettledProcessed
     ))
   };
 
-  if (mergedStatus.status === 'running' && mergedStatus.processed >= mergedTotal) {
+  if ((mergedStatus.status === 'running' || mergedStatus.status === 'starting') && mergedStatus.processed >= mergedTotal) {
     mergedStatus.status = mergedStatus.failed.length > 0 ? 'partial' : 'completed';
     mergedStatus.completedAt = mergedStatus.completedAt || new Date().toISOString();
   }
 
   const transitionedToTerminal =
-    latest.status === 'running' &&
+    (latest.status === 'running' || latest.status === 'starting') &&
     (mergedStatus.status === 'completed' || mergedStatus.status === 'partial');
 
   if ((latest.processed || 0) > (candidateStatus.processed || 0)) {

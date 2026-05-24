@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const sourcePath = path.join(repoRoot, 'src', 'router.js');
+const indexTaskSourcePath = path.join(repoRoot, 'src', 'index-task.js');
 
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -33,6 +34,7 @@ async function loadRouterModule({ initialSettings = {}, authenticated = true } =
   const routerPath = path.join(tempDir, 'router.module.mjs');
   const authStubPath = path.join(tempDir, 'auth.stub.mjs');
   const kvStubPath = path.join(tempDir, 'kv.stub.mjs');
+  const indexTaskStubPath = path.join(tempDir, 'index-task.stub.mjs');
   const utilsStubPath = path.join(tempDir, 'utils.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
   const testId = `${Date.now()}_${Math.random()}`;
@@ -171,14 +173,40 @@ export async function fetchVNDB() {
 }
 `;
 
+  const indexTaskStubCode = `
+export async function startIndexTask() {
+  return {
+    ok: false,
+    status: 500,
+    message: 'unexpected index task call'
+  };
+}
+
+export async function getIndexTaskStatus() {
+  return {
+    status: 'idle',
+    taskId: null,
+    total: 0,
+    processed: 0,
+    failed: [],
+    startedAt: null,
+    completedAt: null,
+    error: null,
+    lastReconciledAt: null
+  };
+}
+`;
+
   const patchedSource = sourceCode
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
     .replace(/from '\.\/kv\.js';/, "from './kv.stub.mjs';")
+    .replace(/from '\.\/index-task\.js';/, "from './index-task.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(kvStubPath, kvStubCode, 'utf8');
+  await fs.writeFile(indexTaskStubPath, indexTaskStubCode, 'utf8');
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(routerPath, patchedSource, 'utf8');

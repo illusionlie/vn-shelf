@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const sourcePath = path.join(repoRoot, 'src', 'router.js');
+const indexTaskSourcePath = path.join(repoRoot, 'src', 'index-task.js');
 
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -67,6 +68,7 @@ async function loadRouterModule({ authenticated = true, indexStatus = {}, vnItem
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-router-index-start-test-'));
   const routerPath = path.join(tempDir, 'router.module.mjs');
+  const indexTaskPath = path.join(tempDir, 'index-task.module.mjs');
   const authStubPath = path.join(tempDir, 'auth.stub.mjs');
   const kvStubPath = path.join(tempDir, 'kv.stub.mjs');
   const utilsStubPath = path.join(tempDir, 'utils.stub.mjs');
@@ -103,9 +105,13 @@ const state = globalThis.__routerIndexStartTestRegistry?.get('${testId}');
 const kv = state.sharedKvState;
 const clone = value => JSON.parse(JSON.stringify(value));
 
-export async function getVNList() {
+export async function listIndexableVNIds() {
   kv.getVNListCalls += 1;
-  return clone(kv.vnList);
+  const rawIds = Array.isArray(kv.vnList?.items)
+    ? kv.vnList.items.map(item => (typeof item?.id === 'string' ? item.id.trim() : '')).filter(Boolean)
+    : [];
+
+  return Array.from(new Set(rawIds)).sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 export async function getIndexStatus() {
@@ -117,6 +123,11 @@ export async function saveIndexStatus(env, status) {
   const next = clone(status);
   kv.indexStatus = next;
   kv.saveIndexStatusCalls.push(next);
+}
+
+export async function recordIndexItemResult(_env, payload) {
+  kv.recordIndexItemResultCalls = kv.recordIndexItemResultCalls || [];
+  kv.recordIndexItemResultCalls.push(clone(payload));
 }
 
 export async function reconcileIndexStatusFromItems(_env, taskId) {
@@ -168,6 +179,7 @@ export async function saveVNEntry() {}
 export async function deleteVNEntry() {}
 export async function addEntryToList() {}
 export async function removeEntryFromList() {}
+export async function getVNList() { return clone(kv.vnList); }
 export async function getSettings() {
   return {
     vndbApiToken: '',
@@ -235,14 +247,20 @@ export async function fetchVNDB() {
 }
 `;
 
+  const indexTaskSourceCode = await fs.readFile(indexTaskSourcePath, 'utf8');
+  const patchedIndexTaskSource = indexTaskSourceCode
+    .replace(/from '\.\/kv\.js';/, "from './kv.stub.mjs';");
+
   const patchedSource = sourceCode
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
     .replace(/from '\.\/kv\.js';/, "from './kv.stub.mjs';")
+    .replace(/from '\.\/index-task\.js';/, "from './index-task.module.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(kvStubPath, kvStubCode, 'utf8');
+  await fs.writeFile(indexTaskPath, patchedIndexTaskSource, 'utf8');
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(routerPath, patchedSource, 'utf8');
@@ -321,7 +339,7 @@ test('并发启动时仅允许一个请求成功，另一个返回冲突（同�
       error: '已有索引任务正在运行'
     });
 
-    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
     assert.equal(state.sharedKvState.getVNListCalls, 1);
     assert.equal(state.sharedKvState.getIndexStatusCalls, 2);
 
@@ -370,7 +388,7 @@ test('running 状态下重复启动会被拒绝', async () => {
   }
 });
 
-test('查询索引状态时，running 任务会触发一次兜底 reconcile', async () => {
+test('查询索引状态时直接返回当前状态，不触发 reconcile', async () => {
   const sharedKvState = createSharedKvState({
     indexStatus: {
       status: 'running',
@@ -379,14 +397,6 @@ test('查询索引状态时，running 任务会触发一次兜底 reconcile', as
       processed: 1,
       failed: []
     }
-  });
-
-  sharedKvState.reconcileResultFactory = status => ({
-    ...status,
-    processed: 8,
-    status: 'completed',
-    completedAt: '2026-01-01T00:00:10.000Z',
-    failed: []
   });
 
   const { routerModule, state, cleanup } = await loadRouterModule({ sharedKvState });
@@ -400,11 +410,10 @@ test('查询索引状态时，running 任务会触发一次兜底 reconcile', as
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(payload.status, 'completed');
-    assert.equal(payload.processed, 8);
+    assert.equal(payload.status, 'running');
+    assert.equal(payload.processed, 1);
     assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
-    assert.equal(state.sharedKvState.reconcileCalls, 1);
-    assert.deepEqual(state.sharedKvState.reconcileTaskIds, ['idx_running_1']);
+    assert.equal(state.sharedKvState.reconcileCalls || 0, 0);
   } finally {
     await cleanup();
   }
@@ -441,7 +450,7 @@ test('查询索引状态时，非 running 任务不会触发 reconcile', async (
   }
 });
 
-test('查询索引状态时，reconcile 失败会回退返回当前状态', async () => {
+test('查询索引状态时不会因 reconcile 副作用而报错', async () => {
   const sharedKvState = createSharedKvState({
     indexStatus: {
       status: 'running',
@@ -451,10 +460,6 @@ test('查询索引状态时，reconcile 失败会回退返回当前状态', asyn
       failed: []
     }
   });
-
-  sharedKvState.reconcileResultFactory = () => {
-    throw new Error('kv unavailable');
-  };
 
   const { routerModule, state, cleanup } = await loadRouterModule({ sharedKvState });
 
@@ -470,7 +475,7 @@ test('查询索引状态时，reconcile 失败会回退返回当前状态', asyn
     assert.equal(payload.status, 'running');
     assert.equal(payload.processed, 2);
     assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
-    assert.equal(state.sharedKvState.reconcileCalls, 1);
+    assert.equal(state.sharedKvState.reconcileCalls || 0, 0);
   } finally {
     await cleanup();
   }
@@ -502,8 +507,10 @@ test('正常启动会创建任务状态并发送全部消息', async () => {
       data: { total: 3 }
     });
 
-    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
-    const savedStatus = state.sharedKvState.saveIndexStatusCalls[0];
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+    const [startingStatus, savedStatus] = state.sharedKvState.saveIndexStatusCalls;
+    assert.equal(startingStatus.status, 'starting');
+    assert.equal(savedStatus.status, 'running');
     assert.equal(savedStatus.status, 'running');
     assert.equal(savedStatus.total, 3);
     assert.equal(savedStatus.processed, 0);
@@ -556,8 +563,8 @@ test('启动索引时会去重重复 VN ID，并按去重后 total 入队', asyn
       data: { total: 3 }
     });
 
-    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
-    const savedStatus = state.sharedKvState.saveIndexStatusCalls[0];
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+    const savedStatus = state.sharedKvState.saveIndexStatusCalls[1];
     assert.equal(savedStatus.total, 3);
 
     assert.equal(sendCalls.length, 3);
@@ -607,7 +614,7 @@ test('批量发送使用分片并发并限制并发上界', async () => {
   }
 });
 
-test('发送失败会写入 failed 状态，并允许后续再次启动', async () => {
+test('部分发送失败会记录失败条目，但任务仍进入 running 并允许后续再次启动', async () => {
   const vnItems = [{ id: 'v101' }, { id: 'v102' }, { id: 'v103' }];
   let shouldFailOnce = true;
   let sendCalls = 0;
@@ -632,37 +639,82 @@ test('发送失败会写入 failed 状态，并允许后续再次启动', async 
       }
     };
 
-    const firstAttempt = await sendStartIndexRequest(routerModule, env);
-    assert.equal(firstAttempt.response.status, 500);
+     const firstAttempt = await sendStartIndexRequest(routerModule, env);
+    assert.equal(firstAttempt.response.status, 200);
     assert.deepEqual(firstAttempt.payload, {
-      success: false,
-      error: '索引任务启动失败，请稍后重试'
-    });
-
-    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
-    const runningStatus = state.sharedKvState.saveIndexStatusCalls[0];
-    const failedStatus = state.sharedKvState.saveIndexStatusCalls[1];
-    assert.equal(runningStatus.status, 'running');
-    assert.equal(failedStatus.status, 'failed');
-    assert.equal(failedStatus.taskId, runningStatus.taskId);
-    assert.equal(failedStatus.error, 'queue send failed');
-    assert.ok(typeof failedStatus.completedAt === 'string' && failedStatus.completedAt.length > 0);
-
-    const secondAttempt = await sendStartIndexRequest(routerModule, env);
-    assert.equal(secondAttempt.response.status, 200);
-    assert.deepEqual(secondAttempt.payload, {
       success: true,
       message: '索引任务已启动',
       data: { total: 3 }
     });
 
-    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 3);
-    const restartedStatus = state.sharedKvState.saveIndexStatusCalls[2];
-    assert.equal(restartedStatus.status, 'running');
-    assert.match(restartedStatus.taskId, /^idx_\d+$/);
+     assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+    const startingStatus = state.sharedKvState.saveIndexStatusCalls[0];
+    const runningStatus = state.sharedKvState.saveIndexStatusCalls[1];
+    assert.equal(startingStatus.status, 'starting');
+    assert.equal(runningStatus.status, 'running');
+    assert.equal(runningStatus.taskId, startingStatus.taskId);
+    assert.equal(runningStatus.processed, 1);
+    assert.deepEqual(runningStatus.failed, ['v101']);
+    assert.equal(runningStatus.error, '1 个条目入队失败');
+    assert.equal(state.sharedKvState.recordIndexItemResultCalls.length, 1);
+    assert.deepEqual(state.sharedKvState.recordIndexItemResultCalls[0], {
+      taskId: runningStatus.taskId,
+      vndbId: 'v101',
+      state: 'failed',
+      retryCount: 0,
+      error: 'enqueue_failed'
+    });
 
-    assert.equal(sendCalls, 6);
+    const secondAttempt = await sendStartIndexRequest(routerModule, env);
+    assert.equal(secondAttempt.response.status, 409);
+    assert.deepEqual(secondAttempt.payload, {
+      success: false,
+      error: '已有索引任务正在运行'
+    });
+
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+
+    assert.equal(sendCalls, 3);
     assert.equal(state.sharedKvState.releaseCalls, 2);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('全部发送失败时会写入 start_failed 状态并返回 500', async () => {
+  const vnItems = [{ id: 'v201' }, { id: 'v202' }];
+
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    indexStatus: {
+      status: 'idle'
+    },
+    vnItems
+  });
+
+  try {
+    const { response, payload } = await sendStartIndexRequest(routerModule, {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('queue send failed');
+        }
+      }
+    });
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(payload, {
+      success: false,
+      error: '索引任务启动失败，请稍后重试'
+    });
+
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+    const startFailedStatus = state.sharedKvState.saveIndexStatusCalls[1];
+    assert.equal(startFailedStatus.status, 'start_failed');
+    assert.equal(startFailedStatus.processed, 2);
+    assert.deepEqual(startFailedStatus.failed, ['v201', 'v202']);
+    assert.equal(startFailedStatus.error, 'queue send failed');
+    assert.ok(typeof startFailedStatus.completedAt === 'string' && startFailedStatus.completedAt.length > 0);
+
+    assert.equal(state.sharedKvState.recordIndexItemResultCalls.length, 2);
   } finally {
     await cleanup();
   }
@@ -697,8 +749,8 @@ test('释放锁失败不会覆盖已成功启动的响应', async () => {
       data: { total: 2 }
     });
 
-    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 1);
-    assert.equal(state.sharedKvState.saveIndexStatusCalls[0].status, 'running');
+    assert.equal(state.sharedKvState.saveIndexStatusCalls.length, 2);
+    assert.equal(state.sharedKvState.saveIndexStatusCalls[1].status, 'running');
     assert.equal(sendCalls.length, 2);
     assert.equal(state.sharedKvState.releaseCalls, 1);
   } finally {
@@ -753,7 +805,7 @@ test('跨实例并发启动会被分布式锁拦截为一个成功一个冲突',
     const taskIds = Array.from(new Set(sendCalls.map(item => item.taskId)));
     assert.equal(taskIds.length, 1);
 
-    assert.equal(sharedKvState.saveIndexStatusCalls.length, 1);
+    assert.equal(sharedKvState.saveIndexStatusCalls.length, 2);
     assert.equal(sharedKvState.getIndexStatusCalls, 1);
     assert.equal(sharedKvState.getVNListCalls, 1);
     assert.equal(sharedKvState.tryAcquireCalls, 2);

@@ -737,6 +737,47 @@ test('queue acks message after terminal failed result is recorded', async () => 
   }
 });
 
+test('queue treats missing entry as failure and records terminal failed result', async () => {
+  const recordCalls = [];
+
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    kvImpl: {
+      getVNEntry: async () => null,
+      recordIndexItemResult: async (_env, payload) => {
+        recordCalls.push(payload);
+      }
+    }
+  });
+
+  try {
+    const message = createQueueMessage({
+      vndbId: 'v404',
+      taskId: 'idx_missing_entry',
+      retryCount: 3
+    });
+
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not send when retry limit reached');
+        }
+      }
+    };
+
+    await worker.queue({ messages: [message] }, env, {});
+
+    assert.equal(recordCalls.length, 1);
+    assert.equal(recordCalls[0].state, 'failed');
+    assert.equal(recordCalls[0].vndbId, 'v404');
+    assert.equal(recordCalls[0].error, 'entry_not_found');
+    assert.equal(message.ackCalled, true);
+    assert.equal(message.retryCalled, false);
+  } finally {
+    await cleanup();
+  }
+});
+
 test('queue triggers original message retry when terminal failed result recording fails', async () => {
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => {

@@ -178,6 +178,9 @@ test('summarizeIndexTaskResults 支持分页 list + 分块 get 并对 failed 去
 
     assert.equal(summary.processed, 53);
     assert.deepEqual(clone(summary.failed).sort(), ['v31', 'v7']);
+    assert.equal(summary.settledIds.length, 52);
+    assert.ok(summary.settledIds.includes('v7'));
+    assert.ok(summary.settledIds.includes('v31'));
     assert.ok(maxInFlightGets <= 25);
     assert.deepEqual(listCalls, [undefined, '20', '40']);
   } finally {
@@ -302,6 +305,155 @@ test('reconcileIndexStatusFromItems 不会被旧 taskId 的条目结果污染', 
     const persisted = await kvModule.getIndexStatus(env);
     assert.equal(persisted.processed, 1);
     assert.deepEqual(clone(persisted.failed), []);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('recordIndexItemResult 保持成功粘性且允许 failed 升级为 success', async () => {
+  const { kvModule, cleanup } = await loadKVModule();
+
+  try {
+    const { env, store } = createMockEnv();
+    const taskId = 'idx_sticky_success';
+    const key = `index:item:${taskId}:v17`;
+
+    await kvModule.recordIndexItemResult(env, {
+      taskId,
+      vndbId: 'v17',
+      state: 'success',
+      retryCount: 1
+    });
+
+    await kvModule.recordIndexItemResult(env, {
+      taskId,
+      vndbId: 'v17',
+      state: 'failed',
+      retryCount: 3,
+      error: 'should_not_override'
+    });
+
+    let persisted = JSON.parse(store.get(key));
+    assert.equal(persisted.state, 'success');
+    assert.equal(persisted.error, null);
+
+    await kvModule.recordIndexItemResult(env, {
+      taskId,
+      vndbId: 'v18',
+      state: 'failed',
+      retryCount: 2,
+      error: 'temporary'
+    });
+
+    await kvModule.recordIndexItemResult(env, {
+      taskId,
+      vndbId: 'v18',
+      state: 'success',
+      retryCount: 3
+    });
+
+    persisted = JSON.parse(store.get(`index:item:${taskId}:v18`));
+    assert.equal(persisted.state, 'success');
+    assert.equal(persisted.error, null);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('reconcileIndexStatusFromItems 会保留 starting 阶段已记录的失败并收敛到 partial', async () => {
+  const { kvModule, cleanup } = await loadKVModule();
+
+  try {
+    const taskId = 'idx_starting_partial';
+    const { env, store } = createMockEnv();
+
+    writeJson(store, 'index:status', createIndexStatus({
+      status: 'starting',
+      taskId,
+      total: 3,
+      processed: 1,
+      failed: ['v2'],
+      startedAt: '2026-01-01T00:00:00.000Z'
+    }));
+
+    writeJson(store, `index:item:${taskId}:v1`, {
+      taskId,
+      vndbId: 'v1',
+      state: 'success',
+      retryCount: 0,
+      error: null,
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    writeJson(store, `index:item:${taskId}:v2`, {
+      taskId,
+      vndbId: 'v2',
+      state: 'failed',
+      retryCount: 0,
+      error: 'enqueue_failed',
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    writeJson(store, `index:item:${taskId}:v3`, {
+      taskId,
+      vndbId: 'v3',
+      state: 'success',
+      retryCount: 0,
+      error: null,
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    const result = await kvModule.reconcileIndexStatusFromItems(env, taskId);
+
+    assert.equal(result.status, 'partial');
+    assert.equal(result.processed, 3);
+    assert.deepEqual(clone(result.failed), ['v2']);
+    assert.ok(typeof result.completedAt === 'string' && result.completedAt.length > 0);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('reconcileIndexStatusFromItems 在 enqueue_failed 条目结果缺失时仍可按状态失败集合收敛', async () => {
+  const { kvModule, cleanup } = await loadKVModule();
+
+  try {
+    const taskId = 'idx_missing_enqueue_failed_item';
+    const { env, store } = createMockEnv();
+
+    writeJson(store, 'index:status', createIndexStatus({
+      status: 'running',
+      taskId,
+      total: 3,
+      processed: 1,
+      failed: ['v1'],
+      startedAt: '2026-01-01T00:00:00.000Z'
+    }));
+
+    writeJson(store, `index:item:${taskId}:v2`, {
+      taskId,
+      vndbId: 'v2',
+      state: 'success',
+      retryCount: 0,
+      error: null,
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    writeJson(store, `index:item:${taskId}:v3`, {
+      taskId,
+      vndbId: 'v3',
+      state: 'success',
+      retryCount: 0,
+      error: null,
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    });
+
+    const result = await kvModule.reconcileIndexStatusFromItems(env, taskId);
+
+    assert.equal(result.status, 'partial');
+    assert.equal(result.processed, 3);
+    assert.deepEqual(clone(result.failed), ['v1']);
+    assert.ok(typeof result.completedAt === 'string' && result.completedAt.length > 0);
   } finally {
     await cleanup();
   }

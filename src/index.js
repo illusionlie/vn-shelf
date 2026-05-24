@@ -13,6 +13,9 @@ import {
 import { handleRequest } from './router.js';
 import { fetchVNDB } from './vndb.js';
 
+const INDEX_ACTIVE_STATUSES = new Set(['starting', 'running']);
+const INDEX_TERMINAL_STATUSES = new Set(['completed', 'partial', 'start_failed']);
+
 const INDEX_MAX_RETRY = 3;
 const INDEX_RETRY_DELAY_SECONDS = 60;
 const INDEX_RECONCILE_INTERVAL_MS = 5000;
@@ -224,7 +227,7 @@ export default {
             await new Promise(resolve => setTimeout(resolve, waitMs));
 
             const delayedBefore = await getIndexStatus(env);
-            if (delayedBefore.taskId !== taskId || delayedBefore.status !== 'running') {
+            if (delayedBefore.taskId !== taskId || !INDEX_ACTIVE_STATUSES.has(delayedBefore.status)) {
               console.log('[index][queue-reconcile-delayed] skipped', {
                 taskId,
                 reason,
@@ -248,14 +251,14 @@ export default {
             });
 
             if (
-              delayedBefore.status === 'running' &&
-              (delayedNext.status === 'completed' || delayedNext.status === 'partial')
+              INDEX_ACTIVE_STATUSES.has(delayedBefore.status) &&
+              INDEX_TERMINAL_STATUSES.has(delayedNext.status)
             ) {
               await rebuildVNList(env);
               return;
             }
 
-            if (delayedNext.status !== 'running') {
+            if (!INDEX_ACTIVE_STATUSES.has(delayedNext.status)) {
               return;
             }
 
@@ -314,11 +317,13 @@ export default {
         // 2. 获取现有条目
         const entry = await getVNEntry(env, vndbId);
 
-        if (entry) {
-          // 更新VNDB数据
-          entry.vndb = vndbData;
-          await saveVNEntry(env, entry);
+        if (!entry) {
+          throw new Error('entry_not_found');
         }
+
+        // 更新VNDB数据
+        entry.vndb = vndbData;
+        await saveVNEntry(env, entry);
 
         // 3. 幂等写入单条结果（按 taskId + vndbId 唯一）
         await recordIndexItemResult(env, {
@@ -388,7 +393,7 @@ export default {
     // 基于条目结果汇总任务状态，增加节流避免每个批次都触发全量扫描
     for (const [taskId, taskMeta] of touchedTasks.entries()) {
       const before = await getIndexStatus(env);
-      if (before.taskId !== taskId || before.status !== 'running') {
+      if (before.taskId !== taskId || !INDEX_ACTIVE_STATUSES.has(before.status)) {
         continue;
       }
 
@@ -418,15 +423,15 @@ export default {
       // 仅在 running -> completed/partial 的转移时触发聚合重建
       if (
         before.taskId === taskId &&
-        before.status === 'running' &&
-        (next.status === 'completed' || next.status === 'partial')
+        INDEX_ACTIVE_STATUSES.has(before.status) &&
+        INDEX_TERMINAL_STATUSES.has(next.status)
       ) {
         await rebuildVNList(env);
         continue;
       }
 
       // 即时汇总后仍是 running，则兜底注册一次延迟汇总，保证最终可收敛
-      if (hasSettledInBatch && next.status === 'running') {
+      if (hasSettledInBatch && INDEX_ACTIVE_STATUSES.has(next.status)) {
         scheduleDelayedReconcile(taskId, taskMeta, INDEX_RECONCILE_INTERVAL_MS, 'post-immediate-running');
       }
     }

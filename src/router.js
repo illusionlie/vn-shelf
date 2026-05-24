@@ -11,6 +11,7 @@ import {
   initAdminPassword,
   isInitialized
 } from './auth.js';
+import { getIndexTaskStatus, startIndexTask } from './index-task.js';
 import {
   getVNList,
   getVNEntry,
@@ -22,9 +23,6 @@ import {
   saveSettings,
   exportData,
   importData,
-  getIndexStatus,
-  saveIndexStatus,
-  reconcileIndexStatusFromItems,
   getTierList,
   saveTierList,
   updateVNTier,
@@ -37,7 +35,6 @@ import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseReque
 import { fetchVNDB } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
-const INDEX_START_QUEUE_BATCH_SIZE = 25;
 
 let startIndexRequestLockTail = Promise.resolve();
 
@@ -1076,70 +1073,13 @@ async function handleStartIndex(request, env, auth) {
     }
 
     try {
-      const currentStatus = await getIndexStatus(env);
-      if (currentStatus.status === 'running') {
-        return errorResponse('已有索引任务正在运行', 409);
+      const result = await startIndexTask(env);
+
+      if (!result.ok) {
+        return errorResponse(result.message, result.status);
       }
 
-      const list = await getVNList(env);
-      const rawIds = Array.isArray(list.items)
-        ? list.items.map(item => (typeof item?.id === 'string' ? item.id.trim() : '')).filter(Boolean)
-        : [];
-      const uniqueIds = Array.from(new Set(rawIds));
-      const duplicateCount = rawIds.length - uniqueIds.length;
-      const total = uniqueIds.length;
-
-      if (duplicateCount > 0) {
-        console.warn('[index][start] duplicate vn ids detected and deduplicated before queue enqueue', {
-          rawCount: rawIds.length,
-          deduplicatedCount: total,
-          duplicateCount
-        });
-      }
-
-      if (total === 0) {
-        return errorResponse('没有需要索引的条目', 400);
-      }
-
-      // 创建索引状态
-      const taskId = `idx_${Date.now()}`;
-      const status = {
-        status: 'running',
-        taskId,
-        total,
-        processed: 0,
-        failed: [],
-        startedAt: new Date().toISOString(),
-        completedAt: null,
-        error: null,
-        lastReconciledAt: null
-      };
-
-      await saveIndexStatus(env, status);
-
-      try {
-        // 分片并发发送（同一批次共享同一个 taskId）
-        for (let i = 0; i < uniqueIds.length; i += INDEX_START_QUEUE_BATCH_SIZE) {
-          const chunk = uniqueIds.slice(i, i + INDEX_START_QUEUE_BATCH_SIZE);
-          await Promise.all(chunk.map(vndbId => env.VN_INDEX_QUEUE.send({
-            vndbId,
-            taskId,
-            retryCount: 0
-          })));
-        }
-      } catch (error) {
-        const failedStatus = {
-          ...status,
-          status: 'failed',
-          completedAt: new Date().toISOString(),
-          error: error instanceof Error ? error.message : String(error)
-        };
-
-        await saveIndexStatus(env, failedStatus);
-        return errorResponse('索引任务启动失败，请稍后重试', 500);
-      }
-
-      return successResponse({ total }, '索引任务已启动');
+      return successResponse({ total: result.total }, '索引任务已启动');
     } finally {
       try {
         await releaseIndexStartLock(env, startLockHolder);
@@ -1159,21 +1099,7 @@ async function handleGetIndexStatus(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const status = await getIndexStatus(env);
-
-  if (status.status === 'running' && status.taskId) {
-    try {
-      const reconciled = await reconcileIndexStatusFromItems(env, status.taskId);
-      return jsonResponse(reconciled);
-    } catch (error) {
-      console.warn('[index][status] reconcile failed, fallback to current status', {
-        taskId: status.taskId,
-        error: error?.message || String(error)
-      });
-      return jsonResponse(status);
-    }
-  }
-
+  const status = await getIndexTaskStatus(env);
   return jsonResponse(status);
 }
 

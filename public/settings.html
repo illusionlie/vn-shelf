@@ -140,9 +140,21 @@
         <div class="mb-4">
           <p class="text-muted">
             状态: <strong x-text="formatStatus(indexStatus.status)"></strong>
-            <span x-show="indexStatus.status === 'running'">
+            <span x-show="isIndexTaskActive(indexStatus.status)">
               - 进度: <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
             </span>
+          </p>
+          <p class="text-muted" x-show="indexStatus.startedAt">
+            开始时间: <span x-text="formatDateTime(indexStatus.startedAt)"></span>
+          </p>
+          <p class="text-muted" x-show="indexStatus.completedAt">
+            完成时间: <span x-text="formatDateTime(indexStatus.completedAt)"></span>
+          </p>
+          <p class="text-muted" x-show="indexStatus.lastReconciledAt">
+            最近进度刷新: <span x-text="formatDateTime(indexStatus.lastReconciledAt)"></span>
+          </p>
+          <p class="text-muted" x-show="indexStatus.error">
+            说明: <span x-text="indexStatus.error"></span>
           </p>
           <p class="text-muted" x-show="indexStatus.failed?.length > 0">
             失败: <span x-text="indexStatus.failed.join(', ')"></span>
@@ -154,7 +166,7 @@
         <button
           class="btn btn-primary"
           @click="startIndex()"
-          :disabled="isLoading || indexStatus?.status === 'running'"
+          :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
         >
           批量更新索引
         </button>
