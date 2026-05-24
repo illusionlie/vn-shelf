@@ -124,77 +124,10 @@ npm run tail      # 查看 Worker 实时日志
 npm run deploy    # 部署到 Cloudflare Workers
 ```
 
-## Worker 执行模型
+## API 及技术详情
 
-- HTTP 入口：
-  - 非 `/api/*` 请求优先尝试 `env.ASSETS.fetch(request)` 获取静态资源
-  - 未命中后回退到 API 路由处理
-- Queue 入口：
-  - 消费批量索引任务
-  - 失败重试（最多 3 次，延迟 60 秒）
-  - 写入幂等 item 结果并周期汇总任务状态
-
-## API 概览
-
-路由总入口：`/api/*`
-
-### 认证
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/auth/status` | 获取初始化 + 登录状态 | 公开 |
-| POST | `/api/auth/init` | 初始化管理员密码（可同时写入 `vndbApiToken`） | 仅未初始化 |
-| POST | `/api/auth/login` | 登录 | 公开 |
-| POST | `/api/auth/logout` | 登出 | 公开 |
-| GET | `/api/auth/verify` | 验证 Token | 公开 |
-
-### VN
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/vn` | 获取 VN 列表（支持 `sort`,`search`,`untiered`） | 公开 |
-| GET | `/api/vn/{id}` | 获取单个 VN（ID 示例：`v17`） | 公开 |
-| POST | `/api/vn` | 创建 VN 条目 | 需认证 |
-| PUT | `/api/vn/{id}` | 更新 VN（支持 `refreshVNDB`） | 需认证 |
-| DELETE | `/api/vn/{id}` | 删除 VN | 需认证 |
-| PUT | `/api/vn/{id}/tier` | 更新单条 VN 的 Tier 归属与排序 | 需认证 |
-| PUT | `/api/vn/tier/batch` | 批量更新 VN Tier（上限 200） | 需认证 |
-
-### Tier
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/tier` | 获取 Tier 列表 | 公开 |
-| POST | `/api/tier` | 创建 Tier | 需认证 |
-| PUT | `/api/tier/order` | 更新 Tier 顺序 | 需认证 |
-| PUT | `/api/tier/{id}` | 更新 Tier 名称/颜色 | 需认证 |
-| DELETE | `/api/tier/{id}` | 删除 Tier（会先清空条目归属） | 需认证 |
-
-### 其他接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/stats` | 获取统计数据 | 公开 |
-| POST | `/api/index/start` | 启动批量索引 | 需认证 |
-| GET | `/api/index/status` | 获取索引状态 | 需认证 |
-| GET | `/api/config` | 获取配置（脱敏） | 需认证 |
-| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags） | 需认证 |
-| GET | `/api/export` | 导出数据（含 `entries`、`tierList`） | 需认证 |
-| POST | `/api/import` | 导入数据（`merge` / `replace`） | 需认证 |
-
-## 页面路由
-
-静态资源由 Worker Assets 提供（`html_handling = "auto-trailing-slash"`）。
-
-| 路径 | 说明 |
-|------|------|
-| `/` 或 `/index.html` | 首页 |
-| `/login` | 登录页 |
-| `/settings` | 设置页 |
-| `/stats` | 统计页 |
-| `/tier` | Tier List 页 |
-| `/success` | 成功页 |
+见 [AGENTS.md](./AGENTS.md)
 
 ## 许可证
 
-MIT License。详见 `LICENSE`
+MIT License。详见 [LICENSE](./LICENSE)
