@@ -19,12 +19,14 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 
 ```text
 src/
-├── index.js      # Worker 入口（fetch + queue）
-├── router.js     # API 路由分发与处理
-├── kv.js         # KV 存储与聚合/索引状态逻辑
-├── auth.js       # JWT + 密码哈希认证
-├── vndb.js       # VNDB API 客户端
-└── utils.js      # 通用工具函数
+├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject
+├── index-task.js   # 索引任务逻辑（启动、状态查询）
+├── router.js       # API 路由分发与处理
+├── kv.js           # KV 存储与聚合/索引状态逻辑
+├── auth.js         # JWT + 密码哈希认证
+├── vndb.js         # VNDB API 客户端
+├── utils.js        # 通用工具函数
+└── repositories/   # （暂空）
 
 public/
 ├── index.html
@@ -32,12 +34,16 @@ public/
 ├── settings.html
 ├── stats.html
 ├── tier.html
+├── success.html
+├── cover.webp
+├── favicon.ico
+├── robots.txt
 ├── css/
 │   └── style.css
 └── js/
     ├── app.js            # Alpine.js 入口：全局 Store + 组件注册
     ├── api.js            # API 封装
-    ├── utils.js          # 工具函数（formatUserPlayTime, scroll lock, toggleMobileMenu, progress bar）
+    ├── utils.js          # 工具函数（formatUserPlayTime, lockPageScroll/unlockPageScroll, toggleMobileMenu, initProgressBar）
     ├── theme.js          # 主题切换 + 自定义背景
     ├── markdown.js       # Markdown 渲染
     ├── translations.js   # Tags 翻译与缓存
@@ -49,8 +55,16 @@ public/
         └── statsPage.js    # 统计页组件
 
 tests/
-└── queue/
-    └── index.queue.test.mjs
+├── kv/
+│   ├── index.reconcile.test.mjs
+│   └── import.rebuild.test.mjs
+├── public/
+│   └── markdown.security.test.mjs
+├── queue/
+│   └── index.queue.test.mjs
+└── router/
+    ├── index.start.test.mjs
+    └── config.update.test.mjs
 
 .github/workflows/
 ├── ci.yml
@@ -59,15 +73,18 @@ tests/
 
 ## Worker 执行模型
 
-- HTTP 入口：[`fetch()`](src/index.js:24)
+- HTTP 入口：[`fetch()`](src/index.js:141)
   - 非 `/api/*` 请求优先尝试 `env.ASSETS.fetch(request)` 获取静态资源。
-  - 失败后回退到路由处理 [`handleRequest()`](src/router.js:49)。
-- Queue 入口：[`queue()`](src/index.js:63)
+  - 失败后回退到路由处理 [`handleRequest()`](src/router.js:69)。
+- Queue 入口：[`queue()`](src/index.js:180)
   - 用于批量索引任务消费，带重试、幂等条目结果记录和状态汇总。
+- Durable Object：[`IndexStartLockDurableObject`](src/index.js:30)
+  - 全局单例，提供索引启动的分布式互斥锁（`/acquire`、`/release`、`/status`）。
+  - 基于 Durable Object 存储，支持 TTL 自动过期。
 
 ## API 路由
 
-路由总入口：[`handleAPI()`](src/router.js:79)
+路由总入口：[`handleAPI()`](src/router.js:99)
 
 ### 认证接口
 
@@ -119,7 +136,8 @@ tests/
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
 | GET | `/api/config` | 获取配置（脱敏） | 需认证 |
-| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags 配置） | 需认证 |
+| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags 配置 / 外观配置） | 需认证 |
+| GET | `/api/config/appearance` | 获取外观配置（`backgroundUrl` / `backgroundOverlay` / `backgroundBlur`） | 公开 |
 
 ### 导入导出接口
 
@@ -149,23 +167,27 @@ tests/
 
 | 键 | 说明 | 数据结构 |
 |----|------|----------|
-| `config:settings` | 全局配置 | `{ vndbApiToken, adminPasswordHash, jwtSecret, lastIndexTime, tagsMode, translateTags, translationUrl }` |
+| `config:settings` | 全局配置 | `{ vndbApiToken, adminPasswordHash, jwtSecret, lastIndexTime, tagsMode, translateTags, translationUrl, backgroundUrl, backgroundOverlay, backgroundBlur }` |
 | `vn:list` | VN 列表聚合数据 | `{ items: [...], stats: {...}, updatedAt }` |
 | `vn:{id}` | 单个 VN 条目 | 见下方完整条目结构 |
 | `tier:list` | Tier 列表 | `{ tiers: [{id,name,color,order}], updatedAt }` |
-| `index:status` | 当前索引任务状态 | `{ status, taskId, total, processed, failed, startedAt, completedAt, error, lastReconciledAt }` |
+| `index:status` | 当前索引任务状态 | `{ status, taskId, total, processed, failed, startedAt, completedAt, error, lastReconciledAt }`（`status` 可取 `idle`、`starting`、`running`、`completed`、`partial`、`start_failed`；`failed` 为失败 ID 数组） |
 | `index:item:{taskId}:{vndbId}` | 索引单条结果（幂等键，TTL 14 天） | `{ taskId, vndbId, state, retryCount, error, updatedAt }` |
 
-核心实现位于：[`getSettings()`](src/kv.js:104)、[`getVNList()`](src/kv.js:132)、[`getTierList()`](src/kv.js:161)、[`recordIndexItemResult()`](src/kv.js:591)。
+核心实现位于：[`getSettings()`](src/kv.js:111)、[`getVNList()`](src/kv.js:143)、[`getTierList()`](src/kv.js:172)、[`recordIndexItemResult()`](src/kv.js:756)。
 
 ## Queue 处理机制（批量索引）
 
 - Queue 绑定：`VN_INDEX_QUEUE`（配置见 [`wrangler.toml.example`](wrangler.toml.example)）
-- 消费逻辑：[`queue()`](src/index.js:63)
+- 消费逻辑：[`queue()`](src/index.js:180)
+- 索引启动：[`startIndexTask()`](src/index-task.js:65)，状态查询 [`getIndexTaskStatus()`](src/index-task.js:61)
+- 分布式锁：[`IndexStartLockDurableObject`](src/index.js:30) 提供启动互斥，绑定名 `INDEX_START_LOCK`
 - 重试策略：最多 3 次，重试延迟 60 秒（`retryCount` 累增）
-- 幂等结果：按 `taskId + vndbId` 写入 `index:item:*`，成功结果对失败回写具有“粘性”
-- 汇总机制：[`reconcileIndexStatusFromItems()`](src/kv.js:694) 基于 item keys 汇总 `processed/failed`
-- 状态终态：`completed` 或 `partial`，终态后会执行聚合重建 [`rebuildVNList()`](src/kv.js:326)
+- 幂等结果：按 `taskId + vndbId` 写入 `index:item:*`，成功结果对失败回写具有"粘性"
+- 汇总机制：[`reconcileIndexStatusFromItems()`](src/kv.js:866) 基于 item keys 汇总 `processed/failed`
+- 延迟汇总：高频批次下仅临近完成时即时汇总，其余走 `ctx.waitUntil` 延迟汇总降载（最多 6 次，间隔 5s）
+- 状态终态：`completed` 或 `partial`，终态后会执行聚合重建 [`rebuildVNList()`](src/kv.js:408)
+- 终态清理：汇总转入终态时自动清理 `index:item:*` 键
 
 ## 认证系统
 
@@ -231,6 +253,7 @@ tests/
   titleJa: "CLANNAD",
   titleCn: "CLANNAD",
   image: "https://...",
+  imageNsfw: false,
   rating: 8.5,
   personalRating: 9.0,
   playTimeMinutes: 3630,
@@ -258,9 +281,9 @@ tests/
 
 - 入口：[`public/js/app.js`](public/js/app.js) — Alpine.js 全局 Store 注册 + 组件注册（胶水层）
 - API 封装：[`public/js/api.js`](public/js/api.js)
-- 工具函数：[`public/js/utils.js`](public/js/utils.js) — `formatUserPlayTime`, scroll lock, `toggleMobileMenu`, progress bar
+- 工具函数：[`public/js/utils.js`](public/js/utils.js) — `formatUserPlayTime`, `lockPageScroll`/`unlockPageScroll`, `toggleMobileMenu`, `initProgressBar`
 - 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换、自定义背景 overlay
-- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js:136)（带安全 URL 校验）
+- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js:162)（带安全 URL 校验）
 - Tags 翻译：[`initTranslations()`](public/js/translations.js:240)
   - IndexedDB 缓存：`vn-shelf-translations`
   - 缓存键：`tagTranslations`
@@ -287,6 +310,11 @@ tests/
 
 - Queue 行为测试：[`tests/queue/index.queue.test.mjs`](tests/queue/index.queue.test.mjs)
   - 覆盖重试补发、ack/retry 分支、失败结果写入异常分支
+- KV 汇总测试：[`tests/kv/index.reconcile.test.mjs`](tests/kv/index.reconcile.test.mjs)
+- KV 导入重建测试：[`tests/kv/import.rebuild.test.mjs`](tests/kv/import.rebuild.test.mjs)
+- Markdown 安全测试：[`tests/public/markdown.security.test.mjs`](tests/public/markdown.security.test.mjs)
+- 索引启动路由测试：[`tests/router/index.start.test.mjs`](tests/router/index.start.test.mjs)
+- 配置更新路由测试：[`tests/router/config.update.test.mjs`](tests/router/config.update.test.mjs)
 - CI（[`ci.yml`](.github/workflows/ci.yml)）
   - ESLint
   - Node 内置测试（`npm run test`）
@@ -301,3 +329,4 @@ tests/
 5. **导入前全量校验**：`/api/import` 会先校验所有条目与 `tierList` 结构，再执行写入。
 6. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 KV，不直接暴露给前端。
 7. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 KV 与 Queue 后再运行 `npm run dev`。
+8. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500。
