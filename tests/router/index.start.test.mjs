@@ -71,7 +71,6 @@ async function loadRouterModule({ authenticated = true, indexStatus = {}, vnItem
   const indexTaskPath = path.join(tempDir, 'index-task.module.mjs');
   const authStubPath = path.join(tempDir, 'auth.stub.mjs');
   const repositoryStubPath = path.join(tempDir, 'repository.stub.mjs');
-  const migrateStubPath = path.join(tempDir, 'migrate.stub.mjs');
   const utilsStubPath = path.join(tempDir, 'utils.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
   const testId = `${Date.now()}_${Math.random()}`;
@@ -210,11 +209,6 @@ export async function batchUpdateVNTiers() { return []; }
 export async function clearTierAssignments() { return 0; }
 `;
 
-  const migrateStubCode = `
-export async function migrateKvToD1() {
-  return { success: true };
-}
-`;
 
   const utilsStubCode = `
 export function jsonResponse(data, status = 200, headers = {}) {
@@ -261,14 +255,12 @@ export async function fetchVNDB() {
   const patchedSource = sourceCode
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
-    .replace(/from '\.\/migrate\.js';/, "from './migrate.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.module.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
-  await fs.writeFile(migrateStubPath, migrateStubCode, 'utf8');
   await fs.writeFile(indexTaskPath, patchedIndexTaskSource, 'utf8');
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');

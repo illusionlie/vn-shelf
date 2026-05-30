@@ -23,9 +23,7 @@ src/
 ├── index-task.js   # 索引任务逻辑（启动、状态查询）
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
-├── repository.js   # D1 数据访问层（替代 kv.js）
-├── migrate.js       # KV → D1 数据迁移
-├── kv.js           # [遗留] KV 存储逻辑（仅迁移端点使用，迁移完成后删除）
+├── repository.js   # D1 数据访问层
 ├── auth.js         # JWT + 密码哈希认证
 ├── vndb.js         # VNDB API 客户端
 ├── utils.js        # 通用工具函数
@@ -58,9 +56,8 @@ public/
         └── statsPage.js    # 统计页组件
 
 tests/
-├── kv/
-│   ├── index.reconcile.test.mjs
-│   └── import.rebuild.test.mjs
+├── d1/
+│   └── repository.test.mjs
 ├── public/
 │   └── markdown.security.test.mjs
 ├── queue/
@@ -149,12 +146,6 @@ tests/
 | GET | `/api/export` | 导出数据（含 `entries` 和 `tierList`） | 需认证 |
 | POST | `/api/import` | 导入数据（`merge` / `replace`，支持 `tierList`） | 需认证 |
 
-### 管理接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| POST | `/api/admin/migrate-kv-to-d1` | 执行 KV → D1 数据迁移（全成功后落标记；失败可修复后重试） | 需认证 |
-
 ## 页面与静态资源路由
 
 页面和静态资源由 Worker Assets 提供，配置见 [`wrangler.toml.example`](wrangler.toml.example)。
@@ -171,24 +162,6 @@ tests/
 | `/js/*.js` | 前端模块 |
 
 > `html_handling = "auto-trailing-slash"`，因此页面路由使用无 `.html` 形式也可访问。
-
-## KV 键命名约定（仅迁移使用）
-
-> 以下 KV 键仅在 KV→D1 迁移端点中使用，迁移完成后可移除 KV 绑定。
-
-| 键 | 说明 |
-|----|------|
-| `config:settings` | 全局配置 |
-| `vn:list` | VN 列表聚合数据 |
-| `vn:{id}` | 单个 VN 条目 |
-| `tier:list` | Tier 列表 |
-| `index:status` | 当前索引任务状态 |
-| `index:item:{taskId}:{vndbId}` | 索引单条结果（幂等键，TTL 14 天） |
-
-核心实现位于 [`migrate.js`](src/migrate.js)，迁移后数据全部存储于 D1 数据库。
-
-- 迁移会一并复制 `index:status` 与 `index:item:{taskId}:{vndbId}`，以保留进行中/未完全收敛的索引任务状态。
-- 仅当迁移过程无错误时才写入 `migrated_from_kv` 标记；若中途失败，可修复问题后再次执行迁移。
 
 ## Queue 处理机制（批量索引）
 
@@ -323,9 +296,8 @@ tests/
 ## 测试与 CI
 
 - Queue 行为测试：[`tests/queue/index.queue.test.mjs`](tests/queue/index.queue.test.mjs)
-  - 覆盖重试补发、ack/retry 分支、失败结果写入异常分支
-- KV 汇总测试：[`tests/kv/index.reconcile.test.mjs`](tests/kv/index.reconcile.test.mjs)
-- KV 导入重建测试：[`tests/kv/import.rebuild.test.mjs`](tests/kv/import.rebuild.test.mjs)
+   - 覆盖重试补发、ack/retry 分支、失败结果写入异常分支
+- D1 数据访问层测试：[`tests/d1/repository.test.mjs`](tests/d1/repository.test.mjs)
 - Markdown 安全测试：[`tests/public/markdown.security.test.mjs`](tests/public/markdown.security.test.mjs)
 - 索引启动路由测试：[`tests/router/index.start.test.mjs`](tests/router/index.start.test.mjs)
 - 配置更新路由测试：[`tests/router/config.update.test.mjs`](tests/router/config.update.test.mjs)
@@ -341,6 +313,6 @@ tests/
 3. **游玩时长字段约定**：后端仅接受 `playTimeHours` + `playTimePartMinutes`，不再接受旧字段 `playTime` / `playTimeMinutes` 作为输入。
 4. **Tier 一致性**：删除 Tier 时先清理条目归属，再落库 Tier 列表。
 5. **导入前全量校验**：`/api/import` 会先校验所有条目与 `tierList` 结构，再执行写入。
-6. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 KV，不直接暴露给前端。
-7. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 KV 与 Queue 后再运行 `npm run dev`。
+6. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表，不直接暴露给前端。
+7. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 D1 数据库与 Queue 后再运行 `npm run dev`。
 8. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500。

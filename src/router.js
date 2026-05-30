@@ -12,7 +12,6 @@ import {
   isInitialized
 } from './auth.js';
 import { getIndexTaskStatus, startIndexTask } from './index-task.js';
-import { migrateKvToD1 } from './migrate.js';
 import {
   getVNList,
   getVNEntry,
@@ -211,10 +210,6 @@ async function handleAPI(request, env, path, method) {
 
   if (path === '/api/export' && method === 'GET') {
     return handleExport(request, env, auth);
-  }
-
-  if (path === '/api/admin/migrate-kv-to-d1' && method === 'POST') {
-    return handleMigrateKvToD1(request, env, auth);
   }
 
   if (path === '/api/import' && method === 'POST') {
@@ -1301,18 +1296,4 @@ async function handleImport(request, env, auth) {
   return successResponse({ count: entries.length }, '导入成功');
 }
 
-// ============ 管理接口 ============
 
-async function handleMigrateKvToD1(request, env, auth) {
-  if (!auth.authenticated) {
-    return errorResponse('未授权', 401);
-  }
-
-  try {
-    const result = await migrateKvToD1(env);
-    return successResponse(result, '迁移完成');
-  } catch (error) {
-    console.error('[migrate] KV→D1 migration failed', { error: error?.message || String(error) });
-    return errorResponse('迁移失败，请查看服务器日志', 500);
-  }
-}

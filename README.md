@@ -24,7 +24,7 @@
 ## 技术栈
 
 - 运行时：Cloudflare Workers（ES Modules）
-- 存储：Cloudflare KV
+- 存储：Cloudflare D1
 - 队列：Cloudflare Queues
 - 前端：原生 HTML/CSS/JavaScript（无构建步骤）
 - 测试：Node.js 内置测试运行器（`node --test`）
@@ -36,7 +36,7 @@
 
 - `WORKER_NAME`
 - `CF_API_TOKEN`
-- `CF_KV_NAMESPACE_ID`
+- `CF_D1_DATABASE_ID`
 - `CF_ACCOUNT_ID`（可选，不填则通过 API token 自动获取）
 - `CUSTOM_DOMAIN`（可选）
 
@@ -47,11 +47,10 @@
 3. 在权限部分点击“添加更多”，选择“Queues”，并选择“编辑”权限。
 4. 点击“继续以显示摘要” -> “创建令牌”按钮，复制生成的 API Token。
 
-### 获取 Cloudflare KV Namespace ID
+### 获取 Cloudflare D1 Database ID
 
-1. 登录 Cloudflare 控制台，进入“存储和数据库” -> “Workers KV”页面。
-2. 创建一个 KV 命名空间（或使用现有），点击“名称”进入详情页。
-3. 复制“ID”字段的值，即为 `CF_KV_NAMESPACE_ID`。
+1. 登录 Cloudflare 控制台，进入"存储和数据库" -> "D1 SQL Database"页面。
+2. 创建一个 D1 数据库（或使用现有），复制数据库 ID，即为 `CF_D1_DATABASE_ID`。
 
 ### 创建 Queue
 
@@ -91,11 +90,11 @@ cp wrangler.toml.example wrangler.toml
 按需替换以下占位符：
 
 - `__WORKER_NAME__`：你的 Worker 名称
-- `__KV_NAMESPACE_ID__`：KV 命名空间 ID
+- `__D1_DATABASE_ID__`：D1 数据库 ID
 
 模板中默认包含：
 
-- KV 绑定：`KV`
+- D1 数据库绑定：`DB`
 - Queue 绑定：`VN_INDEX_QUEUE`（队列名 `vn-index-queue`）
 - Durable Object 绑定：`INDEX_START_LOCK`（类名 `IndexStartLockDurableObject`）
 - 静态资源绑定：`ASSETS`（目录 `./public`）
@@ -104,7 +103,7 @@ cp wrangler.toml.example wrangler.toml
 
 确保已创建并绑定：
 
-- 1 个 KV 命名空间
+- 1 个 D1 数据库
 - 1 个 Queue
 - 1 个 Durable Object（`IndexStartLockDurableObject`）
 

@@ -1,5 +1,5 @@
 /**
- * D1 数据访问层 — 函数签名与 kv.js 兼容，内部用 D1 SQL 替代 KV 操作
+ * D1 数据访问层
  */
 
 import { initDB } from './db.js';

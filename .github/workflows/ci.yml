@@ -71,7 +71,6 @@ jobs:
         shell: bash
         run: |
           sed -e "s/__WORKER_NAME__/vn-shelf-ci/g" \
-            -e "s/__KV_NAMESPACE_ID__/00000000000000000000000000000000/g" \
             -e "s/__D1_DATABASE_ID__/00000000-0000-0000-0000-000000000000/g" \
             wrangler.toml.example > wrangler.toml
 

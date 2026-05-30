@@ -24,7 +24,7 @@ function createQueueMessage(body) {
   };
 }
 
-async function loadWorkerModule({ kvImpl = {}, fetchVNDBImpl, handleRequestImpl } = {}) {
+async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImpl } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-queue-test-'));
   const testId = `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -34,7 +34,7 @@ async function loadWorkerModule({ kvImpl = {}, fetchVNDBImpl, handleRequestImpl 
   }
 
   globalThis.__queueTestRegistry.set(testId, {
-    kvImpl,
+    repoImpl,
     fetchVNDBImpl,
     handleRequestImpl
   });
@@ -46,7 +46,7 @@ async function loadWorkerModule({ kvImpl = {}, fetchVNDBImpl, handleRequestImpl 
 
   const repositoryStubCode = `
 const state = globalThis.__queueTestRegistry?.get('${testId}') || {};
-const impl = state.kvImpl || {};
+const impl = state.repoImpl || {};
 
 function pick(name, fallback) {
   return (...args) => {
@@ -119,7 +119,7 @@ test('queue 在节流时间窗内不做即时 reconcile，仅注册延迟 reconc
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -194,7 +194,7 @@ test('queue 临近完成时即使在时间窗内也会即时 reconcile', async (
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -258,7 +258,7 @@ test('queue 延迟 reconcile 仍可收敛到终态', async () => {
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -332,7 +332,7 @@ test('queue schedules delayed reconcile fallback when immediate reconcile remain
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -405,7 +405,7 @@ test('queue delayed reconcile stops retrying after reaching max attempts', async
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -473,7 +473,7 @@ test('queue delayed reconcile retries on transient reconcile error before succee
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -542,7 +542,7 @@ test('queue delayed reconcile retries on transient reconcile error before succee
 test('queue delayed reconcile scheduling is idempotent per task within one batch', async () => {
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async id => ({ id, vndb: {}, user: {} }),
       recordIndexItemResult: async () => {},
       getIndexStatus: async () => ({
@@ -683,7 +683,7 @@ test('queue acks message after terminal failed result is recorded', async () => 
     fetchVNDBImpl: async () => {
       throw new Error('permanent failure');
     },
-    kvImpl: {
+    repoImpl: {
       recordIndexItemResult: async (_env, payload) => {
         recordCalls.push(payload);
       }
@@ -721,7 +721,7 @@ test('queue treats missing entry as failure and records terminal failed result',
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
-    kvImpl: {
+    repoImpl: {
       getVNEntry: async () => null,
       recordIndexItemResult: async (_env, payload) => {
         recordCalls.push(payload);
@@ -762,7 +762,7 @@ test('queue triggers original message retry when terminal failed result recordin
     fetchVNDBImpl: async () => {
       throw new Error('permanent failure');
     },
-    kvImpl: {
+    repoImpl: {
       recordIndexItemResult: async () => {
         throw new Error('kv write failed');
       }

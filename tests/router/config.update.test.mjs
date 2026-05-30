@@ -28,13 +28,12 @@ function createDefaultSettings(overrides = {}) {
   };
 }
 
-async function loadRouterModule({ initialSettings = {}, authenticated = true, migrateImpl } = {}) {
+async function loadRouterModule({ initialSettings = {}, authenticated = true } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-router-test-'));
   const routerPath = path.join(tempDir, 'router.module.mjs');
   const authStubPath = path.join(tempDir, 'auth.stub.mjs');
   const repositoryStubPath = path.join(tempDir, 'repository.stub.mjs');
-  const migrateStubPath = path.join(tempDir, 'migrate.stub.mjs');
   const indexTaskStubPath = path.join(tempDir, 'index-task.stub.mjs');
   const utilsStubPath = path.join(tempDir, 'utils.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
@@ -45,8 +44,7 @@ async function loadRouterModule({ initialSettings = {}, authenticated = true, mi
     settings: createDefaultSettings(initialSettings),
     authenticated,
     setAdminPasswordCalls: [],
-    saveSettingsCalls: [],
-    migrateImpl: migrateImpl || (async () => ({ success: true }))
+    saveSettingsCalls: []
   };
   globalThis.__routerConfigTestRegistry.set(testId, state);
 
@@ -137,13 +135,6 @@ export async function batchUpdateVNTiers() {}
 export async function clearTierAssignments() {}
 `;
 
-  const migrateStubCode = `
-const state = globalThis.__routerConfigTestRegistry?.get('${testId}');
-
-export async function migrateKvToD1(...args) {
-  return state.migrateImpl(...args);
-}
-`;
 
   const utilsStubCode = `
 export function jsonResponse(data, status = 200, headers = {}) {
@@ -210,14 +201,12 @@ export async function getIndexTaskStatus() {
   const patchedSource = sourceCode
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
-    .replace(/from '\.\/migrate\.js';/, "from './migrate.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
-  await fs.writeFile(migrateStubPath, migrateStubCode, 'utf8');
   await fs.writeFile(indexTaskStubPath, indexTaskStubCode, 'utf8');
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
@@ -246,17 +235,6 @@ async function sendUpdateConfigRequest(routerModule, body) {
   });
 
   const response = await routerModule.handleRequest(request, {});
-  const payload = await response.json();
-
-  return { response, payload };
-}
-
-async function sendMigrateRequest(routerModule, env = {}) {
-  const request = new Request('https://example.com/api/admin/migrate-kv-to-d1', {
-    method: 'POST'
-  });
-
-  const response = await routerModule.handleRequest(request, env);
   const payload = await response.json();
 
   return { response, payload };
@@ -365,55 +343,6 @@ test('不修改密码时不会重置已有凭据', async () => {
     assert.equal(state.settings.tagsMode, 'manual');
     assert.equal(state.settings.translateTags, false);
     assert.equal(state.settings.translationUrl, 'https://example.com/tags.json');
-  } finally {
-    await cleanup();
-  }
-});
-
-test('迁移接口未授权时返回 401', async () => {
-  const { routerModule, cleanup } = await loadRouterModule({ authenticated: false });
-
-  try {
-    const { response, payload } = await sendMigrateRequest(routerModule);
-
-    assert.equal(response.status, 401);
-    assert.deepEqual(payload, { success: false, error: '未授权' });
-  } finally {
-    await cleanup();
-  }
-});
-
-test('迁移接口成功时返回迁移结果', async () => {
-  const { routerModule, cleanup } = await loadRouterModule({
-    migrateImpl: async () => ({ alreadyMigrated: true })
-  });
-
-  try {
-    const { response, payload } = await sendMigrateRequest(routerModule, { KV: {}, DB: {} });
-
-    assert.equal(response.status, 200);
-    assert.deepEqual(payload, {
-      success: true,
-      message: '迁移完成',
-      data: { alreadyMigrated: true }
-    });
-  } finally {
-    await cleanup();
-  }
-});
-
-test('迁移接口异常时返回 500 和错误信息', async () => {
-  const { routerModule, cleanup } = await loadRouterModule({
-    migrateImpl: async () => {
-      throw new Error('KV missing');
-    }
-  });
-
-  try {
-    const { response, payload } = await sendMigrateRequest(routerModule, { DB: {} });
-
-    assert.equal(response.status, 500);
-    assert.deepEqual(payload, { success: false, error: '迁移失败，请查看服务器日志' });
   } finally {
     await cleanup();
   }
