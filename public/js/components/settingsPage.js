@@ -204,6 +204,12 @@ export function settingsPage() {
         const mode = confirm('选择导入模式：\n确定 = 合并（保留现有数据）\n取消 = 替换（清空现有数据）') ? 'merge' : 'replace';
 
         await dataAPI.import(data, mode);
+
+        if (data.appearance) {
+          setBackgroundConfig(data.appearance);
+          applyBackground(data.appearance);
+        }
+
         this.$store.app.addToast(`导入成功，共${data.entries.length}个条目`);
       } catch (error) {
         this.$store.app.addToast('导入失败: ' + error.message, 'error');

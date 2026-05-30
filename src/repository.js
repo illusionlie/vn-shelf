@@ -833,11 +833,19 @@ export async function exportData(env) {
 
   const tierList = await getTierList(env);
 
+  const settings = await getSettings(env);
+  const appearance = {
+    backgroundUrl: settings.backgroundUrl ?? '',
+    backgroundOverlay: settings.backgroundOverlay ?? 0.5,
+    backgroundBlur: settings.backgroundBlur ?? 4
+  };
+
   return {
     version: '1.0',
     exportedAt: new Date().toISOString(),
     entries,
-    tierList
+    tierList,
+    appearance
   };
 }
 
@@ -849,11 +857,26 @@ function chunkArray(array, size) {
   return chunks;
 }
 
+function applyAppearanceToSettings(settings, appearance) {
+  const ap = appearance;
+  if (ap.backgroundUrl !== undefined) settings.backgroundUrl = String(ap.backgroundUrl);
+  if (ap.backgroundOverlay !== undefined) {
+    const overlay = Number(ap.backgroundOverlay);
+    if (Number.isFinite(overlay)) settings.backgroundOverlay = Math.max(0, Math.min(1, overlay));
+  }
+  if (ap.backgroundBlur !== undefined) {
+    const blur = Number(ap.backgroundBlur);
+    if (Number.isFinite(blur)) settings.backgroundBlur = Math.max(0, Math.min(20, blur));
+  }
+  return settings;
+}
+
 export async function importData(env, data, mode = 'merge') {
   await initDB(env.DB);
 
   const incomingEntries = Array.isArray(data?.entries) ? data.entries : [];
   const hasIncomingTierList = isTierListObject(data?.tierList);
+  const hasIncomingAppearance = data?.appearance && typeof data.appearance === 'object' && !Array.isArray(data.appearance);
 
   if (mode === 'replace') {
     // ⚠️ replace 模式将 DELETE 与 INSERT 混合在分片 batch 中。
@@ -877,6 +900,11 @@ export async function importData(env, data, mode = 'merge') {
     for (const chunk of chunkArray(deleteStatements, D1_BATCH_CHUNK_SIZE)) {
       await env.DB.batch(chunk);
     }
+
+    if (hasIncomingAppearance) {
+      await saveSettings(env, applyAppearanceToSettings(await getSettings(env), data.appearance));
+    }
+
     return;
   }
 
@@ -892,5 +920,9 @@ export async function importData(env, data, mode = 'merge') {
     const currentTierList = await getTierList(env);
     const mergedTierList = mergeTierLists(currentTierList, data.tierList);
     await saveTierList(env, mergedTierList);
+  }
+
+  if (hasIncomingAppearance) {
+    await saveSettings(env, applyAppearanceToSettings(await getSettings(env), data.appearance));
   }
 }

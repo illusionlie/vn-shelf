@@ -1232,13 +1232,44 @@ async function handleImport(request, env, auth) {
   } catch (response) {
     return response;
   }
-  const { entries, tierList, mode } = body;
+  const { entries, tierList, appearance, mode } = body;
   const importMode = mode || 'merge';
 
   if (tierList !== undefined) {
     const tierListError = validateTierListPayload(tierList);
     if (tierListError) {
       return errorResponse(tierListError, 400);
+    }
+  }
+
+  if (appearance !== undefined) {
+    if (typeof appearance !== 'object' || appearance === null || Array.isArray(appearance)) {
+      return errorResponse('导入数据 appearance 必须是对象', 400);
+    }
+    if (appearance.backgroundUrl !== undefined && appearance.backgroundUrl !== null) {
+      if (typeof appearance.backgroundUrl !== 'string') {
+        return errorResponse('appearance.backgroundUrl 必须为字符串', 400);
+      }
+      const url = appearance.backgroundUrl;
+      if (url !== '' && !/^https?:\/\//i.test(url)) {
+        return errorResponse('appearance.backgroundUrl 必须为空或以 http:// / https:// 开头', 400);
+      }
+      if (url.length > 2048) {
+        return errorResponse('appearance.backgroundUrl 长度不能超过 2048', 400);
+      }
+    }
+    if (appearance.backgroundUrl === null) {
+      appearance.backgroundUrl = '';
+    }
+    if (appearance.backgroundOverlay !== undefined) {
+      if (typeof appearance.backgroundOverlay !== 'number' || !Number.isFinite(appearance.backgroundOverlay)) {
+        return errorResponse('appearance.backgroundOverlay 必须为有限数字', 400);
+      }
+    }
+    if (appearance.backgroundBlur !== undefined) {
+      if (typeof appearance.backgroundBlur !== 'number' || !Number.isFinite(appearance.backgroundBlur)) {
+        return errorResponse('appearance.backgroundBlur 必须为有限数字', 400);
+      }
     }
   }
 
@@ -1291,7 +1322,7 @@ async function handleImport(request, env, auth) {
     }
   }
 
-  await importData(env, { entries, tierList }, importMode);
+  await importData(env, { entries, tierList, appearance }, importMode);
 
   return successResponse({ count: entries.length }, '导入成功');
 }

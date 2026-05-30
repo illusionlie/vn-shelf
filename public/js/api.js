@@ -323,13 +323,17 @@ export const dataAPI = {
    * @param {string} mode - 导入模式
    */
   async import(data, mode = 'merge') {
+    const body = {
+      entries: data.entries,
+      tierList: data.tierList,
+      mode
+    };
+    if (data.appearance) {
+      body.appearance = data.appearance;
+    }
     return apiRequest('/import', {
       method: 'POST',
-      body: {
-        entries: data.entries,
-        tierList: data.tierList,
-        mode
-      }
+      body
     });
   }
 };
