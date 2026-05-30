@@ -6,15 +6,14 @@ import {
   getVNEntry,
   saveVNEntry,
   getIndexStatus,
-  rebuildVNList,
   recordIndexItemResult,
   reconcileIndexStatusFromItems
-} from './kv.js';
+} from './repository.js';
 import { handleRequest } from './router.js';
 import { fetchVNDB } from './vndb.js';
 
 const INDEX_ACTIVE_STATUSES = new Set(['starting', 'running']);
-const INDEX_TERMINAL_STATUSES = new Set(['completed', 'partial', 'start_failed']);
+const INDEX_TERMINAL_STATUSES = new Set(['completed', 'partial', 'failed', 'start_failed']);
 
 const INDEX_MAX_RETRY = 3;
 const INDEX_RETRY_DELAY_SECONDS = 60;
@@ -160,7 +159,6 @@ export default {
         }
       }
 
-      // 处理 API 路由
       return await handleRequest(request, env, ctx);
     } catch (error) {
       console.error('Worker error:', error);
@@ -254,7 +252,6 @@ export default {
               INDEX_ACTIVE_STATUSES.has(delayedBefore.status) &&
               INDEX_TERMINAL_STATUSES.has(delayedNext.status)
             ) {
-              await rebuildVNList(env);
               return;
             }
 
@@ -420,13 +417,11 @@ export default {
         settledInBatch: taskMeta.settledCount
       });
 
-      // 仅在 running -> completed/partial 的转移时触发聚合重建
       if (
         before.taskId === taskId &&
         INDEX_ACTIVE_STATUSES.has(before.status) &&
         INDEX_TERMINAL_STATUSES.has(next.status)
       ) {
-        await rebuildVNList(env);
         continue;
       }
 

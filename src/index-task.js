@@ -3,7 +3,7 @@ import {
   saveIndexStatus,
   listIndexableVNIds,
   recordIndexItemResult
-} from './kv.js';
+} from './repository.js';
 
 export const INDEX_TASK_ACTIVE_STATUSES = new Set(['starting', 'running']);
 export const INDEX_TASK_TERMINAL_STATUSES = new Set(['completed', 'partial', 'failed', 'start_failed']);

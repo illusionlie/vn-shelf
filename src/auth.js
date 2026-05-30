@@ -2,7 +2,7 @@
  * 认证模块
  */
 
-import { getSettings, saveSettings } from './kv.js';
+import { getSettings, saveSettings } from './repository.js';
 import { randomString, parseCookies } from './utils.js';
 
 /**
@@ -52,7 +52,7 @@ export async function verifyJWT(token, secret) {
 
     // 验证签名
     const expectedSignature = await sign(`${encodedHeader}.${encodedPayload}`, secret);
-    if (signature !== expectedSignature) {
+    if (!constantTimeEqual(signature, expectedSignature)) {
       return null;
     }
 
@@ -155,6 +155,16 @@ export async function hashPassword(password, salt) {
     .join('');
 }
 
+function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 /**
  * 验证密码
  * @param {string} password - 密码
@@ -164,7 +174,7 @@ export async function hashPassword(password, salt) {
  */
 export async function verifyPassword(password, salt, storedHash) {
   const hash = await hashPassword(password, salt);
-  return hash === storedHash;
+  return constantTimeEqual(hash, storedHash);
 }
 
 /**
@@ -236,7 +246,7 @@ export function clearAuthCookie(response) {
  * @param {Object} env - 环境变量
  * @param {string} password - 密码
  */
-export async function initAdminPassword(env, password) {
+export async function setAdminPassword(env, password) {
   const salt = randomString(16);
   const hash = await hashPassword(password, salt);
 

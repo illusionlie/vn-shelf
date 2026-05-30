@@ -8,17 +8,16 @@ import {
   setAuthCookie,
   clearAuthCookie,
   verifyAdminPassword,
-  initAdminPassword,
+  setAdminPassword,
   isInitialized
 } from './auth.js';
 import { getIndexTaskStatus, startIndexTask } from './index-task.js';
+import { migrateKvToD1 } from './migrate.js';
 import {
   getVNList,
   getVNEntry,
   saveVNEntry,
   deleteVNEntry,
-  addEntryToList,
-  removeEntryFromList,
   getSettings,
   saveSettings,
   exportData,
@@ -30,7 +29,7 @@ import {
   clearTierAssignments,
   tryAcquireIndexStartLock,
   releaseIndexStartLock
-} from './kv.js';
+} from './repository.js';
 import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
 
@@ -214,6 +213,10 @@ async function handleAPI(request, env, path, method) {
     return handleExport(request, env, auth);
   }
 
+  if (path === '/api/admin/migrate-kv-to-d1' && method === 'POST') {
+    return handleMigrateKvToD1(request, env, auth);
+  }
+
   if (path === '/api/import' && method === 'POST') {
     return handleImport(request, env, auth);
   }
@@ -251,7 +254,7 @@ async function handleInit(request, env) {
     return errorResponse('密码长度至少6位', 400);
   }
 
-  await initAdminPassword(env, password);
+  await setAdminPassword(env, password);
 
   if (vndbApiToken) {
     const settings = await getSettings(env);
@@ -599,10 +602,9 @@ async function handleCreateVN(request, env, auth) {
     }
   };
 
-  await saveVNEntry(env, entry);
-  await addEntryToList(env, entry);
+  const savedEntry = await saveVNEntry(env, entry);
 
-  return successResponse(entry, '创建成功');
+  return successResponse(savedEntry, '创建成功');
 }
 
 async function handleUpdateVN(request, env, id, auth) {
@@ -697,10 +699,9 @@ async function handleUpdateVN(request, env, id, auth) {
     tags: tags !== undefined ? (Array.isArray(tags) ? tags : []) : (entry.user.tags || [])
   };
 
-  await saveVNEntry(env, entry);
-  await addEntryToList(env, entry); // 更新列表中的条目
+  const savedEntry = await saveVNEntry(env, entry);
 
-  return successResponse(entry, '更新成功');
+  return successResponse(savedEntry, '更新成功');
 }
 
 async function handleDeleteVN(request, env, id, auth) {
@@ -714,7 +715,6 @@ async function handleDeleteVN(request, env, id, auth) {
   }
 
   await deleteVNEntry(env, id);
-  await removeEntryFromList(env, id);
 
   return successResponse(null, '删除成功');
 }
@@ -1154,13 +1154,15 @@ async function handleUpdateConfig(request, env, auth) {
     return response;
   }
   let settings = await getSettings(env);
+  let passwordChanged = false;
 
   if (body.newPassword) {
     if (body.newPassword.length < 6) {
       return errorResponse('密码长度至少6位', 400);
     }
-    await initAdminPassword(env, body.newPassword);
+    await setAdminPassword(env, body.newPassword);
     settings = await getSettings(env);
+    passwordChanged = true;
   }
 
   if (body.vndbApiToken !== undefined) {
@@ -1203,7 +1205,14 @@ async function handleUpdateConfig(request, env, auth) {
 
   await saveSettings(env, settings);
 
-  return successResponse(null, '设置已更新');
+  const response = successResponse(null, '设置已更新');
+
+  if (passwordChanged) {
+    const token = await createJWT(settings.jwtSecret, { sub: 'admin' });
+    setAuthCookie(response, token, env.ENVIRONMENT === 'production');
+  }
+
+  return response;
 }
 
 // ============ 导入导出接口 ============
@@ -1250,6 +1259,10 @@ async function handleImport(request, env, auth) {
     return errorResponse('导入数据 entries 必须为非空数组', 400);
   }
 
+  if (importMode === 'replace' && entries.length === 0) {
+    return errorResponse('replace 模式必须提供非空 entries，否则将清空全部数据', 400);
+  }
+
   const seenIds = new Set();
 
   // 完整预校验：先校验全部条目，再执行导入写入/删除
@@ -1286,4 +1299,20 @@ async function handleImport(request, env, auth) {
   await importData(env, { entries, tierList }, importMode);
 
   return successResponse({ count: entries.length }, '导入成功');
+}
+
+// ============ 管理接口 ============
+
+async function handleMigrateKvToD1(request, env, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  try {
+    const result = await migrateKvToD1(env);
+    return successResponse(result, '迁移完成');
+  } catch (error) {
+    console.error('[migrate] KV→D1 migration failed', { error: error?.message || String(error) });
+    return errorResponse('迁移失败，请查看服务器日志', 500);
+  }
 }

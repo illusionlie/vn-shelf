@@ -5,10 +5,16 @@ compatibility_date = "2026-02-14"
 # 禁用指标发送
 send_metrics = false
 
-# KV命名空间绑定
+# KV命名空间绑定（仅迁移端点使用，迁移完成后可移除）
 [[kv_namespaces]]
 binding = "KV"   # 不要修改此项
 id = "__KV_NAMESPACE_ID__"
+
+# D1 数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "vn-shelf-db"
+database_id = "__D1_DATABASE_ID__"
 
 # Queue生产者（批量索引）
 [[queues.producers]]

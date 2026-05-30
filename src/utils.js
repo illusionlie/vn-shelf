@@ -9,11 +9,21 @@
  */
 export function randomString(length = 32) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const charsLen = chars.length;
+  const maxByte = 256 - (256 % charsLen);
   let result = '';
-  const randomValues = new Uint8Array(length);
-  crypto.getRandomValues(randomValues);
-  for (let i = 0; i < length; i++) {
-    result += chars[randomValues[i] % chars.length];
+  const randomValues = new Uint8Array(length * 2);
+  let pos = randomValues.length;
+
+  while (result.length < length) {
+    if (pos >= randomValues.length) {
+      crypto.getRandomValues(randomValues);
+      pos = 0;
+    }
+    const byte = randomValues[pos++];
+    if (byte < maxByte) {
+      result += chars[byte % charsLen];
+    }
   }
   return result;
 }

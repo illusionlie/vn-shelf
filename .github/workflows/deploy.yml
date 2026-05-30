@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      
+
       - name: Validate Secrets
         run: |
           echo "Validating secrets..."
@@ -33,6 +33,10 @@ jobs:
             echo "::error::Secret CF_KV_NAMESPACE_ID is not set. Please add it to your repository secrets."
             exit 1
           fi
+          if [ -z "${{ secrets.CF_D1_DATABASE_ID }}" ]; then
+            echo "::error::Secret CF_D1_DATABASE_ID is not set. Please add it to your repository secrets."
+            exit 1
+          fi
           echo "✅ All necessary secrets are set."
 
       - name: Setup Node.js
@@ -40,7 +44,7 @@ jobs:
         with:
           node-version: 22.x
           cache: npm
-      
+
       - name: Install Dependencies
         run: npm ci
 
@@ -67,6 +71,7 @@ jobs:
         run: |
           sed -e "s/__WORKER_NAME__/${{ secrets.WORKER_NAME }}/g" \
             -e "s/__KV_NAMESPACE_ID__/${{ secrets.CF_KV_NAMESPACE_ID }}/g" \
+            -e "s/__D1_DATABASE_ID__/${{ secrets.CF_D1_DATABASE_ID }}/g" \
             wrangler.toml.example > wrangler.toml
           if [[ -n "${{ secrets.CUSTOM_DOMAIN }}" ]]; then
             echo "Setting custom domain to ${{ secrets.CUSTOM_DOMAIN }}"

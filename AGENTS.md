@@ -22,7 +22,10 @@ src/
 ├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject
 ├── index-task.js   # 索引任务逻辑（启动、状态查询）
 ├── router.js       # API 路由分发与处理
-├── kv.js           # KV 存储与聚合/索引状态逻辑
+├── db.js           # D1 Schema 定义与初始化
+├── repository.js   # D1 数据访问层（替代 kv.js）
+├── migrate.js       # KV → D1 数据迁移
+├── kv.js           # [遗留] KV 存储逻辑（仅迁移端点使用，迁移完成后删除）
 ├── auth.js         # JWT + 密码哈希认证
 ├── vndb.js         # VNDB API 客户端
 ├── utils.js        # 通用工具函数
@@ -146,6 +149,12 @@ tests/
 | GET | `/api/export` | 导出数据（含 `entries` 和 `tierList`） | 需认证 |
 | POST | `/api/import` | 导入数据（`merge` / `replace`，支持 `tierList`） | 需认证 |
 
+### 管理接口
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| POST | `/api/admin/migrate-kv-to-d1` | 执行 KV → D1 数据迁移（全成功后落标记；失败可修复后重试） | 需认证 |
+
 ## 页面与静态资源路由
 
 页面和静态资源由 Worker Assets 提供，配置见 [`wrangler.toml.example`](wrangler.toml.example)。
@@ -163,18 +172,23 @@ tests/
 
 > `html_handling = "auto-trailing-slash"`，因此页面路由使用无 `.html` 形式也可访问。
 
-## KV 键命名约定
+## KV 键命名约定（仅迁移使用）
 
-| 键 | 说明 | 数据结构 |
-|----|------|----------|
-| `config:settings` | 全局配置 | `{ vndbApiToken, adminPasswordHash, jwtSecret, lastIndexTime, tagsMode, translateTags, translationUrl, backgroundUrl, backgroundOverlay, backgroundBlur }` |
-| `vn:list` | VN 列表聚合数据 | `{ items: [...], stats: {...}, updatedAt }` |
-| `vn:{id}` | 单个 VN 条目 | 见下方完整条目结构 |
-| `tier:list` | Tier 列表 | `{ tiers: [{id,name,color,order}], updatedAt }` |
-| `index:status` | 当前索引任务状态 | `{ status, taskId, total, processed, failed, startedAt, completedAt, error, lastReconciledAt }`（`status` 可取 `idle`、`starting`、`running`、`completed`、`partial`、`start_failed`；`failed` 为失败 ID 数组） |
-| `index:item:{taskId}:{vndbId}` | 索引单条结果（幂等键，TTL 14 天） | `{ taskId, vndbId, state, retryCount, error, updatedAt }` |
+> 以下 KV 键仅在 KV→D1 迁移端点中使用，迁移完成后可移除 KV 绑定。
 
-核心实现位于：[`getSettings()`](src/kv.js:111)、[`getVNList()`](src/kv.js:143)、[`getTierList()`](src/kv.js:172)、[`recordIndexItemResult()`](src/kv.js:756)。
+| 键 | 说明 |
+|----|------|
+| `config:settings` | 全局配置 |
+| `vn:list` | VN 列表聚合数据 |
+| `vn:{id}` | 单个 VN 条目 |
+| `tier:list` | Tier 列表 |
+| `index:status` | 当前索引任务状态 |
+| `index:item:{taskId}:{vndbId}` | 索引单条结果（幂等键，TTL 14 天） |
+
+核心实现位于 [`migrate.js`](src/migrate.js)，迁移后数据全部存储于 D1 数据库。
+
+- 迁移会一并复制 `index:status` 与 `index:item:{taskId}:{vndbId}`，以保留进行中/未完全收敛的索引任务状态。
+- 仅当迁移过程无错误时才写入 `migrated_from_kv` 标记；若中途失败，可修复问题后再次执行迁移。
 
 ## Queue 处理机制（批量索引）
 
@@ -183,11 +197,11 @@ tests/
 - 索引启动：[`startIndexTask()`](src/index-task.js:65)，状态查询 [`getIndexTaskStatus()`](src/index-task.js:61)
 - 分布式锁：[`IndexStartLockDurableObject`](src/index.js:30) 提供启动互斥，绑定名 `INDEX_START_LOCK`
 - 重试策略：最多 3 次，重试延迟 60 秒（`retryCount` 累增）
-- 幂等结果：按 `taskId + vndbId` 写入 `index:item:*`，成功结果对失败回写具有"粘性"
-- 汇总机制：[`reconcileIndexStatusFromItems()`](src/kv.js:866) 基于 item keys 汇总 `processed/failed`
+- 幂等结果：按 `taskId + vndbId` 写入 `index_task_items` 表，成功结果对失败回写具有"粘性"
+- 汇总机制：[`reconcileIndexStatusFromItems()`](src/repository.js:633) 基于 `index_task_items` 表汇总 `processed/failed`
 - 延迟汇总：高频批次下仅临近完成时即时汇总，其余走 `ctx.waitUntil` 延迟汇总降载（最多 6 次，间隔 5s）
-- 状态终态：`completed` 或 `partial`，终态后会执行聚合重建 [`rebuildVNList()`](src/kv.js:408)
-- 终态清理：汇总转入终态时自动清理 `index:item:*` 键
+- 状态终态：`completed` 或 `partial`，D1 模式下聚合列表由 SQL 实时计算，无需手动重建
+- 终态清理：汇总转入终态时自动清理 `index_task_items` 表对应记录
 
 ## 认证系统
 
@@ -195,7 +209,7 @@ tests/
 - 签名算法：HMAC-SHA256（Web Crypto API）
 - Token 存储：`httpOnly` Cookie `auth_token`，有效期 24h
 - 密码哈希：PBKDF2 + SHA-256（见 [`hashPassword()`](src/auth.js:132)）
-- 初始化/校验：[`initAdminPassword()`](src/auth.js:239)、[`verifyAdminPassword()`](src/auth.js:256)
+- 初始化/校验：[`setAdminPassword()`](src/auth.js:249)、[`verifyAdminPassword()`](src/auth.js:269)
 
 ## VNDB API 集成
 

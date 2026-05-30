@@ -28,12 +28,13 @@ function createDefaultSettings(overrides = {}) {
   };
 }
 
-async function loadRouterModule({ initialSettings = {}, authenticated = true } = {}) {
+async function loadRouterModule({ initialSettings = {}, authenticated = true, migrateImpl } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-router-test-'));
   const routerPath = path.join(tempDir, 'router.module.mjs');
   const authStubPath = path.join(tempDir, 'auth.stub.mjs');
-  const kvStubPath = path.join(tempDir, 'kv.stub.mjs');
+  const repositoryStubPath = path.join(tempDir, 'repository.stub.mjs');
+  const migrateStubPath = path.join(tempDir, 'migrate.stub.mjs');
   const indexTaskStubPath = path.join(tempDir, 'index-task.stub.mjs');
   const utilsStubPath = path.join(tempDir, 'utils.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
@@ -43,8 +44,9 @@ async function loadRouterModule({ initialSettings = {}, authenticated = true } =
   const state = {
     settings: createDefaultSettings(initialSettings),
     authenticated,
-    initAdminPasswordCalls: [],
-    saveSettingsCalls: []
+    setAdminPasswordCalls: [],
+    saveSettingsCalls: [],
+    migrateImpl: migrateImpl || (async () => ({ success: true }))
   };
   globalThis.__routerConfigTestRegistry.set(testId, state);
 
@@ -64,13 +66,13 @@ export function setAuthCookie() {}
 export function clearAuthCookie() {}
 export async function verifyAdminPassword() { return true; }
 
-export async function initAdminPassword(env, password) {
-  state.initCounter = (state.initCounter || 0) + 1;
+export async function setAdminPassword(env, password) {
+  state.setAdminPasswordCounter = (state.setAdminPasswordCounter || 0) + 1;
   const next = clone(state.settings);
-  next.adminPasswordHash = \`salt-\${state.initCounter}:hash-\${password}\`;
-  next.jwtSecret = \`jwt-secret-\${state.initCounter}\`;
+  next.adminPasswordHash = \`salt-\${state.setAdminPasswordCounter}:hash-\${password}\`;
+  next.jwtSecret = \`jwt-secret-\${state.setAdminPasswordCounter}\`;
   state.settings = next;
-  state.initAdminPasswordCalls.push({
+  state.setAdminPasswordCalls.push({
     password,
     adminPasswordHash: next.adminPasswordHash,
     jwtSecret: next.jwtSecret
@@ -82,7 +84,7 @@ export async function isInitialized() {
 }
 `;
 
-  const kvStubCode = `
+  const repositoryStubCode = `
 const state = globalThis.__routerConfigTestRegistry?.get('${testId}');
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -133,6 +135,14 @@ export async function saveTierList(env, tierList) { return tierList; }
 export async function updateVNTier() {}
 export async function batchUpdateVNTiers() {}
 export async function clearTierAssignments() {}
+`;
+
+  const migrateStubCode = `
+const state = globalThis.__routerConfigTestRegistry?.get('${testId}');
+
+export async function migrateKvToD1(...args) {
+  return state.migrateImpl(...args);
+}
 `;
 
   const utilsStubCode = `
@@ -199,13 +209,15 @@ export async function getIndexTaskStatus() {
 
   const patchedSource = sourceCode
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
-    .replace(/from '\.\/kv\.js';/, "from './kv.stub.mjs';")
+    .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
+    .replace(/from '\.\/migrate\.js';/, "from './migrate.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
-  await fs.writeFile(kvStubPath, kvStubCode, 'utf8');
+  await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
+  await fs.writeFile(migrateStubPath, migrateStubCode, 'utf8');
   await fs.writeFile(indexTaskStubPath, indexTaskStubCode, 'utf8');
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
@@ -239,7 +251,18 @@ async function sendUpdateConfigRequest(routerModule, body) {
   return { response, payload };
 }
 
-test('仅修改密码时会持久化新的 adminPasswordHash 与 jwtSecret', async () => {
+async function sendMigrateRequest(routerModule, env = {}) {
+  const request = new Request('https://example.com/api/admin/migrate-kv-to-d1', {
+    method: 'POST'
+  });
+
+  const response = await routerModule.handleRequest(request, env);
+  const payload = await response.json();
+
+  return { response, payload };
+}
+
+test('仅修改密码时会更新密码哈希并重新签发 JWT', async () => {
   const initialSettings = createDefaultSettings({
     adminPasswordHash: 'salt-old:hash-old',
     jwtSecret: 'jwt-secret-old',
@@ -249,7 +272,6 @@ test('仅修改密码时会持久化新的 adminPasswordHash 与 jwtSecret', asy
 
   try {
     const oldHash = state.settings.adminPasswordHash;
-    const oldSecret = state.settings.jwtSecret;
 
     const { response, payload } = await sendUpdateConfigRequest(routerModule, {
       newPassword: 'new-password-123'
@@ -258,17 +280,17 @@ test('仅修改密码时会持久化新的 adminPasswordHash 与 jwtSecret', asy
     assert.equal(response.status, 200);
     assert.deepEqual(payload, { success: true, message: '设置已更新', data: null });
 
-    assert.equal(state.initAdminPasswordCalls.length, 1);
+    assert.equal(state.setAdminPasswordCalls.length, 1);
     assert.notEqual(state.settings.adminPasswordHash, oldHash);
-    assert.notEqual(state.settings.jwtSecret, oldSecret);
-    assert.equal(state.settings.adminPasswordHash, state.initAdminPasswordCalls[0].adminPasswordHash);
-    assert.equal(state.settings.jwtSecret, state.initAdminPasswordCalls[0].jwtSecret);
+    assert.equal(state.settings.adminPasswordHash, state.setAdminPasswordCalls[0].adminPasswordHash);
+    assert.notEqual(state.settings.jwtSecret, 'jwt-secret-old');
+    assert.equal(state.settings.jwtSecret, state.setAdminPasswordCalls[0].jwtSecret);
   } finally {
     await cleanup();
   }
 });
 
-test('同时修改密码与其他配置字段时会正确保留新凭据并更新其他字段', async () => {
+test('同时修改密码与其他配置字段时会正确更新密码并保留其他字段', async () => {
   const initialSettings = createDefaultSettings({
     adminPasswordHash: 'salt-old:hash-old',
     jwtSecret: 'jwt-secret-old',
@@ -282,7 +304,6 @@ test('同时修改密码与其他配置字段时会正确保留新凭据并更�
 
   try {
     const oldHash = state.settings.adminPasswordHash;
-    const oldSecret = state.settings.jwtSecret;
 
     const { response, payload } = await sendUpdateConfigRequest(routerModule, {
       newPassword: 'new-password-456',
@@ -295,11 +316,11 @@ test('同时修改密码与其他配置字段时会正确保留新凭据并更�
     assert.equal(response.status, 200);
     assert.deepEqual(payload, { success: true, message: '设置已更新', data: null });
 
-    assert.equal(state.initAdminPasswordCalls.length, 1);
+    assert.equal(state.setAdminPasswordCalls.length, 1);
     assert.notEqual(state.settings.adminPasswordHash, oldHash);
-    assert.notEqual(state.settings.jwtSecret, oldSecret);
-    assert.equal(state.settings.adminPasswordHash, state.initAdminPasswordCalls[0].adminPasswordHash);
-    assert.equal(state.settings.jwtSecret, state.initAdminPasswordCalls[0].jwtSecret);
+    assert.equal(state.settings.adminPasswordHash, state.setAdminPasswordCalls[0].adminPasswordHash);
+    assert.notEqual(state.settings.jwtSecret, 'jwt-secret-old');
+    assert.equal(state.settings.jwtSecret, state.setAdminPasswordCalls[0].jwtSecret);
 
     assert.equal(state.settings.vndbApiToken, 'token-new');
     assert.equal(state.settings.tagsMode, 'manual');
@@ -336,7 +357,7 @@ test('不修改密码时不会重置已有凭据', async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(payload, { success: true, message: '设置已更新', data: null });
 
-    assert.equal(state.initAdminPasswordCalls.length, 0);
+    assert.equal(state.setAdminPasswordCalls.length, 0);
     assert.equal(state.settings.adminPasswordHash, oldHash);
     assert.equal(state.settings.jwtSecret, oldSecret);
 
@@ -344,6 +365,55 @@ test('不修改密码时不会重置已有凭据', async () => {
     assert.equal(state.settings.tagsMode, 'manual');
     assert.equal(state.settings.translateTags, false);
     assert.equal(state.settings.translationUrl, 'https://example.com/tags.json');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('迁移接口未授权时返回 401', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({ authenticated: false });
+
+  try {
+    const { response, payload } = await sendMigrateRequest(routerModule);
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(payload, { success: false, error: '未授权' });
+  } finally {
+    await cleanup();
+  }
+});
+
+test('迁移接口成功时返回迁移结果', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({
+    migrateImpl: async () => ({ alreadyMigrated: true })
+  });
+
+  try {
+    const { response, payload } = await sendMigrateRequest(routerModule, { KV: {}, DB: {} });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, {
+      success: true,
+      message: '迁移完成',
+      data: { alreadyMigrated: true }
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test('迁移接口异常时返回 500 和错误信息', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({
+    migrateImpl: async () => {
+      throw new Error('KV missing');
+    }
+  });
+
+  try {
+    const { response, payload } = await sendMigrateRequest(routerModule, { DB: {} });
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(payload, { success: false, error: '迁移失败，请查看服务器日志' });
   } finally {
     await cleanup();
   }

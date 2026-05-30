@@ -39,12 +39,12 @@ async function loadWorkerModule({ kvImpl = {}, fetchVNDBImpl, handleRequestImpl 
     handleRequestImpl
   });
 
-  const kvStubPath = path.join(tempDir, 'kv.stub.mjs');
+  const repositoryStubPath = path.join(tempDir, 'repository.stub.mjs');
   const routerStubPath = path.join(tempDir, 'router.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
   const workerPath = path.join(tempDir, 'index.worker.mjs');
 
-  const kvStubCode = `
+  const repositoryStubCode = `
 const state = globalThis.__queueTestRegistry?.get('${testId}') || {};
 const impl = state.kvImpl || {};
 
@@ -68,7 +68,6 @@ export const getIndexStatus = pick('getIndexStatus', async () => ({
   error: null,
   lastReconciledAt: null
 }));
-export const rebuildVNList = pick('rebuildVNList', async () => {});
 export const recordIndexItemResult = pick('recordIndexItemResult', async () => {});
 export const reconcileIndexStatusFromItems = pick('reconcileIndexStatusFromItems', async () => ({
   status: 'idle',
@@ -93,11 +92,11 @@ export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
 `;
 
   const patchedSource = sourceCode
-    .replace(/from '\.\/kv\.js';/, "from './kv.stub.mjs';")
+    .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
     .replace(/from '\.\/router\.js';/, "from './router.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
-  await fs.writeFile(kvStubPath, kvStubCode, 'utf8');
+  await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
   await fs.writeFile(routerStubPath, routerStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(workerPath, patchedSource, 'utf8');
@@ -191,7 +190,6 @@ test('queue 在节流时间窗内不做即时 reconcile，仅注册延迟 reconc
 
 test('queue 临近完成时即使在时间窗内也会即时 reconcile', async () => {
   const reconcileCalls = [];
-  const rebuildCalls = [];
   const nowIso = new Date().toISOString();
 
   const { worker, cleanup } = await loadWorkerModule({
@@ -218,9 +216,6 @@ test('queue 临近完成时即使在时间窗内也会即时 reconcile', async (
           total: 2,
           failed: []
         };
-      },
-      rebuildVNList: async () => {
-        rebuildCalls.push('rebuild');
       }
     }
   });
@@ -251,16 +246,14 @@ test('queue 临近完成时即使在时间窗内也会即时 reconcile', async (
 
     assert.equal(message.ackCalled, true);
     assert.equal(reconcileCalls.length, 1);
-    assert.equal(rebuildCalls.length, 1);
     assert.equal(waitUntilPromises.length, 0);
   } finally {
     await cleanup();
   }
 });
 
-test('queue 延迟 reconcile 仍可收敛到终态并触发 rebuild', async () => {
+test('queue 延迟 reconcile 仍可收敛到终态', async () => {
   const reconcileCalls = [];
-  const rebuildCalls = [];
   const nowIso = new Date().toISOString();
 
   const { worker, cleanup } = await loadWorkerModule({
@@ -287,9 +280,6 @@ test('queue 延迟 reconcile 仍可收敛到终态并触发 rebuild', async () =
           total: 50,
           failed: []
         };
-      },
-      rebuildVNList: async () => {
-        rebuildCalls.push('rebuild');
       }
     }
   });
@@ -331,7 +321,6 @@ test('queue 延迟 reconcile 仍可收敛到终态并触发 rebuild', async () =
     await Promise.all(waitUntilPromises);
 
     assert.equal(reconcileCalls.length, 1);
-    assert.equal(rebuildCalls.length, 1);
   } finally {
     globalThis.setTimeout = originalSetTimeout;
     await cleanup();
@@ -340,7 +329,6 @@ test('queue 延迟 reconcile 仍可收敛到终态并触发 rebuild', async () =
 
 test('queue schedules delayed reconcile fallback when immediate reconcile remains running', async () => {
   const reconcileCalls = [];
-  const rebuildCalls = [];
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
@@ -366,9 +354,6 @@ test('queue schedules delayed reconcile fallback when immediate reconcile remain
           total: 2,
           failed: []
         };
-      },
-      rebuildVNList: async () => {
-        rebuildCalls.push('rebuild');
       }
     }
   });
@@ -409,7 +394,6 @@ test('queue schedules delayed reconcile fallback when immediate reconcile remain
     await Promise.all(waitUntilPromises);
 
     assert.equal(reconcileCalls.length, 2);
-    assert.equal(rebuildCalls.length, 1);
   } finally {
     globalThis.setTimeout = originalSetTimeout;
     await cleanup();
@@ -486,7 +470,6 @@ test('queue delayed reconcile stops retrying after reaching max attempts', async
 
 test('queue delayed reconcile retries on transient reconcile error before succeeding', async () => {
   const reconcileCalls = [];
-  const rebuildCalls = [];
 
   const { worker, cleanup } = await loadWorkerModule({
     fetchVNDBImpl: async () => ({ title: 'ok' }),
@@ -515,9 +498,6 @@ test('queue delayed reconcile retries on transient reconcile error before succee
           total: 50,
           failed: []
         };
-      },
-      rebuildVNList: async () => {
-        rebuildCalls.push('rebuild');
       }
     }
   });
@@ -553,7 +533,6 @@ test('queue delayed reconcile retries on transient reconcile error before succee
     assert.equal(waitUntilPromises.length, 1);
     await Promise.all(waitUntilPromises);
     assert.equal(reconcileCalls.length, 2);
-    assert.equal(rebuildCalls.length, 1);
   } finally {
     globalThis.setTimeout = originalSetTimeout;
     await cleanup();
