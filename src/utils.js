@@ -86,24 +86,6 @@ export function parseCookies(cookieString) {
 }
 
 /**
- * 格式化日期
- * @param {Date|string} date - 日期
- * @param {string} format - 格式
- * @returns {string}
- */
-export function formatDate(date, format = 'YYYY-MM-DD') {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-
-  return format
-    .replace('YYYY', year)
-    .replace('MM', month)
-    .replace('DD', day);
-}
-
-/**
  * 验证VNDB ID格式
  * @param {string} id - VNDB ID
  * @returns {boolean}
