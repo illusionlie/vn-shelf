@@ -13,7 +13,6 @@ wrangler.toml
 data/
 
 # 项目计划
-plans/
 .ace-tool/
-.claude/
 .omc/
+.kilo/
