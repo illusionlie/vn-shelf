@@ -27,29 +27,6 @@ export function isIndexTaskActiveStatus(status) {
   return INDEX_TASK_ACTIVE_STATUSES.has(status);
 }
 
-export function isIndexTaskTerminalStatus(status) {
-  return INDEX_TASK_TERMINAL_STATUSES.has(status);
-}
-
-export function mergeIndexTaskFailedIds(...collections) {
-  const merged = new Set();
-
-  for (const collection of collections) {
-    if (!Array.isArray(collection)) {
-      continue;
-    }
-
-    for (const rawId of collection) {
-      const normalizedId = typeof rawId === 'string' ? rawId.trim() : '';
-      if (normalizedId) {
-        merged.add(normalizedId);
-      }
-    }
-  }
-
-  return Array.from(merged).sort((a, b) => a.localeCompare(b, 'en'));
-}
-
 function buildEnqueueFailureSummary(failureCount) {
   if (failureCount <= 0) {
     return null;

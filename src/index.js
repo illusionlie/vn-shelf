@@ -3,6 +3,10 @@
  */
 
 import {
+  INDEX_TASK_ACTIVE_STATUSES,
+  INDEX_TASK_TERMINAL_STATUSES
+} from './index-task.js';
+import {
   getVNEntry,
   saveVNEntry,
   getIndexStatus,
@@ -11,9 +15,6 @@ import {
 } from './repository.js';
 import { handleRequest } from './router.js';
 import { fetchVNDB } from './vndb.js';
-
-const INDEX_ACTIVE_STATUSES = new Set(['starting', 'running']);
-const INDEX_TERMINAL_STATUSES = new Set(['completed', 'partial', 'failed', 'start_failed']);
 
 const INDEX_MAX_RETRY = 3;
 const INDEX_RETRY_DELAY_SECONDS = 60;
@@ -225,7 +226,7 @@ export default {
             await new Promise(resolve => setTimeout(resolve, waitMs));
 
             const delayedBefore = await getIndexStatus(env);
-            if (delayedBefore.taskId !== taskId || !INDEX_ACTIVE_STATUSES.has(delayedBefore.status)) {
+            if (delayedBefore.taskId !== taskId || !INDEX_TASK_ACTIVE_STATUSES.has(delayedBefore.status)) {
               console.log('[index][queue-reconcile-delayed] skipped', {
                 taskId,
                 reason,
@@ -249,13 +250,13 @@ export default {
             });
 
             if (
-              INDEX_ACTIVE_STATUSES.has(delayedBefore.status) &&
-              INDEX_TERMINAL_STATUSES.has(delayedNext.status)
+              INDEX_TASK_ACTIVE_STATUSES.has(delayedBefore.status) &&
+              INDEX_TASK_TERMINAL_STATUSES.has(delayedNext.status)
             ) {
               return;
             }
 
-            if (!INDEX_ACTIVE_STATUSES.has(delayedNext.status)) {
+            if (!INDEX_TASK_ACTIVE_STATUSES.has(delayedNext.status)) {
               return;
             }
 
@@ -390,7 +391,7 @@ export default {
     // 基于条目结果汇总任务状态，增加节流避免每个批次都触发全量扫描
     for (const [taskId, taskMeta] of touchedTasks.entries()) {
       const before = await getIndexStatus(env);
-      if (before.taskId !== taskId || !INDEX_ACTIVE_STATUSES.has(before.status)) {
+      if (before.taskId !== taskId || !INDEX_TASK_ACTIVE_STATUSES.has(before.status)) {
         continue;
       }
 
@@ -419,14 +420,14 @@ export default {
 
       if (
         before.taskId === taskId &&
-        INDEX_ACTIVE_STATUSES.has(before.status) &&
-        INDEX_TERMINAL_STATUSES.has(next.status)
+        INDEX_TASK_ACTIVE_STATUSES.has(before.status) &&
+        INDEX_TASK_TERMINAL_STATUSES.has(next.status)
       ) {
         continue;
       }
 
       // 即时汇总后仍是 running，则兜底注册一次延迟汇总，保证最终可收敛
-      if (hasSettledInBatch && INDEX_ACTIVE_STATUSES.has(next.status)) {
+      if (hasSettledInBatch && INDEX_TASK_ACTIVE_STATUSES.has(next.status)) {
         scheduleDelayedReconcile(taskId, taskMeta, INDEX_RECONCILE_INTERVAL_MS, 'post-immediate-running');
       }
     }

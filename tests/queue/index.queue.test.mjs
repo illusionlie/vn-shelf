@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const sourcePath = path.join(repoRoot, 'src', 'index.js');
+const indexTaskSourcePath = path.join(repoRoot, 'src', 'index-task.js');
 
 function createQueueMessage(body) {
   return {
@@ -26,6 +27,7 @@ function createQueueMessage(body) {
 
 async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImpl } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
+  const indexTaskSourceCode = await fs.readFile(indexTaskSourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-queue-test-'));
   const testId = `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -42,6 +44,7 @@ async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImp
   const repositoryStubPath = path.join(tempDir, 'repository.stub.mjs');
   const routerStubPath = path.join(tempDir, 'router.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
+  const indexTaskModulePath = path.join(tempDir, 'index-task.mjs');
   const workerPath = path.join(tempDir, 'index.worker.mjs');
 
   const repositoryStubCode = `
@@ -75,6 +78,8 @@ export const reconcileIndexStatusFromItems = pick('reconcileIndexStatusFromItems
   total: 0,
   failed: []
 }));
+export const saveIndexStatus = pick('saveIndexStatus', async () => {});
+export const listIndexableVNIds = pick('listIndexableVNIds', async () => []);
 `;
 
   const routerStubCode = `
@@ -94,11 +99,17 @@ export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
   const patchedSource = sourceCode
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
     .replace(/from '\.\/router\.js';/, "from './router.stub.mjs';")
-    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
+    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
+    .replace(/from '\.\/index-task\.js';/, "from './index-task.mjs';");
+
+  // 复用真实 index-task.js（状态集合常量单一来源），仅将其 repository 依赖指向测试桩
+  const patchedIndexTaskSource = indexTaskSourceCode
+    .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';");
 
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
   await fs.writeFile(routerStubPath, routerStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
+  await fs.writeFile(indexTaskModulePath, patchedIndexTaskSource, 'utf8');
   await fs.writeFile(workerPath, patchedSource, 'utf8');
 
   const moduleUrl = `${pathToFileURL(workerPath).href}?test=${encodeURIComponent(testId)}`;

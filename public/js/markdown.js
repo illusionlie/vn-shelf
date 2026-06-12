@@ -154,15 +154,10 @@ function sanitizeCodeBlockLanguage(lang) {
 /**
  * 渲染 Markdown 文本
  * @param {string} text - Markdown 文本
- * @param {Object} options - 配置选项
- * @param {boolean} options.disableImages - 禁用图片渲染（默认 false）
- * @param {boolean} options.disableLinks - 禁用链接渲染（默认 false）
  * @returns {string} HTML 字符串
  */
-export function renderMarkdown(text, options = {}) {
+export function renderMarkdown(text) {
   if (!text) return '';
-
-  const { disableImages = false, disableLinks = false } = options;
 
   // 预处理：统一换行符
   const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -399,18 +394,7 @@ export function renderMarkdown(text, options = {}) {
     flushTable(result, tableRows);
   }
 
-  // 应用选项过滤
-  let html = result.join('\n');
-
-  if (disableImages) {
-    html = html.replace(/<img[^>]*>/g, '');
-  }
-
-  if (disableLinks) {
-    html = html.replace(/<a[^>]*>([^<]*)<\/a>/g, '$1');
-  }
-
-  return html;
+  return result.join('\n');
 }
 
 /**
@@ -458,65 +442,4 @@ function flushTable(result, rows) {
   }).join('\n');
 
   result.push(`<table class="md-table">\n${tableRows}\n</table>`);
-}
-
-/**
- * 清理 Markdown 文本（移除格式符号）
- * @param {string} text - Markdown 文本
- * @returns {string} 纯文本
- */
-export function stripMarkdown(text) {
-  if (!text) return '';
-
-  return text
-    // 移除代码块
-    .replace(/```[\s\S]*?```/g, '')
-    // 移除行内代码
-    .replace(/`([^`]+)`/g, '$1')
-    // 移除图片
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-    // 移除链接
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // 移除粗体
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/__(.+?)__/g, '$1')
-    // 移除斜体
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/_(.+?)_/g, '$1')
-    // 移除删除线
-    .replace(/~~(.+?)~~/g, '$1')
-    // 移除高亮
-    .replace(/==(.+?)==/g, '$1')
-    // 移除上标下标
-    .replace(/\^([^^]+)\^/g, '$1')
-    .replace(/~([^~]+)~/g, '$1')
-    // 移除标题标记
-    .replace(/^#{1,6}\s+/gm, '')
-    // 移除列表标记
-    .replace(/^[-*+]\s+/gm, '')
-    .replace(/^\d+\.\s+/gm, '')
-    // 移除任务列表标记
-    .replace(/^\[[ xX]\]\s+/gm, '')
-    // 移除引用标记
-    .replace(/^>\s?/gm, '')
-    // 移除水平线
-    .replace(/^[-*_]{3,}$/gm, '')
-    // 清理多余空行
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-/**
- * 获取 Markdown 文本摘要
- * @param {string} text - Markdown 文本
- * @param {number} maxLength - 最大长度
- * @returns {string} 摘要文本
- */
-export function getMarkdownExcerpt(text, maxLength = 200) {
-  if (!text) return '';
-
-  const plainText = stripMarkdown(text);
-  if (plainText.length <= maxLength) return plainText;
-
-  return plainText.slice(0, maxLength).trim() + '...';
 }
