@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "R6 重复逻辑提取（前端共享模块、router tier 校验 helper）需遵循复用思维：改动常量/工具函数前先全库搜索引用"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "R3/R4 修改 /api/config/appearance 响应结构并被前端消费，属跨层数据流变更；需同步检查所有消费方"}

@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/guides/index.md", "reason": "检查阶段需应用其中的 AI 审查假阳性核验规则（信任边界、设计注释、变量溯源），所有 CRITICAL/WARNING 结论必须对照实际代码验证"}
