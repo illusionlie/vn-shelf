@@ -47,6 +47,7 @@ public/
     ├── markdown.js       # Markdown 渲染
     ├── translations.js   # Tags 翻译与缓存
     └── components/
+        ├── shared.js       # 跨页面共享 mixin（tags 视图 + 详情弹窗）
         ├── vnShelf.js      # 主页书架组件
         ├── tierlistPage.js # Tier List 页组件
         ├── settingsPage.js # 设置页组件

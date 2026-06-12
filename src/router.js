@@ -34,6 +34,19 @@ import { fetchVNDB } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
 
+// 公开只读端点（提供真实 CORS：GET 响应附加 Allow-Origin，OPTIONS 预检返回 204）
+const PUBLIC_CORS_PATH_PATTERNS = [
+  /^\/api\/vn$/,
+  /^\/api\/vn\/v\d+$/,
+  /^\/api\/stats$/,
+  /^\/api\/tier$/,
+  /^\/api\/config\/appearance$/
+];
+
+function isPublicCorsPath(path) {
+  return PUBLIC_CORS_PATH_PATTERNS.some(pattern => pattern.test(path));
+}
+
 let startIndexRequestLockTail = Promise.resolve();
 
 async function runWithStartIndexLock(fn) {
@@ -69,14 +82,13 @@ export async function handleRequest(request, env) {
   const path = url.pathname;
   const method = request.method;
 
-  // CORS预检请求
-  if (method === 'OPTIONS') {
+  // 公开只读端点的 CORS 预检；其余 OPTIONS 不做特殊处理，自然落入后续路由得到 404（不带 CORS 头）
+  if (method === 'OPTIONS' && isPublicCorsPath(path)) {
     return new Response(null, {
       status: 204,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Max-Age': '86400'
       }
     });
@@ -84,7 +96,14 @@ export async function handleRequest(request, env) {
 
   // API路由
   if (path.startsWith('/api/')) {
-    return handleAPI(request, env, path, method);
+    const response = await handleAPI(request, env, path, method);
+
+    // 仅公开只读端点的 GET 响应附加 CORS 头，认证/写操作端点一律不加
+    if (method === 'GET' && isPublicCorsPath(path)) {
+      response.headers.set('Access-Control-Allow-Origin', '*');
+    }
+
+    return response;
   }
 
   // 非API路由返回404（静态资源由 index.js 中的 Assets 处理）
@@ -1106,7 +1125,11 @@ async function handleGetAppearance(request, env) {
   const response = successResponse({
     backgroundUrl: settings.backgroundUrl || '',
     backgroundOverlay: settings.backgroundOverlay ?? 0.5,
-    backgroundBlur: settings.backgroundBlur ?? 4
+    backgroundBlur: settings.backgroundBlur ?? 4,
+    // Tags 相关配置（非敏感，匿名访客与管理员看到一致的 tags 显示）
+    tagsMode: settings.tagsMode || 'vndb',
+    translateTags: settings.translateTags !== false,
+    translationUrl: settings.translationUrl || ''
   });
 
   // 公开端点设置缓存

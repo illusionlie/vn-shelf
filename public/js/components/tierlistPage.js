@@ -2,29 +2,22 @@
  * VN Shelf Tier List 页组件
  */
 
-import { vnAPI, configAPI, tierAPI } from '../api.js';
+import { vnAPI, tierAPI } from '../api.js';
 import { renderMarkdown } from '../markdown.js';
-import { initTranslations, translateTags, DEFAULT_TRANSLATION_URL } from '../translations.js';
 import { formatUserPlayTime, lockPageScroll, unlockPageScroll } from '../utils.js';
+
+import { createDetailModal, createTagsView } from './shared.js';
 
 export function tierlistPage() {
   return {
+    ...createTagsView(),
+    ...createDetailModal(),
+
     tiers: [],
     allVN: [],
     tieredVN: {},
     untieredVN: [],
     isLoading: true,
-
-    // 翻译相关状态
-    config: {
-      tagsMode: 'vndb',
-      translateTags: true,
-      translationUrl: ''
-    },
-    translations: null,
-
-    selectedVN: null,
-    showDetail: false,
 
     showTierEdit: false,
     editingTier: null,
@@ -46,41 +39,10 @@ export function tierlistPage() {
       return error?.message || '未知错误';
     },
 
-    async loadConfig() {
-      try {
-        const res = await configAPI.get();
-        this.config = res.data || {
-          tagsMode: 'vndb',
-          translateTags: true,
-          translationUrl: ''
-        };
-      } catch (error) {
-        console.warn('[tierlistPage] load config fallback to defaults', {
-          error: error?.message || String(error)
-        });
-        this.config = {
-          tagsMode: 'vndb',
-          translateTags: true,
-          translationUrl: ''
-        };
-      }
-    },
-
-    async initTranslations() {
-      if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
-        const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
-        try {
-          this.translations = await initTranslations(url);
-        } catch (error) {
-          console.error('[tierlistPage] Failed to load translations:', error);
-          this.translations = null;
-        }
-      }
-    },
-
     async init() {
       if (this._initialized) return;
       this._initialized = true;
+      this.setupTranslationsRefresh();
       this.isLoading = true;
       try {
         await this.loadConfig();
@@ -502,42 +464,6 @@ export function tierlistPage() {
 
     async onDropToUntiered(event) {
       await this.onDrop(null, event);
-    },
-
-    async openDetail(vn) {
-      try {
-        const res = await vnAPI.get(vn.id);
-        this.selectedVN = res;
-        if (!this.showDetail) {
-          lockPageScroll();
-        }
-        this.showDetail = true;
-      } catch (error) {
-        this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
-      }
-    },
-
-    closeDetail() {
-      if (!this.showDetail) return;
-      this.showDetail = false;
-      this.selectedVN = null;
-      unlockPageScroll();
-    },
-
-    getDetailTags(vn) {
-      if (!vn) return [];
-
-      if (this.config.tagsMode === 'manual') {
-        return Array.isArray(vn?.user?.tags) ? vn.user.tags : [];
-      }
-
-      const vndbTags = Array.isArray(vn?.vndb?.tags) ? vn.vndb.tags : [];
-
-      if (this.config.translateTags && this.translations) {
-        return translateTags(vndbTags, this.translations);
-      }
-
-      return vndbTags;
     },
 
     formatUserPlayTime,

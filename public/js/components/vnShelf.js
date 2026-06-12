@@ -2,92 +2,33 @@
  * VN Shelf 主页书架组件
  */
 
-import { vnAPI, configAPI } from '../api.js';
+import { vnAPI } from '../api.js';
 import { renderMarkdown } from '../markdown.js';
-import { initTranslations, translateTags, DEFAULT_TRANSLATION_URL } from '../translations.js';
 import { formatUserPlayTime, lockPageScroll, unlockPageScroll } from '../utils.js';
+
+import { createDetailModal, createTagsView } from './shared.js';
 
 export function vnShelf() {
   return {
+    ...createTagsView(),
+    ...createDetailModal(),
+
     vnList: [],
     filteredList: [],
     searchQuery: '',
     sortBy: 'created_desc',
     isLoading: true,
-    selectedVN: null,
-    showDetail: false,
     showEdit: false,
     editForm: {},
-    // 翻译相关状态
-    config: null,
-    translations: null,
     _initialized: false,
 
     async init() {
       if (this._initialized) return;
       this._initialized = true;
+      this.setupTranslationsRefresh();
       await this.loadConfig();
       await this.initTranslations();
       await this.loadVNList();
-    },
-
-    async loadConfig() {
-      try {
-        const res = await configAPI.get();
-        this.config = res.data || {
-          tagsMode: 'vndb',
-          translateTags: true,
-          translationUrl: ''
-        };
-      } catch (error) {
-        console.warn('[vnShelf] load config fallback to defaults', {
-          error: error?.message || String(error)
-        });
-        // 未登录时使用默认配置
-        this.config = {
-          tagsMode: 'vndb',
-          translateTags: true,
-          translationUrl: ''
-        };
-      }
-    },
-
-    async initTranslations() {
-      // 只在 vndb 模式且启用翻译时加载翻译数据
-      if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
-        const url = this.config.translationUrl || DEFAULT_TRANSLATION_URL;
-        try {
-          this.translations = await initTranslations(url);
-        } catch (error) {
-          console.error('[vnShelf] Failed to load translations:', error);
-          this.translations = null;
-        }
-      }
-    },
-
-    /**
-     * 获取要显示的 tags
-     * @param {Object} vn - VN 条目
-     * @returns {string[]} - 要显示的 tags 数组
-     */
-    getDisplayTags(vn) {
-      if (!vn) return [];
-
-      // 手动模式：优先使用用户 tags
-      if (this.config.tagsMode === 'manual') {
-        return vn.user?.tags || [];
-      }
-
-      // VNDB 模式
-      const vndbTags = vn.vndb?.tags || [];
-
-      // 如果启用翻译且有翻译数据，翻译 tags
-      if (this.config.translateTags && this.translations) {
-        return translateTags(vndbTags, this.translations);
-      }
-
-      // 否则返回原始英文 tags
-      return vndbTags;
     },
 
     async loadVNList() {
@@ -118,26 +59,6 @@ export function vnShelf() {
 
     handleSortChange() {
       this.loadVNList();
-    },
-
-    async openDetail(vn) {
-      try {
-        const res = await vnAPI.get(vn.id);
-        this.selectedVN = res;
-        if (!this.showDetail) {
-          lockPageScroll();
-        }
-        this.showDetail = true;
-      } catch (error) {
-        this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
-      }
-    },
-
-    closeDetail() {
-      if (!this.showDetail) return;
-      this.showDetail = false;
-      this.selectedVN = null;
-      unlockPageScroll();
     },
 
     openEdit(vn = null) {

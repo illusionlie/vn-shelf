@@ -283,10 +283,10 @@
               </div>
             </div>
 
-            <div class="detail-tags" x-show="getDetailTags(selectedVN).length">
+            <div class="detail-tags" x-show="getDisplayTags(selectedVN).length">
               <h4 class="detail-tags-title">标签</h4>
               <div class="detail-tags-list">
-                <template x-for="tag in getDetailTags(selectedVN).slice(0, 15)" :key="tag">
+                <template x-for="tag in getDisplayTags(selectedVN).slice(0, 15)" :key="tag">
                   <span class="detail-tag" x-text="tag"></span>
                 </template>
               </div>

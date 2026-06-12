@@ -240,6 +240,11 @@ async function sendUpdateConfigRequest(routerModule, body) {
   return { response, payload };
 }
 
+async function sendRequest(routerModule, path, method = 'GET') {
+  const request = new Request(`https://example.com${path}`, { method });
+  return routerModule.handleRequest(request, {});
+}
+
 test('仅修改密码时会更新密码哈希并重新签发 JWT', async () => {
   const initialSettings = createDefaultSettings({
     adminPasswordHash: 'salt-old:hash-old',
@@ -343,6 +348,117 @@ test('不修改密码时不会重置已有凭据', async () => {
     assert.equal(state.settings.tagsMode, 'manual');
     assert.equal(state.settings.translateTags, false);
     assert.equal(state.settings.translationUrl, 'https://example.com/tags.json');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('匿名 GET /api/config/appearance 返回外观与公开 tags 配置默认值', async () => {
+  // 覆盖为 undefined：getSettings stub 的 JSON 克隆会丢弃这些键，从而触发默认值规则
+  const { routerModule, cleanup } = await loadRouterModule({
+    initialSettings: {
+      tagsMode: undefined,
+      translateTags: undefined,
+      translationUrl: undefined
+    },
+    authenticated: false
+  });
+
+  try {
+    const response = await sendRequest(routerModule, '/api/config/appearance');
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.backgroundUrl, '');
+    assert.equal(payload.data.backgroundOverlay, 0.5);
+    assert.equal(payload.data.backgroundBlur, 4);
+    assert.equal(payload.data.tagsMode, 'vndb');
+    assert.equal(payload.data.translateTags, true);
+    assert.equal(payload.data.translationUrl, '');
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=300');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('匿名 GET /api/config/appearance 返回已配置的 tags 字段且不泄露敏感信息', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({
+    initialSettings: {
+      adminPasswordHash: 'salt-secret:hash-secret',
+      jwtSecret: 'jwt-secret-secret',
+      vndbApiToken: 'token-secret',
+      tagsMode: 'manual',
+      translateTags: false,
+      translationUrl: 'https://example.com/tags.json',
+      backgroundUrl: 'https://example.com/bg.webp',
+      backgroundOverlay: 0.3,
+      backgroundBlur: 8
+    },
+    authenticated: false
+  });
+
+  try {
+    const response = await sendRequest(routerModule, '/api/config/appearance');
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.data.tagsMode, 'manual');
+    assert.equal(payload.data.translateTags, false);
+    assert.equal(payload.data.translationUrl, 'https://example.com/tags.json');
+    assert.equal(payload.data.backgroundUrl, 'https://example.com/bg.webp');
+    assert.equal(payload.data.backgroundOverlay, 0.3);
+    assert.equal(payload.data.backgroundBlur, 8);
+
+    assert.equal('vndbApiToken' in payload.data, false);
+    assert.equal('adminPasswordHash' in payload.data, false);
+    assert.equal('jwtSecret' in payload.data, false);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('公开只读端点 GET 响应带 CORS 头且 OPTIONS 预检返回 204', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({ authenticated: false });
+
+  try {
+    const publicPaths = ['/api/vn', '/api/vn/v17', '/api/stats', '/api/tier', '/api/config/appearance'];
+
+    for (const path of publicPaths) {
+      const optionsResponse = await sendRequest(routerModule, path, 'OPTIONS');
+      assert.equal(optionsResponse.status, 204, `OPTIONS ${path} 应返回 204`);
+      assert.equal(optionsResponse.headers.get('Access-Control-Allow-Origin'), '*', `OPTIONS ${path} 应带 Allow-Origin`);
+      assert.equal(optionsResponse.headers.get('Access-Control-Allow-Methods'), 'GET, OPTIONS', `OPTIONS ${path} 应带 Allow-Methods`);
+      assert.equal(optionsResponse.headers.get('Access-Control-Max-Age'), '86400', `OPTIONS ${path} 应带 Max-Age`);
+
+      const getResponse = await sendRequest(routerModule, path, 'GET');
+      assert.equal(getResponse.headers.get('Access-Control-Allow-Origin'), '*', `GET ${path} 应带 Allow-Origin`);
+    }
+
+    // 公开端点即使返回 404（条目不存在）也携带 CORS 头，跨域调用方可读取错误
+    const missingEntryResponse = await sendRequest(routerModule, '/api/vn/v17', 'GET');
+    assert.equal(missingEntryResponse.status, 404);
+    assert.equal(missingEntryResponse.headers.get('Access-Control-Allow-Origin'), '*');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('认证端点响应不带 CORS 头且 OPTIONS 不提供预检', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({ authenticated: true });
+
+  try {
+    const getConfigResponse = await sendRequest(routerModule, '/api/config', 'GET');
+    assert.equal(getConfigResponse.status, 200);
+    assert.equal(getConfigResponse.headers.get('Access-Control-Allow-Origin'), null);
+
+    const optionsConfigResponse = await sendRequest(routerModule, '/api/config', 'OPTIONS');
+    assert.equal(optionsConfigResponse.status, 404);
+    assert.equal(optionsConfigResponse.headers.get('Access-Control-Allow-Origin'), null);
+
+    const optionsExportResponse = await sendRequest(routerModule, '/api/export', 'OPTIONS');
+    assert.equal(optionsExportResponse.status, 404);
+    assert.equal(optionsExportResponse.headers.get('Access-Control-Allow-Origin'), null);
   } finally {
     await cleanup();
   }
