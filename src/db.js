@@ -4,10 +4,11 @@
  * 当前使用 CREATE TABLE IF NOT EXISTS，仅适用于首次建表，不支持增量迁移（ALTER TABLE）。
  * 若未来需要加列或改列，需引入版本化迁移机制（如 schema_version 设置项 + ALTER 语句）。
  *
- * 注意：D1 的 db.exec() 无法正确处理多行 SQL（换行符会导致 SQLITE_ERROR incomplete input），
+ * 注意：所有 SQL 语句均写成单行形式。历史上 initDB 曾用 db.exec() 逐条执行，
+ * 而 D1 的 db.exec() 无法正确处理多行 SQL（换行符会导致 SQLITE_ERROR incomplete input），
  * 参考 https://github.com/cloudflare/workers-sdk/issues/9133
  *       https://github.com/cloudflare/workers-sdk/issues/9479
- * 因此所有 SQL 语句均写成单行形式。
+ * 现已改为一次 db.batch(prepare) 提交全部建表语句以降低冷启动首请求延迟，单行书写习惯保留。
  */
 
 const SCHEMA_SQL = [
@@ -26,7 +27,7 @@ let initializedDatabases = new WeakSet();
 let initializingDatabases = new WeakMap();
 
 export async function initDB(db) {
-  if (!db || typeof db.exec !== 'function') {
+  if (!db || typeof db.prepare !== 'function' || typeof db.batch !== 'function') {
     throw new Error('D1 database binding is required');
   }
 
@@ -41,9 +42,7 @@ export async function initDB(db) {
   }
 
   const initializationPromise = (async () => {
-    for (const sql of SCHEMA_SQL) {
-      await db.exec(sql);
-    }
+    await db.batch(SCHEMA_SQL.map(sql => db.prepare(sql)));
     initializedDatabases.add(db);
   })().finally(() => {
     initializingDatabases.delete(db);

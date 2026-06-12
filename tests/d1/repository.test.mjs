@@ -13,6 +13,11 @@ function normalizeSql(sql) {
   return sql.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+// initDB 经 prepare+batch 执行的建表/建索引 DDL（真实 D1 中 batch 可执行 DDL）
+function isSchemaDdlSql(normalizedSql) {
+  return normalizedSql.startsWith('create table if not exists') || normalizedSql.startsWith('create index if not exists');
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -79,7 +84,11 @@ class FakeD1Database {
   }
 
   prepare(sql) {
-    this.prepareLog.push(normalizeSql(sql));
+    const normalizedSql = normalizeSql(sql);
+    // schema DDL 不计入 prepareLog，保持其只跟踪数据访问 SQL 的断言语义
+    if (!isSchemaDdlSql(normalizedSql)) {
+      this.prepareLog.push(normalizedSql);
+    }
     return new FakePreparedStatement(this, sql);
   }
 
@@ -114,6 +123,12 @@ class FakeD1Database {
 
   executeStatement(sql, bindings, state, mode) {
     const normalizedSql = normalizeSql(sql);
+
+    // schema DDL 仅计数，不改数据状态，也不参与 failOn 注入
+    if (isSchemaDdlSql(normalizedSql)) {
+      this.schemaExecCount += 1;
+      return { success: true, meta: { changes: 0 } };
+    }
 
     if (mode === 'run') {
       this.maybeFail(sql, bindings);

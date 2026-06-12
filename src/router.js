@@ -292,12 +292,14 @@ async function handleLogin(request, env) {
     return errorResponse('请输入密码', 400);
   }
 
-  const valid = await verifyAdminPassword(env, password);
+  // 单次加载 settings：密码校验与 JWT 签发复用同一对象，避免重复查询
+  const settings = await getSettings(env);
+
+  const valid = await verifyAdminPassword(settings, password);
   if (!valid) {
     return errorResponse('密码错误', 401);
   }
 
-  const settings = await getSettings(env);
   const token = await createJWT(settings.jwtSecret, { sub: 'admin' });
 
   const response = successResponse(null, '登录成功');
@@ -911,6 +913,43 @@ async function handleUpdateTierOrder(request, env, auth) {
   return successResponse(savedTierList.tiers, '排序更新成功');
 }
 
+/**
+ * 解析 tier 归属请求体中的 tierId/tierSort 字段（单条与批量更新共用）
+ * @param {Object} item - 待解析对象（单条场景为请求体，批量场景为 updates[i]）
+ * @param {string} [label] - 批量场景的错误文案前缀（如 `updates[0]`），单条场景省略
+ * @returns {{ tierId: string|null, tierSort: number|undefined }}
+ * @throws {Error} 校验失败时抛出带文案的错误，由调用方转为 errorResponse(message, 400)
+ */
+function parseTierAssignmentBody(item, label = '') {
+  if (!Object.prototype.hasOwnProperty.call(item, 'tierId')) {
+    throw new Error(label ? `${label} 缺少 tierId 字段` : '缺少 tierId 字段');
+  }
+
+  const rawTierId = item.tierId;
+  const rawTierSort = item.tierSort;
+  let tierId = null;
+  let tierSort = undefined;
+
+  if (rawTierId !== null) {
+    if (typeof rawTierId !== 'string') {
+      throw new Error(label ? `${label}.tierId 必须为字符串或 null` : 'tierId 必须为字符串或 null');
+    }
+
+    const normalizedTierId = rawTierId.trim();
+    tierId = normalizedTierId || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(item, 'tierSort')) {
+    const parsedTierSort = Number(rawTierSort);
+    if (!Number.isFinite(parsedTierSort) || parsedTierSort < 0) {
+      throw new Error(label ? `${label}.tierSort 必须是非负数字` : 'tierSort 必须是非负数字');
+    }
+    tierSort = Math.floor(parsedTierSort);
+  }
+
+  return { tierId, tierSort };
+}
+
 async function handleBatchUpdateVNTier(request, env, auth) {
   if (!auth.authenticated) {
     return errorResponse('未授权', 401);
@@ -957,30 +996,12 @@ async function handleBatchUpdateVNTier(request, env, auth) {
     }
     seenIds.add(idValue);
 
-    if (!Object.prototype.hasOwnProperty.call(item, 'tierId')) {
-      return errorResponse(`updates[${index}] 缺少 tierId 字段`, 400);
-    }
-
-    const rawTierId = item.tierId;
-    const rawTierSort = item.tierSort;
-    let tierId = null;
-    let tierSort = undefined;
-
-    if (rawTierId !== null) {
-      if (typeof rawTierId !== 'string') {
-        return errorResponse(`updates[${index}].tierId 必须为字符串或 null`, 400);
-      }
-
-      const normalizedTierId = rawTierId.trim();
-      tierId = normalizedTierId || null;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(item, 'tierSort')) {
-      const parsedTierSort = Number(rawTierSort);
-      if (!Number.isFinite(parsedTierSort) || parsedTierSort < 0) {
-        return errorResponse(`updates[${index}].tierSort 必须是非负数字`, 400);
-      }
-      tierSort = Math.floor(parsedTierSort);
+    let tierId;
+    let tierSort;
+    try {
+      ({ tierId, tierSort } = parseTierAssignmentBody(item, `updates[${index}]`));
+    } catch (error) {
+      return errorResponse(error.message, 400);
     }
 
     if (tierId && !tierIdSet.has(tierId)) {
@@ -1022,30 +1043,12 @@ async function handleUpdateVNTier(request, env, id, auth) {
     return errorResponse('请求体必须是对象', 400);
   }
 
-  if (!Object.prototype.hasOwnProperty.call(body, 'tierId')) {
-    return errorResponse('缺少 tierId 字段', 400);
-  }
-
-  const rawTierId = body.tierId;
-  const rawTierSort = body.tierSort;
-  let tierId = null;
-  let tierSort = undefined;
-
-  if (rawTierId !== null) {
-    if (typeof rawTierId !== 'string') {
-      return errorResponse('tierId 必须为字符串或 null', 400);
-    }
-
-    const normalizedTierId = rawTierId.trim();
-    tierId = normalizedTierId || null;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, 'tierSort')) {
-    const parsedTierSort = Number(rawTierSort);
-    if (!Number.isFinite(parsedTierSort) || parsedTierSort < 0) {
-      return errorResponse('tierSort 必须是非负数字', 400);
-    }
-    tierSort = Math.floor(parsedTierSort);
+  let tierId;
+  let tierSort;
+  try {
+    ({ tierId, tierSort } = parseTierAssignmentBody(body));
+  } catch (error) {
+    return errorResponse(error.message, 400);
   }
 
   if (tierId) {
@@ -1142,7 +1145,8 @@ async function handleGetConfig(request, env, auth) {
     return errorResponse('未授权', 401);
   }
 
-  const settings = await getSettings(env);
+  // authMiddleware 认证成功时必然已加载 settings，直接复用避免单请求内重复查询
+  const settings = auth.settings;
 
   // 不返回敏感信息
   return successResponse({
@@ -1171,7 +1175,8 @@ async function handleUpdateConfig(request, env, auth) {
   } catch (response) {
     return response;
   }
-  let settings = await getSettings(env);
+  // authMiddleware 认证成功时必然已加载 settings，直接复用避免单请求内重复查询
+  let settings = auth.settings;
   let passwordChanged = false;
 
   if (body.newPassword) {
@@ -1179,6 +1184,7 @@ async function handleUpdateConfig(request, env, auth) {
       return errorResponse('密码长度至少6位', 400);
     }
     await setAdminPassword(env, body.newPassword);
+    // 密码哈希与 jwtSecret 刚被改写，必须重新加载
     settings = await getSettings(env);
     passwordChanged = true;
   }

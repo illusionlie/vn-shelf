@@ -181,7 +181,9 @@ export async function verifyPassword(password, salt, storedHash) {
  * 认证中间件
  * @param {Request} request - 请求对象
  * @param {Object} env - 环境变量
- * @returns {Object} { authenticated: boolean, user?: Object, error?: string }
+ * @returns {Object} { authenticated: boolean, user?: Object, error?: string, settings?: Object }
+ *   settings 为本次已加载的配置对象（无 cookie 的早退分支不加载、不附带），
+ *   认证 handler 可直接复用以避免单请求内重复查询
  */
 export async function authMiddleware(request, env) {
   const cookie = request.headers.get('Cookie') || '';
@@ -195,15 +197,15 @@ export async function authMiddleware(request, env) {
 
   if (!settings.jwtSecret) {
     console.warn('[auth] jwtSecret not configured');
-    return { authenticated: false, error: 'Auth not initialized' };
+    return { authenticated: false, error: 'Auth not initialized', settings };
   }
 
   const payload = await verifyJWT(cookies.auth_token, settings.jwtSecret);
   if (!payload) {
-    return { authenticated: false, error: 'Invalid token' };
+    return { authenticated: false, error: 'Invalid token', settings };
   }
 
-  return { authenticated: true, user: payload };
+  return { authenticated: true, user: payload, settings };
 }
 
 /**
@@ -259,13 +261,11 @@ export async function setAdminPassword(env, password) {
 
 /**
  * 验证管理员密码
- * @param {Object} env - 环境变量
+ * @param {Object} settings - 已加载的配置对象（由调用方传入，避免重复查询）
  * @param {string} password - 密码
  * @returns {Promise<boolean>}
  */
-export async function verifyAdminPassword(env, password) {
-  const settings = await getSettings(env);
-
+export async function verifyAdminPassword(settings, password) {
   if (!settings.adminPasswordHash) {
     return false;
   }

@@ -44,21 +44,47 @@ export function vnShelf() {
       }
     },
 
-    handleSearch() {
+    // 搜索过滤（匹配字段与后端 handleGetVNList 一致：title / titleJa / titleCn）
+    applySearchFilter(list) {
       if (!this.searchQuery) {
-        this.filteredList = this.vnList;
-        return;
+        return list;
       }
 
       const query = this.searchQuery.toLowerCase();
-      this.filteredList = this.vnList.filter(vn =>
+      return list.filter(vn =>
         vn.title.toLowerCase().includes(query) ||
+        (vn.titleJa && vn.titleJa.toLowerCase().includes(query)) ||
         (vn.titleCn && vn.titleCn.toLowerCase().includes(query))
       );
     },
 
+    handleSearch() {
+      this.filteredList = this.applySearchFilter(this.vnList);
+    },
+
+    // 本地排序（比较器语义与后端 handleGetVNList 一致），不再重新请求列表
     handleSortChange() {
-      this.loadVNList();
+      const [field, order] = this.sortBy.split('_');
+
+      this.vnList.sort((a, b) => {
+        let valA, valB;
+
+        if (field === 'created') {
+          valA = new Date(a.createdAt || 0);
+          valB = new Date(b.createdAt || 0);
+        } else if (field === 'personal') {
+          valA = a.personalRating || 0;
+          valB = b.personalRating || 0;
+        } else {
+          valA = a.rating || 0;
+          valB = b.rating || 0;
+        }
+
+        return order === 'desc' ? valB - valA : valA - valB;
+      });
+
+      // 重放当前搜索过滤，保持 filteredList 与排序结果同步
+      this.filteredList = this.applySearchFilter(this.vnList);
     },
 
     openEdit(vn = null) {

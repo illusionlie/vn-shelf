@@ -53,7 +53,8 @@ const state = globalThis.__routerConfigTestRegistry?.get('${testId}');
 const clone = value => JSON.parse(JSON.stringify(value));
 
 export async function authMiddleware() {
-  return { authenticated: !!state.authenticated };
+  // 与真实 authMiddleware 契约一致：认证结果附带已加载的 settings，供认证 handler 复用
+  return { authenticated: !!state.authenticated, settings: clone(state.settings) };
 }
 
 export async function createJWT() {
