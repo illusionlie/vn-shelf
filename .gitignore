@@ -2,12 +2,16 @@
 node_modules/
 
 # wrangler 缓存
+.wrangler/
 .wrangler
 
 # wrangler 配置
 # 注意：wrangler.toml 是敏感文件，不要提交到 Git 仓库!
 # 使用 wrangler.toml.example 作为模板，并在 CI/CD 环境中设置敏感信息。
 wrangler.toml
+
+# 本地覆盖变量
+.dev.vars
 
 # Wrangler 本地 D1 数据库
 data/
