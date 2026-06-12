@@ -74,8 +74,8 @@ tests/
 
 - HTTP 入口：[`fetch()`](src/index.js:141)
   - 非 `/api/*` 请求优先尝试 `env.ASSETS.fetch(request)` 获取静态资源。
-  - 失败后回退到路由处理 [`handleRequest()`](src/router.js:69)。
-- Queue 入口：[`queue()`](src/index.js:180)
+  - 失败后回退到路由处理 [`handleRequest()`](src/router.js:80)。
+- Queue 入口：[`queue()`](src/index.js:179)
   - 用于批量索引任务消费，带重试、幂等条目结果记录和状态汇总。
 - Durable Object：[`IndexStartLockDurableObject`](src/index.js:30)
   - 全局单例，提供索引启动的分布式互斥锁（`/acquire`、`/release`、`/status`）。
@@ -83,7 +83,7 @@ tests/
 
 ## API 路由
 
-路由总入口：[`handleAPI()`](src/router.js:99)
+路由总入口：[`handleAPI()`](src/router.js:116)
 
 ### 认证接口
 
@@ -136,7 +136,7 @@ tests/
 |------|------|------|------|
 | GET | `/api/config` | 获取配置（脱敏） | 需认证 |
 | PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags 配置 / 外观配置） | 需认证 |
-| GET | `/api/config/appearance` | 获取外观配置（`backgroundUrl` / `backgroundOverlay` / `backgroundBlur`） | 公开 |
+| GET | `/api/config/appearance` | 获取外观与公开 tags 配置（`backgroundUrl` / `backgroundOverlay` / `backgroundBlur` / `tagsMode` / `translateTags` / `translationUrl`） | 公开 |
 
 ### 导入导出接口
 
@@ -164,12 +164,12 @@ tests/
 ## Queue 处理机制（批量索引）
 
 - Queue 绑定：`VN_INDEX_QUEUE`（配置见 [`wrangler.toml.example`](wrangler.toml.example)）
-- 消费逻辑：[`queue()`](src/index.js:180)
-- 索引启动：[`startIndexTask()`](src/index-task.js:65)，状态查询 [`getIndexTaskStatus()`](src/index-task.js:61)
+- 消费逻辑：[`queue()`](src/index.js:179)
+- 索引启动：[`startIndexTask()`](src/index-task.js:42)，状态查询 [`getIndexTaskStatus()`](src/index-task.js:38)
 - 分布式锁：[`IndexStartLockDurableObject`](src/index.js:30) 提供启动互斥，绑定名 `INDEX_START_LOCK`
 - 重试策略：最多 3 次，重试延迟 60 秒（`retryCount` 累增）
 - 幂等结果：按 `taskId + vndbId` 写入 `index_task_items` 表，成功结果对失败回写具有"粘性"
-- 汇总机制：[`reconcileIndexStatusFromItems()`](src/repository.js:633) 基于 `index_task_items` 表汇总 `processed/failed`
+- 汇总机制：[`reconcileIndexStatusFromItems()`](src/repository.js:702) 基于 `index_task_items` 表汇总 `processed/failed`
 - 延迟汇总：高频批次下仅临近完成时即时汇总，其余走 `ctx.waitUntil` 延迟汇总降载（最多 6 次，间隔 5s）
 - 状态终态：`completed` 或 `partial`，D1 模式下聚合列表由 SQL 实时计算，无需手动重建
 - 终态清理：汇总转入终态时自动清理 `index_task_items` 表对应记录
@@ -180,7 +180,7 @@ tests/
 - 签名算法：HMAC-SHA256（Web Crypto API）
 - Token 存储：`httpOnly` Cookie `auth_token`，有效期 24h
 - 密码哈希：PBKDF2 + SHA-256（见 [`hashPassword()`](src/auth.js:132)）
-- 初始化/校验：[`setAdminPassword()`](src/auth.js:249)、[`verifyAdminPassword()`](src/auth.js:269)
+- 初始化/校验：[`setAdminPassword()`](src/auth.js:251)、[`verifyAdminPassword()`](src/auth.js:268)
 
 ## VNDB API 集成
 
@@ -268,7 +268,7 @@ tests/
 - API 封装：[`public/js/api.js`](public/js/api.js)
 - 工具函数：[`public/js/utils.js`](public/js/utils.js) — `formatUserPlayTime`, `lockPageScroll`/`unlockPageScroll`, `toggleMobileMenu`, `initProgressBar`
 - 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换、自定义背景 overlay
-- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js:162)（带安全 URL 校验）
+- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js:159)（带安全 URL 校验）
 - Tags 翻译：[`initTranslations()`](public/js/translations.js:240)
   - IndexedDB 缓存：`vn-shelf-translations`
   - 缓存键：`tagTranslations`
