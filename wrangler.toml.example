@@ -44,8 +44,5 @@ head_sampling_rate = 1
 
 # 环境变量
 [vars]
-ENVIRONMENT = "development"
-
-# 生产环境配置
-[env.production]
-vars = { ENVIRONMENT = "production" }
+# 本地开发时由 .dev.vars 覆盖为 development（wrangler dev 自动读取 .dev.vars）
+ENVIRONMENT = "production"

@@ -9,7 +9,7 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 ## Build / Test / Deploy Commands
 
 - `npm run dev` - 本地开发服务器（`wrangler dev`）
-- `npm run deploy` - 部署到 Cloudflare Workers（当前脚本为 `npm i & wrangler deploy`）
+- `npm run deploy` - 部署到 Cloudflare Workers（当前脚本为 `npm ci && wrangler deploy`）
 - `npm run tail` - 实时查看 Worker 日志
 - `npm run lint` - ESLint 检查（`src/**/*.js` + `public/js/**/*.js`）
 - `npm run lint:fix` - 自动修复可修复的 lint 问题
@@ -26,8 +26,7 @@ src/
 ├── repository.js   # D1 数据访问层
 ├── auth.js         # JWT + 密码哈希认证
 ├── vndb.js         # VNDB API 客户端
-├── utils.js        # 通用工具函数
-└── repositories/   # （暂空）
+└── utils.js        # 通用工具函数
 
 public/
 ├── index.html
@@ -35,7 +34,6 @@ public/
 ├── settings.html
 ├── stats.html
 ├── tier.html
-├── success.html
 ├── cover.webp
 ├── favicon.ico
 ├── robots.txt
@@ -157,7 +155,6 @@ tests/
 | `/settings` | 设置页 |
 | `/stats` | 统计页 |
 | `/tier` | Tier List 页 |
-| `/success` | 静态成功页（对应 `public/success.html`） |
 | `/css/style.css` | 样式 |
 | `/js/*.js` | 前端模块 |
 
@@ -194,7 +191,7 @@ tests/
 
 ## 数据结构
 
-### VN 完整条目（`vn:{id}`）
+### VN 完整条目
 
 ```javascript
 {
@@ -231,7 +228,7 @@ tests/
 }
 ```
 
-### 列表项（`vn:list.items[]`）
+### 列表项
 
 ```javascript
 {
@@ -252,7 +249,7 @@ tests/
 }
 ```
 
-### Tier 列表（`tier:list`）
+### Tier 列表
 
 ```javascript
 {

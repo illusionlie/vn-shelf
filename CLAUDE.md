@@ -22,9 +22,7 @@ src/
 ├── index-task.js   # 索引任务逻辑（启动、状态查询）
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
-├── repository.js   # D1 数据访问层（替代 kv.js）
-├── migrate.js      # KV → D1 数据迁移
-├── kv.js           # [遗留] KV 存储逻辑（仅迁移端点使用，迁移完成后删除）
+├── repository.js   # D1 数据访问层
 ├── auth.js         # JWT + 密码哈希认证
 ├── vndb.js         # VNDB API 客户端
 └── utils.js        # 通用工具函数
@@ -45,10 +43,7 @@ public/js/
 
 tests/
 ├── d1/
-│   └── repository.migrate.test.mjs
-├── kv/
-│   ├── index.reconcile.test.mjs
-│   └── import.rebuild.test.mjs
+│   └── repository.test.mjs
 ├── public/
 │   └── markdown.security.test.mjs
 ├── queue/
@@ -72,5 +67,5 @@ tests/
 2. **前端组件拆分**：每个页面组件独立一个文件，通过 `app.js` 统一注册到 Alpine.js。
 3. **游玩时长字段**：后端仅接受 `playTimeHours` + `playTimePartMinutes`。
 4. **Tier 一致性**：删除 Tier 时先清理条目归属，再落库 Tier 列表。
-5. **敏感信息**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表（迁移前存储于 KV），不暴露给前端。
+5. **敏感信息**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表，不暴露给前端。
 6. **ESLint**：修改前端 JS 后务必运行 `npm run lint` 确认无错误。

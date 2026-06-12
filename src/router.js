@@ -282,7 +282,7 @@ async function handleLogin(request, env) {
   const token = await createJWT(settings.jwtSecret, { sub: 'admin' });
 
   const response = successResponse(null, '登录成功');
-  setAuthCookie(response, token, env.ENVIRONMENT === 'production');
+  setAuthCookie(response, token, env.ENVIRONMENT !== 'development');
 
   return response;
 }
@@ -1204,7 +1204,7 @@ async function handleUpdateConfig(request, env, auth) {
 
   if (passwordChanged) {
     const token = await createJWT(settings.jwtSecret, { sub: 'admin' });
-    setAuthCookie(response, token, env.ENVIRONMENT === 'production');
+    setAuthCookie(response, token, env.ENVIRONMENT !== 'development');
   }
 
   return response;

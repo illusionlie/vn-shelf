@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "npm i & wrangler deploy",
+    "deploy": "npm ci && wrangler deploy",
     "tail": "wrangler tail",
     "lint": "eslint \"src/**/*.js\" \"public/js/**/*.js\"",
     "lint:fix": "npm run lint -- --fix",
