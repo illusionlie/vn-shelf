@@ -14,6 +14,9 @@ import { initProgressBar, toggleMobileMenu } from './utils.js';
 
 // ============ 全局状态 ============
 
+// toast 递增序列，避免同毫秒并发 toast 的 id 碰撞导致 removeToast 误删
+let _toastSeq = 0;
+
 document.addEventListener('alpine:init', () => {
   // 全局Store
   Alpine.store('app', {
@@ -43,7 +46,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     addToast(message, type = 'success') {
-      const id = Date.now();
+      const id = ++_toastSeq;
       this.toasts.push({ id, message, type });
       setTimeout(() => this.removeToast(id), 3000);
     },
