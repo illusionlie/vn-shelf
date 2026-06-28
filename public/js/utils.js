@@ -94,3 +94,53 @@ export function initProgressBar() {
     }, 500);
   }, 3000);
 }
+
+
+// =========== Loading 包装器 ============
+
+/**
+ * 包裹异步操作：统一翻转 isLoading、捕获错误并产出友好 toast。
+ *
+ * 约定：
+ * - `ctx` 为组件实例，需提供 `isLoading` 字段与 `this.$store.app.addToast` 绑定。
+ * - 异步函数正常返回时，若有 `successMsg` 则推 success toast，并返回其结果。
+ * - 异步函数抛错时，输出 `${errorPrefix}: ${message}` error toast，并将原始错误记入 console.warn。
+ * - `finally` 复位 `isLoading`，无论成功失败。
+ *
+ * @param {Object} ctx - 宿主组件实例（提供 isLoading / $store）
+ * @param {() => Promise<*>} asyncFn - 待执行的异步主体
+ * @param {Object} opts
+ * @param {string} [opts.successMsg=''] - 成功 toast 文案（空则不弹）
+ * @param {string} [opts.errorPrefix='操作失败'] - 失败 toast 文案前缀
+ * @returns {Promise<*>} asyncFn 的返回值；失败时返回 undefined
+ */
+export async function withLoading(ctx, asyncFn, { successMsg = '', errorPrefix = '操作失败' } = {}) {
+  ctx.isLoading = true;
+  try {
+    const result = await asyncFn();
+    if (successMsg) ctx.$store?.app?.addToast(successMsg);
+    return result;
+  } catch (error) {
+    console.warn('[withLoading]', { errorPrefix, error: error?.message || String(error) });
+    ctx.$store?.app?.addToast(`${errorPrefix}: ${error?.message || error}`, 'error');
+  } finally {
+    ctx.isLoading = false;
+  }
+}
+
+// =========== 防抖 ============
+
+/**
+ * trailing 防抖：在停止调用 `ms` 毫秒后执行一次，保留 `this` 与参数。
+ *
+ * @param {Function} fn - 需防抖的目标函数
+ * @param {number} [ms=200] - 防抖等待毫秒
+ * @returns {Function} 防抖后的函数
+ */
+export function debounce(fn, ms = 200) {
+  let timer = null;
+  return function (...args) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
