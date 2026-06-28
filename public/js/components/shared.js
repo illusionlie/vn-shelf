@@ -5,7 +5,7 @@
  * 方法内的 this 指向宿主组件实例。
  */
 
-import { configAPI, vnAPI } from '../api.js';
+import { vnAPI } from '../api.js';
 import {
   DEFAULT_TRANSLATION_URL,
   getFromIndexedDB,
@@ -29,15 +29,13 @@ export function createTagsView() {
     translations: null,
 
     async loadConfig() {
-      try {
-        const res = await configAPI.getAppearance();
-        this.config = res.data || { ...DEFAULT_TAGS_CONFIG };
-      } catch (error) {
-        console.warn('[tagsView] load config fallback to defaults', {
-          error: error?.message || String(error)
-        });
-        this.config = { ...DEFAULT_TAGS_CONFIG };
-      }
+      // 从全局 Store 读取 appearance（带 sessionStorage 直读 + 后台刷新，避免每页重复请求）
+      const cfg = await this.$store.app.loadAppearance();
+      this.config = {
+        tagsMode: cfg.tagsMode ?? DEFAULT_TAGS_CONFIG.tagsMode,
+        translateTags: cfg.translateTags ?? DEFAULT_TAGS_CONFIG.translateTags,
+        translationUrl: cfg.translationUrl ?? DEFAULT_TAGS_CONFIG.translationUrl
+      };
     },
 
     async initTranslations() {

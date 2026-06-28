@@ -2,8 +2,6 @@
  * VN Shelf 主题与背景模块
  */
 
-import { configAPI } from './api.js';
-
 // ========== 主题 ===========
 
 function createThemeIcon(isDark) {
@@ -92,14 +90,27 @@ export function setBackgroundConfig(config) {
   _backgroundConfig = config;
 }
 
+// 标记是否已挂载后台刷新监听，避免重复 addEventListener
+let _appearanceRefreshListenerBound = false;
+
 export async function initBackground() {
   try {
-    const res = await configAPI.getAppearance();
-    _backgroundConfig = res.data || null;
-    applyBackground(_backgroundConfig);
+    const cfg = await Alpine.store('app').loadAppearance();
+    setBackgroundConfig(cfg);
+    applyBackground(cfg);
   } catch (error) {
-    console.warn('[app] load appearance config failed', {
+    console.warn('[theme] initBackground', {
       error: error?.message || String(error)
+    });
+  }
+
+  // 监听 Store 后台刷新事件，重新应用背景（幂等挂载一次）
+  if (!_appearanceRefreshListenerBound) {
+    _appearanceRefreshListenerBound = true;
+    window.addEventListener('appearance-refreshed', (event) => {
+      const cfg = event?.detail || null;
+      setBackgroundConfig(cfg);
+      applyBackground(cfg);
     });
   }
 }
