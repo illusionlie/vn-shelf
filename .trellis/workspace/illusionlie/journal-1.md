@@ -43,3 +43,40 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: B1 前端健壮性与供应链修复
+
+**Date**: 2026-06-28
+**Task**: B1 前端健壮性与供应链修复
+**Branch**: `master`
+
+### Summary
+
+侦察前端全量(public/ 5 HTML + 11 js 模块 + style.css)产出 docs/frontend-improvements.md(33 项/5 批次/21 任务单元/决策日志);纳入 Trellis 立项 06-28-frontend-b1-robustness 并完成 B1 批次:自托管 Alpine 3.14.9(5 HTML 切本地引用 + package.json alpineVersion + fetch:vendor 重复下载脚本)、修复 apiRequest headers 合并顺序(保留默认 Content-Type)、修复 toast id 同毫秒碰撞(模块级单调计数器)。lint/test 全绿(62 pass),AC1-AC8 验证;沉淀 3 条执行性约束到 frontend spec(Forbidden runtime CDN/headers 合并顺序/Date.now id)。AC9 冒烟待用户本地 npm run dev 走查。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74e8ebd` | (see git log) |
+| `fec9afe` | (see git log) |
+| `a0dbc8e` | (see git log) |
+| `edc13cb` | (see git log) |
+| `b4bcf31` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
