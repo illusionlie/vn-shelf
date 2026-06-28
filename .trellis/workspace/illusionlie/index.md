@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
+- **Total Sessions**: 3
 - **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~82 | Active |
+| `journal-1.md` | ~119 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-06-28 | B2 前端缓存与重复消除 | `89e2820`, `294f679`, `e2f717d`, `462dbbc`, `68d6da9` | `master` |
 | 2 | 2026-06-28 | B1 前端健壮性与供应链修复 | `74e8ebd`, `fec9afe`, `a0dbc8e`, `edc13cb`, `b4bcf31` | `master` |
 | 1 | 2026-06-12 | 代码库审阅落地：死代码清理、安全修复、公开配置与 CORS 改造 | `4a7024e`, `38d35ee`, `3d63403`, `943b06e`, `27b0243`, `7adb28e` | `master` |
 <!-- @@@/auto:session-history -->
