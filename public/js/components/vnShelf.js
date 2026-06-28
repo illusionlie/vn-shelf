@@ -4,7 +4,7 @@
 
 import { vnAPI } from '../api.js';
 import { renderMarkdown } from '../markdown.js';
-import { debounce, formatUserPlayTime, lockPageScroll, unlockPageScroll } from '../utils.js';
+import { debounce, formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
 
 import { createDetailModal, createTagsView } from './shared.js';
 
@@ -132,15 +132,39 @@ export function vnShelf() {
       this.showEdit = true;
 
       if (this.showDetail) {
+        // 从详情跳转到编辑：释放详情焦点陷阱（但不走 closeDetail，避免清空 selectedVN
+        // 进而破坏编辑模态内 getDisplayTags(selectedVN || editForm) 的标签展示）
         this.showDetail = false;
+        if (this._detailTrapRelease) {
+          try {
+            this._detailTrapRelease();
+          } catch {
+            // 释放焦点陷阱失败时静默降级
+          }
+          this._detailTrapRelease = null;
+        }
         unlockPageScroll();
       }
+
+      this.$nextTick(() => {
+        if (this.$refs.editModal) {
+          this._editTrapRelease = trapFocus(this.$refs.editModal);
+        }
+      });
     },
 
     closeEdit() {
       if (!this.showEdit) return;
       this.showEdit = false;
       this.editForm = {};
+      if (this._editTrapRelease) {
+        try {
+          this._editTrapRelease();
+        } catch {
+          // 释放焦点陷阱失败时静默降级
+        }
+        this._editTrapRelease = null;
+      }
       unlockPageScroll();
     },
 
@@ -216,7 +240,13 @@ export function vnShelf() {
     },
 
     async deleteVN() {
-      if (!confirm('确定要删除这个条目吗？')) return;
+      const ok = await this.$store.app.confirm({
+        title: '删除条目',
+        message: '确定要删除这个条目吗？',
+        confirmText: '删除',
+        danger: true
+      });
+      if (!ok) return;
 
       try {
         await vnAPI.delete(this.selectedVN.id);

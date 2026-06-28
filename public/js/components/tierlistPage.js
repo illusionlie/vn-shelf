@@ -4,7 +4,7 @@
 
 import { vnAPI, tierAPI } from '../api.js';
 import { renderMarkdown } from '../markdown.js';
-import { formatUserPlayTime, lockPageScroll, unlockPageScroll } from '../utils.js';
+import { formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
 
 import { createDetailModal, createTagsView } from './shared.js';
 
@@ -195,6 +195,7 @@ export function tierlistPage() {
         lockPageScroll();
       }
       this.showTierEdit = true;
+      this._trapTierEdit();
     },
 
     openTierEdit(tier) {
@@ -207,12 +208,29 @@ export function tierlistPage() {
         lockPageScroll();
       }
       this.showTierEdit = true;
+      this._trapTierEdit();
+    },
+
+    _trapTierEdit() {
+      this.$nextTick(() => {
+        if (this.$refs.tierEditModal) {
+          this._tierEditTrapRelease = trapFocus(this.$refs.tierEditModal);
+        }
+      });
     },
 
     closeTierEdit() {
       if (!this.showTierEdit) return;
       this.showTierEdit = false;
       this.editingTier = null;
+      if (this._tierEditTrapRelease) {
+        try {
+          this._tierEditTrapRelease();
+        } catch {
+          // 释放焦点陷阱失败时静默降级
+        }
+        this._tierEditTrapRelease = null;
+      }
       unlockPageScroll();
     },
 
@@ -250,7 +268,13 @@ export function tierlistPage() {
     },
 
     async deleteTier(id) {
-      if (!confirm('删除该 Tier 后，其下条目将变为未分类。确定删除？')) return;
+      const ok = await this.$store.app.confirm({
+        title: '删除 Tier',
+        message: '删除该 Tier 后，其下条目将变为未分类。',
+        confirmText: '删除',
+        danger: true
+      });
+      if (!ok) return;
 
       try {
         await tierAPI.delete(id);

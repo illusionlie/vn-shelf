@@ -190,7 +190,20 @@ export function settingsPage() {
           throw new Error('无效的导入文件格式');
         }
 
-        const mode = confirm('选择导入模式：\n确定 = 合并（保留现有数据）\n取消 = 替换（清空现有数据）') ? 'merge' : 'replace';
+        const choice = await this.$store.app.confirm({
+          title: '导入模式',
+          message: '合并：保留现有数据并追加；替换：清空现有数据后写入。',
+          confirmText: '合并',
+          cancelText: '替换',
+          danger: false,
+          thirdText: '取消导入'
+        });
+        // true=null 语义：true=合并、false=替换、null=取消导入（放弃不弹错）
+        if (choice === null) {
+          event.target.value = '';
+          return;
+        }
+        const mode = choice ? 'merge' : 'replace';
 
         await dataAPI.import(data, mode);
 
@@ -199,7 +212,8 @@ export function settingsPage() {
           applyBackground(data.appearance);
         }
 
-        this.$store.app.addToast(`导入成功，共${data.entries.length}个条目`);
+        const actionText = mode === 'merge' ? '合并' : '替换';
+        this.$store.app.addToast(`导入成功（${actionText}），共${data.entries.length}个条目`);
       } catch (error) {
         this.$store.app.addToast('导入失败: ' + error.message, 'error');
       }
@@ -296,7 +310,13 @@ export function settingsPage() {
     },
 
     async clearTranslationCache() {
-      if (!confirm('确定要清除翻译缓存吗？下次使用时需要重新下载翻译数据。')) return;
+      const ok = await this.$store.app.confirm({
+        title: '清除翻译缓存',
+        message: '下次使用时需要重新下载翻译数据。',
+        confirmText: '清除',
+        danger: true
+      });
+      if (!ok) return;
 
       try {
         await clearTranslationsCache();

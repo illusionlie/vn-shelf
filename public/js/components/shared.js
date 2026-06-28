@@ -12,7 +12,7 @@ import {
   initTranslations,
   translateTags
 } from '../translations.js';
-import { lockPageScroll, unlockPageScroll } from '../utils.js';
+import { lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
 
 const DEFAULT_TAGS_CONFIG = {
   tagsMode: 'vndb',
@@ -113,6 +113,11 @@ export function createDetailModal() {
           lockPageScroll();
         }
         this.showDetail = true;
+        this.$nextTick(() => {
+          if (this.$refs.detailModal) {
+            this._detailTrapRelease = trapFocus(this.$refs.detailModal);
+          }
+        });
       } catch (error) {
         this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
       }
@@ -122,6 +127,14 @@ export function createDetailModal() {
       if (!this.showDetail) return;
       this.showDetail = false;
       this.selectedVN = null;
+      if (this._detailTrapRelease) {
+        try {
+          this._detailTrapRelease();
+        } catch {
+          // 释放焦点陷阱失败时静默降级
+        }
+        this._detailTrapRelease = null;
+      }
       unlockPageScroll();
     }
   };
