@@ -17,10 +17,17 @@ Vendor minified bundles (`public/js/vendor/*.min.js`) and `.cjs` helper scripts 
 - **Runtime third-party CDN `<script src="https://cdn...">`** in any `public/*.html`. All front-end runtime deps must be self-hosted under `public/js/vendor/`. (Supply-chain drift + availability single-point. See `alpineVersion` + `fetch:vendor` for the audit path.)
 - **`{ headers: {...defaults, ...options.headers}, ...options }` merge order in `apiRequest`** — the trailing `...options` wipes the merged `headers`, losing the default `Content-Type: application/json` when a caller passes any `headers`. Always spread `...options` first, then set `headers` separately. See `public/js/api.js` `apiRequest`.
 - **`Date.now()` as a unique id** for in-session counters (e.g. toast ids) — same-millisecond collisions make `removeToast` delete the wrong entry. Use a module-scoped monotonic counter (`let _seq = 0; const id = ++_seq;`) or `crypto.randomUUID()`.
+- **`@click` on a non-focusable `<div>`** to open an interactive flow (e.g. a VN card). Either use a native `<button>` or add `role="button" tabindex="0"` + `@keydown.enter.space.prevent="..."` + `:aria-label`. A click-only `<div>` is invisible to keyboard users. (Tier cards already use `<button>`; index cards must add the role/keyboard attrs.)
+- **Icon-only `<button>` with text content only (`&times;`, SVG).** Must carry `aria-label`. Same for toggle buttons: also `aria-expanded` + `aria-controls`.
 
 ---
 
 ## Required Patterns
+
+- **Self-hosted vendor with reproducible fetch script.** To add a runtime front-end lib: place the minified bundle under `public/js/vendor/<name>.min.js`, record its locked version as a root field in `package.json` (e.g. `alpineVersion`), and add a `fetch:vendor`-style script that re-downloads by that version and prints a sha256 for upgrade audit.
+- **`apiRequest` default header survival.** Default headers that must survive caller-supplied `options` are applied AFTER spreading `options`, never via a leading `headers` key that `...options` later overwrites.
+- **Native `confirm()` is forbidden for new flows.** Use the global `await this.$store.app.confirm({ title, message, confirmText, cancelText, danger })` Promise dialog instead (the `confirmDialog` component injected by `public/js/layout.js`). Native `confirm()` blocks the UI, is un-stylable, and is keyboard-inaccessible; the ambiguous “OK=merge / Cancel=replace” antipattern is not allowed — use two explicit text buttons via `confirmText`/`cancelText`.
+- **Modals need `role="dialog" aria-modal="true" aria-labelledby`** (on the panel `.modal`, NOT the `.modal-overlay` backdrop) + a focus trap (`trapFocus` from `utils.js`) on open + focus restore on close. `@keydown.escape` lives on the panel with `.stop` so a stacked confirmDialog does NOT cascade-close the content modal behind it — never rely on `window`-level Esc listener registration order.
 
 - **Self-hosted vendor with reproducible fetch script.** To add a runtime front-end lib: place the minified bundle under `public/js/vendor/<name>.min.js`, record its locked version as a root field in `package.json` (e.g. `alpineVersion`), and add a `fetch:vendor`-style script that re-downloads by that version and prints a sha256 for upgrade audit.
 - **`apiRequest` default header survival.** Default headers that must survive caller-supplied `options` are applied AFTER spreading `options`, never via a leading `headers` key that `...options` later overwrites.
@@ -36,6 +43,14 @@ Vendor minified bundles (`public/js/vendor/*.min.js`) and `.cjs` helper scripts 
 
 ## Code Review Checklist
 
-<!-- What reviewers should check -->
+Front-end changes must pass these before commit:
 
-(To be filled by the team)
+- `npm run lint && npm run test` exit 0.
+- No runtime third-party CDN; vendor self-hosted with `fetch:vendor` reproducible.
+- No native `confirm()` / `alert()` in new flows — use `$store.app.confirm`.
+- Clickable `<div>` has `role=button tabindex=0 + @keydown.enter.space + :aria-label`, or is a native `<button>`.
+- Modal has `role=dialog aria-modal aria-labelledby` on the panel + `trapFocus` on open + focus restore on close + panel-level Esc with `.stop`.
+- Toggle button has `aria-expanded`/`aria-controls`; menus have `role=menu`/`role=menuitem`.
+- `aria-live` region for transient status messages (toast).
+- Shared shell elements (progress bar / background / toast / confirmDialog) come from `public/js/layout.js` `injectShell()`, NOT copy-pasted per page. Header/nav stays per-page (active nav + per-page actions differ).
+- Injected shell DOM reproduces the original markup byte-for-byte (same classes + Alpine directives) to avoid style regressions.
