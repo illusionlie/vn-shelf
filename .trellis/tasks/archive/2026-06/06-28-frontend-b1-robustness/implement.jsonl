@@ -1,0 +1,5 @@
+{"file": "AGENTS.md", "reason": "Project instructions: no-step deploy, static-assets-first, play-time field conventions, lint/test commands — implement must respect."}
+{"file": "docs/frontend-improvements.md", "reason": "Source design doc: B1 batch (T1-S1/T1-B1/T1-B2) definitions, rationale, AC."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend pre-development checklist + guidelines index to honor before editing."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality standards (lint/test/forbidden patterns) — even if sparse, canonical reference."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Where vendor/static assets live under public/ (vendor file placement)."}

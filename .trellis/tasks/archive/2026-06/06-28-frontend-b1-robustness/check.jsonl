@@ -1,0 +1,5 @@
+{"file": "AGENTS.md", "reason": "Verify changes respect no-build-step deploy + static-assets-first + project conventions."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality gate: lint/test, forbidden patterns to check against."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend quality/check checklist reference."}
+{"file": ".trellis/tasks/06-28-frontend-b1-robustness/prd.md", "reason": "Acceptance criteria AC1–AC9 to verify against."}
+{"file": ".trellis/tasks/06-28-frontend-b1-robustness/implement.md", "reason": "Step review gates G1–G4 + validation commands to confirm."}
