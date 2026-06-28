@@ -26,12 +26,10 @@ function createApiError(status, payload = {}) {
  */
 async function apiRequest(endpoint, options = {}) {
   const url = API_BASE + endpoint;
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    },
-    ...options
+  const config = { ...options };
+  config.headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
   };
 
   if (options.body && typeof options.body === 'object') {
