@@ -117,3 +117,40 @@ B2 批次5交付物全部落地:(T2-A4)utils.js 抽 withLoading/debounce, settin
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: B3 前端交互可达性与确认UI
+
+**Date**: 2026-06-28
+**Task**: B3 前端交互可达性与确认UI
+**Branch**: `master`
+
+### Summary
+
+B3 批次8交付物落地: (K4/K5/K7)5页 toast aria-live+modal-close aria-label=关闭 x4+search/sort aria-label, utils.js 新增 trapFocus(el)返回清理函数;(K2)index.html vn-card div 改 role=button tabindex=0+@keydown.enter.space(tier 卡片已 button 不动);(K9)toggleMobileMenu 重写同步 aria-expanded+点外部/Esc 关闭+监听卫生,5页 more-menu role=menu/menuitem;(U1)新增 components/confirmDialog.js(Alpine.data, show/confirm/cancel/third, init() 把自身挂到 .app._confirmDialog—必须 init 非 x-init,因后者 this 回落到外层无 show 方法), layout.js injectShell() 渐进注入 progress/bg/toast/confirmDialog 到 <div id=app-shell> 占位, Store.confirm 返回 Promise<boolean|null>;(U1 替换)4处 native confirm 改 .app.confirm: deleteVN/deleteTier/clearTranslationCache(danger) + importData 三按钮(合并/替换/取消导入, null 路径不导入且清空文件输入, 成功 toast 区分 合并/替换 文案);(K3)shared/vnShelf/tierlistPage 的 open/closeDetail/openEdit/closeEdit/openTierEdit/closeTierEdit 接入 trapFocus release, 3内容模态加 role=dialog aria-modal aria-labelledby(放 .modal 面板非 overlay)+Esc 守卫 !.app._confirmDialog?.visible 防叠模态级联; confirmDialog Esc/点遮罩 在有 thirdText 时归 third() 安全项(Esc 不再触发 destructive replace)。布局 confirmDialog overlay z-index 1500 介于内容模态1000与 toast 2000 之间,修复删除弹窗被详情遮住。trellis-check 发现并修真实缺陷: 原 x-init 握手在 Alpine 表达式上下文 this 非组件实例致 show is not a function 报错(改为 init() 内挂);另补 tier/stats 登录项 role=menuitem 一致性。lint/test 62 pass 全绿。沉淀 spec quality-guidelines 四条新约束(native confirm 禁用/模态 role+面板级Esc/可点击div需role+键盘/图标按钮需aria-label+expanded)+Code Review Checklist。fetch-alpine.cjs 用 Node 内置 fetch 重写消 CodeQL shell-injection 告警, sha256 字节一致。AC1-AC12 验证通过, AC13 经用户现场验收(含删除弹窗层级/三按钮/Esc 归属/导入 toast 区分)。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `357b11b` | (see git log) |
+| `5ab9758` | (see git log) |
+| `255e48b` | (see git log) |
+| `ad5c5f0` | (see git log) |
+| `50704e5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
