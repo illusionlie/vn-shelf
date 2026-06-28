@@ -17,11 +17,20 @@ const DEFAULT_TRANSLATION_URL = 'https://illusionlie.github.io/vndb-tags-cn/tags
 // 版本文件 URL（用于轻量级版本检查）
 const DEFAULT_VERSION_URL = 'https://illusionlie.github.io/vndb-tags-cn/version.json';
 
+// 模块级 IndexedDB 连接缓存：复用句柄避免每次操作重新 open
+let _db = null;
+
+// version.json 后台检查的节流窗口（24h），避免每页访问都拉远端
+const VERSION_CHECK_TTL_MS = 24 * 60 * 60 * 1000;
+const VERSION_CHECK_KEY = 'vn-shelf:trans:versionCheckAt';
+
 /**
  * 打开 IndexedDB 数据库
  * @returns {Promise<IDBDatabase>}
  */
 function openTranslationsDB() {
+  if (_db) return Promise.resolve(_db);
+
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(TRANSLATIONS_DB_NAME, 1);
 
@@ -31,7 +40,13 @@ function openTranslationsDB() {
     };
 
     request.onsuccess = () => {
-      resolve(request.result);
+      const db = request.result;
+      // 连接异常关闭时清空缓存，下次自动重建
+      db.onclose = () => { _db = null; };
+      // 版本变化（如其它标签页升级 schema）时主动关闭并清缓存
+      db.onversionchange = () => { db.close(); _db = null; };
+      _db = db;
+      resolve(_db);
     };
 
     request.onupgradeneeded = (event) => {
@@ -62,10 +77,6 @@ async function getFromIndexedDB() {
 
       request.onsuccess = () => {
         resolve(request.result?.value || null);
-      };
-
-      transaction.oncomplete = () => {
-        db.close();
       };
     });
   } catch (error) {
@@ -98,10 +109,6 @@ async function saveToIndexedDB(data) {
       request.onsuccess = () => {
         resolve(true);
       };
-
-      transaction.oncomplete = () => {
-        db.close();
-      };
     });
   } catch (error) {
     console.error('[Translations] Error saving to IndexedDB:', error);
@@ -128,10 +135,6 @@ async function clearTranslationsCache() {
 
       request.onsuccess = () => {
         resolve(true);
-      };
-
-      transaction.oncomplete = () => {
-        db.close();
       };
     });
   } catch (error) {
@@ -285,6 +288,15 @@ async function initTranslations(url, forceRefresh = false) {
  * @param {string} currentVersion - 当前缓存版本
  */
 async function checkForUpdatesInBackground(translationUrl, currentVersion) {
+  // 24h 内跳过远端版本检查，避免每次进站都拉 version.json。
+  // 先标记检查时间再发请求：发起即计费，防止失败时每页反复重试。
+  const lastAt = Number(localStorage.getItem(VERSION_CHECK_KEY) || 0);
+  if (Date.now() - lastAt < VERSION_CHECK_TTL_MS) {
+    console.log('[Translations] Background check: skipped (within TTL)');
+    return;
+  }
+  localStorage.setItem(VERSION_CHECK_KEY, String(Date.now()));
+
   const versionUrl = deriveVersionUrl(translationUrl);
 
   try {
