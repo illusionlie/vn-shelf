@@ -1,0 +1,5 @@
+{"file": "AGENTS.md", "reason": "Project instructions: no-build deploy, static-assets-first, play-time field conventions, lint/test commands."}
+{"file": "docs/frontend-improvements.md", "reason": "Design source: B2 batch (T2-A2/P1/P2/P3/A4) definitions, rationale, ACs."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend pre-development checklist + guidelines index."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "B1-codified contracts to honor: forbidden header merge order, forbidden Date.now id, forbidden runtime CDN."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Where utils.js / components / store live; vendor layout convention."}
