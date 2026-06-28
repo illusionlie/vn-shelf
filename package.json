@@ -3,8 +3,10 @@
   "version": "1.2.0",
   "description": "视觉小说书架 - 部署于Cloudflare Worker",
   "main": "src/index.js",
+  "alpineVersion": "3.14.9",
   "scripts": {
     "dev": "wrangler dev",
+    "fetch:vendor": "node public/js/vendor/fetch-alpine.cjs",
     "deploy": "npm ci && wrangler deploy",
     "tail": "wrangler tail",
     "lint": "eslint \"src/**/*.js\" \"public/js/**/*.js\"",
