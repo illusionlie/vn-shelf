@@ -10,6 +10,7 @@ import {
   clearTranslationsCache,
   DEFAULT_TRANSLATION_URL
 } from '../translations.js';
+import { withLoading } from '../utils.js';
 
 export function settingsPage() {
   return {
@@ -123,17 +124,11 @@ export function settingsPage() {
     async saveVndbToken() {
       if (!this.vndbApiToken) return;
 
-      this.isLoading = true;
-      try {
+      await withLoading(this, async () => {
         await configAPI.update({ vndbApiToken: this.vndbApiToken });
         this.vndbApiToken = '';
-        this.$store.app.addToast('VNDB API Token已保存');
         await this.loadConfig();
-      } catch (error) {
-        this.$store.app.addToast('保存失败: ' + error.message, 'error');
-      } finally {
-        this.isLoading = false;
-      }
+      }, { successMsg: 'VNDB API Token已保存', errorPrefix: '保存失败' });
     },
 
     async changePassword() {
@@ -147,17 +142,11 @@ export function settingsPage() {
         return;
       }
 
-      this.isLoading = true;
-      try {
+      await withLoading(this, async () => {
         await configAPI.update({ newPassword: this.newPassword });
         this.newPassword = '';
         this.confirmPassword = '';
-        this.$store.app.addToast('密码已更新');
-      } catch (error) {
-        this.$store.app.addToast('更新失败: ' + error.message, 'error');
-      } finally {
-        this.isLoading = false;
-      }
+      }, { successMsg: '密码已更新', errorPrefix: '更新失败' });
     },
 
     async startIndex() {
@@ -287,14 +276,12 @@ export function settingsPage() {
     },
 
     async saveTagsConfig() {
-      this.isLoading = true;
-      try {
+      await withLoading(this, async () => {
         await configAPI.update({
           tagsMode: this.config.tagsMode,
           translateTags: this.config.translateTags,
           translationUrl: this.config.translationUrl
         });
-        this.$store.app.addToast('Tags 设置已保存');
 
         // 如果启用了翻译，预加载翻译数据
         if (this.config.tagsMode === 'vndb' && this.config.translateTags) {
@@ -302,11 +289,10 @@ export function settingsPage() {
           await initTranslations(url, false);
           await this.loadTranslationCacheStatus();
         }
-      } catch (error) {
-        this.$store.app.addToast('保存失败: ' + error.message, 'error');
-      } finally {
-        this.isLoading = false;
-      }
+
+        // 失效 appearance 缓存，使其它标签页/组件即时读到新 tags 配置
+        await this.$store.app.loadAppearance({ force: true });
+      }, { successMsg: 'Tags 设置已保存', errorPrefix: '保存失败' });
     },
 
     async clearTranslationCache() {
@@ -332,19 +318,18 @@ export function settingsPage() {
     },
 
     async saveAppearanceConfig() {
-      this.isLoading = true;
-      try {
+      await withLoading(this, async () => {
         await configAPI.update({
           backgroundUrl: this.config.backgroundUrl || '',
           backgroundOverlay: this.config.backgroundOverlay ?? 0.5,
           backgroundBlur: this.config.backgroundBlur ?? 4
         });
-        this.$store.app.addToast('外观设置已保存');
-      } catch (error) {
-        this.$store.app.addToast('保存失败: ' + error.message, 'error');
-      } finally {
-        this.isLoading = false;
-      }
+
+        // 失效 appearance 缓存并用新数据即时应用背景
+        const cfg = await this.$store.app.loadAppearance({ force: true });
+        setBackgroundConfig(cfg);
+        applyBackground(cfg);
+      }, { successMsg: '外观设置已保存', errorPrefix: '保存失败' });
     }
   };
 }

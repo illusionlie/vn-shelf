@@ -78,7 +78,7 @@
     <!-- 控制条 -->
     <div class="controls-bar">
       <div class="search-container">
-        <input type="text" class="search-input" placeholder="搜索视觉小说..." x-model="searchQuery" @input="handleSearch()">
+        <input type="text" class="search-input" placeholder="搜索视觉小说..." x-model="searchQuery" @input="debouncedSearch()">
       </div>
       <select class="sort-select" x-model="sortBy" @change="handleSortChange()">
         <option value="created_desc">最新录入</option>

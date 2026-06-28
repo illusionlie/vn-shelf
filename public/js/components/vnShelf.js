@@ -4,7 +4,7 @@
 
 import { vnAPI } from '../api.js';
 import { renderMarkdown } from '../markdown.js';
-import { formatUserPlayTime, lockPageScroll, unlockPageScroll } from '../utils.js';
+import { debounce, formatUserPlayTime, lockPageScroll, unlockPageScroll } from '../utils.js';
 
 import { createDetailModal, createTagsView } from './shared.js';
 
@@ -25,6 +25,7 @@ export function vnShelf() {
     async init() {
       if (this._initialized) return;
       this._initialized = true;
+      this.debouncedSearch = debounce(this.handleSearch.bind(this), 200);
       this.setupTranslationsRefresh();
       await this.loadConfig();
       await this.initTranslations();
