@@ -10,13 +10,8 @@
   <script defer src="/js/vendor/alpine.min.js"></script>
 </head>
 <body x-data="vnShelf()">
-  <!-- 加载进度条 -->
-  <div class="loading-progress-bar">
-    <div class="progress-fill"></div>
-  </div>
-
-  <!-- 背景-overlay -->
-  <div class="background-overlay"></div>
+  <!-- 公共壳层（进度条 / 背景遮罩 / Toast / 确认对话框，由 layout.js 注入） -->
+  <div id="app-shell"></div>
 
   <!-- 头部 -->
   <header class="main-header">
@@ -58,19 +53,19 @@
           </svg>
         </button>
         <div class="mobile-nav mobile-only">
-          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu" aria-expanded="false" aria-controls="more-menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div id="more-menu" class="more-menu">
-            <a href="/">首页</a>
-            <a href="/tier">Tier List</a>
-            <a href="/stats">统计</a>
-            <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
-            <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          <div id="more-menu" class="more-menu" role="menu">
+            <a href="/" role="menuitem">首页</a>
+            <a href="/tier" role="menuitem">Tier List</a>
+            <a href="/stats" role="menuitem">统计</a>
+            <template x-if="$store.app.isAdmin"><a href="/settings" role="menuitem">设置</a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login" role="menuitem">登录</a></template>
           </div>
         </div>
       </div>
@@ -78,9 +73,9 @@
     <!-- 控制条 -->
     <div class="controls-bar">
       <div class="search-container">
-        <input type="text" class="search-input" placeholder="搜索视觉小说..." x-model="searchQuery" @input="debouncedSearch()">
+        <input type="text" class="search-input" placeholder="搜索视觉小说..." aria-label="搜索视觉小说" x-model="searchQuery" @input="debouncedSearch()">
       </div>
-      <select class="sort-select" x-model="sortBy" @change="handleSortChange()">
+      <select class="sort-select" aria-label="排序方式" x-model="sortBy" @change="handleSortChange()">
         <option value="created_desc">最新录入</option>
         <option value="created_asc">最早录入</option>
         <option value="rating_desc">VNDB评分 ↓</option>
@@ -122,7 +117,7 @@
     <!-- 卡片网格 -->
     <div class="cards-grid" x-show="!isLoading && filteredList.length > 0">
       <template x-for="vn in filteredList" :key="vn.id">
-        <div class="vn-card" @click="openDetail(vn)">
+        <div class="vn-card" role="button" tabindex="0" :aria-label="vn.titleCn || vn.titleJa || vn.title" @click="openDetail(vn)" @keydown.enter.space.prevent="openDetail(vn)">
           <div class="vn-card-image-wrapper" x-data="{ showNsfw: false }">
             <img
               :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
@@ -160,13 +155,13 @@
   </main>
 
   <!-- 详情模态框 -->
-  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()">
-    <div class="modal" x-show="showDetail" x-transition>
+  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeDetail()">
+    <div class="modal" x-ref="detailModal" x-show="showDetail" x-transition role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
       <template x-if="selectedVN">
         <div>
           <div class="modal-header">
-            <h2 class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
-            <button class="modal-close" @click="closeDetail()">&times;</button>
+            <h2 id="detailModalTitle" class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
+            <button class="modal-close" aria-label="关闭" @click="closeDetail()">&times;</button>
           </div>
 
           <div class="modal-body">
@@ -281,11 +276,11 @@
   </div>
 
   <!-- 编辑模态框 -->
-  <div class="modal-overlay" :class="{ active: showEdit }" @click.self="closeEdit()">
-    <div class="modal" x-show="showEdit" x-transition>
+  <div class="modal-overlay" :class="{ active: showEdit }" @click.self="closeEdit()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeEdit()">
+    <div class="modal" x-ref="editModal" x-show="showEdit" x-transition role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
       <div class="modal-header">
-        <h2 class="modal-title" x-text="editForm.isNew ? '添加条目' : '编辑条目'"></h2>
-        <button class="modal-close" @click="closeEdit()">&times;</button>
+        <h2 id="editModalTitle" class="modal-title" x-text="editForm.isNew ? '添加条目' : '编辑条目'"></h2>
+        <button class="modal-close" aria-label="关闭" @click="closeEdit()">&times;</button>
       </div>
 
       <div class="modal-body">
@@ -404,15 +399,6 @@
         <button class="btn btn-primary" @click="saveEdit()">保存</button>
       </div>
     </div>
-  </div>
-
-  <!-- Toast通知 -->
-  <div class="toast-container">
-    <template x-for="toast in $store.app.toasts" :key="toast.id">
-      <div class="toast" :class="'toast-' + toast.type">
-        <span x-text="toast.message"></span>
-      </div>
-    </template>
   </div>
 </body>
 </html>

@@ -52,9 +52,123 @@ export function unlockPageScroll() {
 
 // =========== 移动端菜单 ============
 
+/**
+ * 切换移动端 more-menu：同步 toggle 按钮 aria-expanded，打开时挂“点外部/Esc 关闭”
+ * 监听（关闭即卸载），避免重复绑定与监听泄露。
+ *
+ * - 打开：menu 加 .open、toggle 按钮 aria-expanded=true；下一 tick 挂 document click（点菜单/toggle 外部即关闭）
+ *   与 keydown(Esc) 监听；用 setTimeout(0) 错开当前触发点击，避免开启后立刻自关闭。
+ * - 关闭：移除 .open、aria-expanded=false、卸载监听。
+ */
 export function toggleMobileMenu() {
   const menu = document.getElementById('more-menu');
-  if (menu) menu.classList.toggle('open');
+  const toggleBtn = document.querySelector('.more-menu-toggle-btn');
+  if (!menu || !toggleBtn) return;
+
+  const willOpen = !menu.classList.contains('open');
+  if (willOpen) {
+    menu.classList.add('open');
+    toggleBtn.setAttribute('aria-expanded', 'true');
+
+    const closeHandler = (event) => {
+      if (!menu.contains(event.target) && !toggleBtn.contains(event.target)) {
+        closeMobileMenu(menu, toggleBtn);
+      }
+    };
+    const escHandler = (event) => {
+      if (event.key === 'Escape') {
+        closeMobileMenu(menu, toggleBtn);
+      }
+    };
+
+    menu._mobileMenuClose = closeHandler;
+    menu._mobileMenuEsc = escHandler;
+
+    // 下一 tick 挂 click 监听，避免当前触发点击冒泡到 document 立即关闭
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+    document.addEventListener('keydown', escHandler);
+  } else {
+    closeMobileMenu(menu, toggleBtn);
+  }
+}
+
+function closeMobileMenu(menu, toggleBtn) {
+  menu.classList.remove('open');
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+  if (menu._mobileMenuClose) {
+    document.removeEventListener('click', menu._mobileMenuClose);
+    menu._mobileMenuClose = null;
+  }
+  if (menu._mobileMenuEsc) {
+    document.removeEventListener('keydown', menu._mobileMenuEsc);
+    menu._mobileMenuEsc = null;
+  }
+}
+
+// =========== 焦点陷阱 ============
+
+const FOCUSABLE_SELECTOR =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+/**
+ * 在指定容器内建立焦点陷阱：聚焦首个可聚焦项，Tab/Shift+Tab 在容器内循环不外溢，
+ * 并记录触发元素以便关闭后还原。返回清理函数：移除 keydown 监听并把焦点还原到触发元素。
+ *
+ * 与 lockPageScroll 解耦：滚动锁由调用方各自管理，本函数只管焦点。
+ *
+ * @param {HTMLElement} el - 模态容器（.modal）
+ * @returns {() => void} 清理函数（移除监听 + 还原焦点）
+ */
+export function trapFocus(el) {
+  if (!el) return () => {};
+  const lastFocus = document.activeElement;
+
+  const getFocusables = () =>
+    Array.from(el.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+      node => node.offsetParent !== null || node.getClientRects().length > 0
+    );
+
+  // 聚焦首个可聚焦项
+  const focusFirst = () => {
+    const focusables = getFocusables();
+    if (focusables.length > 0) {
+      focusables[0].focus();
+    } else {
+      el.focus?.();
+    }
+  };
+  focusFirst();
+
+  const onKeydown = (event) => {
+    if (event.key !== 'Tab') return;
+    const focusables = getFocusables();
+    if (focusables.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  el.addEventListener('keydown', onKeydown);
+
+  return () => {
+    el.removeEventListener('keydown', onKeydown);
+    try {
+      if (lastFocus && typeof lastFocus.focus === 'function') {
+        lastFocus.focus();
+      }
+    } catch {
+      // 还原焦点失败时静默降级
+    }
+  };
 }
 
 // =========== 进度条 ============

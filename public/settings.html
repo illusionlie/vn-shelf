@@ -9,13 +9,8 @@
   <script defer src="/js/vendor/alpine.min.js"></script>
 </head>
 <body x-data="settingsPage()">
-  <!-- 加载进度条 -->
-  <div class="loading-progress-bar">
-    <div class="progress-fill"></div>
-  </div>
-
-  <!-- 背景-overlay -->
-  <div class="background-overlay"></div>
+  <!-- 公共壳层（进度条 / 背景遮罩 / Toast / 确认对话框，由 layout.js 注入） -->
+  <div id="app-shell"></div>
 
   <!-- 头部 -->
   <header class="main-header">
@@ -56,18 +51,18 @@
           </svg>
         </button>
         <div class="mobile-nav mobile-only">
-          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu" aria-expanded="false" aria-controls="more-menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div id="more-menu" class="more-menu">
-            <a href="/">首页</a>
-            <a href="/tier">Tier List</a>
-            <a href="/stats">统计</a>
-            <a href="/settings">设置</a>
+          <div id="more-menu" class="more-menu" role="menu">
+            <a href="/" role="menuitem">首页</a>
+            <a href="/tier" role="menuitem">Tier List</a>
+            <a href="/stats" role="menuitem">统计</a>
+            <a href="/settings" role="menuitem">设置</a>
           </div>
         </div>
       </div>
@@ -344,14 +339,5 @@
       </button>
     </section>
   </main>
-
-  <!-- Toast通知 -->
-  <div class="toast-container">
-    <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
-      <div class="toast" :class="'toast-' + toast.type">
-        <span x-text="toast.message"></span>
-      </div>
-    </template>
-  </div>
 </body>
 </html>

@@ -89,6 +89,11 @@ body.modal-open {
   overflow: hidden;
 }
 
+/* Alpine x-cloak：在 Alpine 初始化前隐藏带 x-cloak 的节点，避免对话框等组件首屏闪烁 */
+[x-cloak] {
+  display: none !important;
+}
+
 /* ===== Loading Progress Bar ===== */
 .loading-progress-bar {
   position: fixed;
@@ -705,6 +710,11 @@ img { max-width: 100%; height: auto; display: block; }
 
 .modal-overlay.active .modal {
   transform: scale(1);
+}
+
+/* 确认对话框层级：高于内容模态(1000)、低于 toast(2000) */
+.modal-overlay.confirm-dialog-overlay {
+  z-index: 1500;
 }
 
 .modal-header {

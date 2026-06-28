@@ -9,13 +9,8 @@
   <script defer src="/js/vendor/alpine.min.js"></script>
 </head>
 <body x-data="tierlistPage()">
-  <!-- 加载进度条 -->
-  <div class="loading-progress-bar">
-    <div class="progress-fill"></div>
-  </div>
-
-  <!-- 背景-overlay -->
-  <div class="background-overlay"></div>
+  <!-- 公共壳层（进度条 / 背景遮罩 / Toast / 确认对话框，由 layout.js 注入） -->
+  <div id="app-shell"></div>
 
   <!-- 头部导航 -->
   <header class="main-header">
@@ -57,19 +52,19 @@
           </svg>
         </button>
         <div class="mobile-nav mobile-only">
-          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu">
+          <button class="more-menu-toggle-btn" @click="toggleMobileMenu()" aria-label="Menu" aria-expanded="false" aria-controls="more-menu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div id="more-menu" class="more-menu">
-            <a href="/">首页</a>
-            <a href="/tier" class="active">Tier List</a>
-            <a href="/stats">统计</a>
-            <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
-            <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          <div id="more-menu" class="more-menu" role="menu">
+            <a href="/" role="menuitem">首页</a>
+            <a href="/tier" class="active" role="menuitem">Tier List</a>
+            <a href="/stats" role="menuitem">统计</a>
+            <template x-if="$store.app.isAdmin"><a href="/settings" role="menuitem">设置</a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login" role="menuitem">登录</a></template>
           </div>
         </div>
       </div>
@@ -209,13 +204,13 @@
   </main>
 
   <!-- 详情模态框（复用首页结构） -->
-  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()">
-    <div class="modal" x-show="showDetail" x-transition>
+  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeDetail()">
+    <div class="modal" x-ref="detailModal" x-show="showDetail" x-transition role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
       <template x-if="selectedVN">
         <div>
           <div class="modal-header">
-            <h2 class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
-            <button class="modal-close" @click="closeDetail()">&times;</button>
+            <h2 id="detailModalTitle" class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
+            <button class="modal-close" aria-label="关闭" @click="closeDetail()">&times;</button>
           </div>
 
           <div class="modal-body">
@@ -303,11 +298,11 @@
   </div>
 
   <!-- Tier 编辑模态框 -->
-  <div class="modal-overlay" :class="{ active: showTierEdit }" @click.self="closeTierEdit()">
-    <div class="modal tier-edit-modal" x-show="showTierEdit" x-transition>
+  <div class="modal-overlay" :class="{ active: showTierEdit }" @click.self="closeTierEdit()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeTierEdit()">
+    <div class="modal tier-edit-modal" x-ref="tierEditModal" x-show="showTierEdit" x-transition role="dialog" aria-modal="true" aria-labelledby="tierEditModalTitle">
       <div class="modal-header">
-        <h2 class="modal-title" x-text="editingTier ? '编辑 Tier' : '创建 Tier'"></h2>
-        <button class="modal-close" @click="closeTierEdit()">&times;</button>
+        <h2 id="tierEditModalTitle" class="modal-title" x-text="editingTier ? '编辑 Tier' : '创建 Tier'"></h2>
+        <button class="modal-close" aria-label="关闭" @click="closeTierEdit()">&times;</button>
       </div>
 
       <div class="modal-body">
@@ -347,15 +342,6 @@
         </form>
       </div>
     </div>
-  </div>
-
-  <!-- Toast通知 -->
-  <div class="toast-container">
-    <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
-      <div class="toast" :class="'toast-' + toast.type">
-        <span x-text="toast.message"></span>
-      </div>
-    </template>
   </div>
 </body>
 </html>
