@@ -1,0 +1,6 @@
+{"file": "AGENTS.md", "reason": "Verify changes respect no-build-step deploy + static-assets-first + conventions."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality gate: lint/test, forbidden patterns (header order, Date.now id, runtime CDN)."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify appearance Store flow preserved; confirm dialog via $store.app handshake correct."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend quality/check checklist reference."}
+{"file": ".trellis/tasks/06-28-frontend-b3-a11y-confirm/prd.md", "reason": "Acceptance criteria AC1-AC13 to verify against."}
+{"file": ".trellis/tasks/06-28-frontend-b3-a11y-confirm/implement.md", "reason": "Step review gates G1-G8 + validation commands to confirm."}

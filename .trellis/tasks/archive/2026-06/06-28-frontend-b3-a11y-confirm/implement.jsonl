@@ -1,0 +1,6 @@
+{"file": "AGENTS.md", "reason": "Project instructions: no-build deploy, static-assets-first, lint/test commands."}
+{"file": "docs/frontend-improvements.md", "reason": "Design source: B3 batch (U1/K2/K3/K4/K5/K7/K9/A1) definitions + decision log (D-A progressive shell)."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend pre-development checklist + guidelines index."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "B1-codified contracts: forbidden runtime CDN/header merge/Date.now id; quality gate."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "B2-codified: appearance Store already exists — reuse $store.app for confirm dialog; do not break appearance flow."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Where components/layout/utils live; convention for new confirmDialog.js and layout.js placement."}
