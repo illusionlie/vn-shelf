@@ -4,13 +4,18 @@
  */
 
 import { authAPI, configAPI } from './api.js';
+import { confirmDialog } from './components/confirmDialog.js';
 import { loginPage } from './components/loginPage.js';
 import { settingsPage } from './components/settingsPage.js';
 import { statsPage } from './components/statsPage.js';
 import { tierlistPage } from './components/tierlistPage.js';
 import { vnShelf } from './components/vnShelf.js';
+import { injectShell } from './layout.js';
 import { initTheme, toggleTheme, initBackground } from './theme.js';
 import { initProgressBar, toggleMobileMenu } from './utils.js';
+
+// 在 Alpine 初始化前注入公共壳层（进度条 / 背景遮罩 / Toast / confirmDialog）
+injectShell();
 
 // ============ 全局状态 ============
 
@@ -26,6 +31,7 @@ document.addEventListener('alpine:init', () => {
     _initialized: false,
     appearance: null,
     _appearancePromise: null,
+    _confirmDialog: null,
 
     init() {
       if (this._initialized) return;
@@ -141,6 +147,19 @@ document.addEventListener('alpine:init', () => {
 
     removeToast(id) {
       this.toasts = this.toasts.filter(t => t.id !== id);
+    },
+
+    /**
+     * 全局确认对话框：驱动 confirmDialog 组件显示，返回 Promise<boolean>。
+     * confirmDialog 组件通过自身 init() 把自身挂到本 Store（init 里 this 是组件实例，可正确暴露 show 方法）。
+     * 若组件未挂载（极端时序），回退返回 false，不阻塞业务。
+     *
+     * @param {Object} [opts] - 透传给 confirmDialog.show
+     * @returns {Promise<boolean>} true=确认、false=取消
+     */
+    async confirm(opts = {}) {
+      if (!this._confirmDialog) return false;
+      return this._confirmDialog.show(opts);
     }
   });
 
@@ -150,6 +169,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('settingsPage', settingsPage);
   Alpine.data('statsPage', statsPage);
   Alpine.data('tierlistPage', tierlistPage);
+  Alpine.data('confirmDialog', confirmDialog);
 });
 
 // 注册全局函数（供 HTML onclick 使用）
