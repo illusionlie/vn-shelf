@@ -154,3 +154,40 @@ B3 批次8交付物落地: (K4/K5/K7)5页 toast aria-live+modal-close aria-label
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: B4 前端拖拽键盘化与安全兜底
+
+**Date**: 2026-07-03
+**Task**: B4 前端拖拽键盘化与安全兜底
+**Branch**: `master`
+
+### Summary
+
+B4 批次5交付物落地:(S3)theme.js safeBackgroundUrl 用 new URL+http/https 白名单拒换行/;/注释/javascript:/data:注入, 相对路径仍通过;(S4)api.js friendlyErrorMessage 按 code→status 映射, 5xx/网络合成通用文案, 4xx/本地保留后端友好中文 message 直出(因 src/utils.js errorResponse 返回无 code 字段且 message 已友好), apiRequest 网络失败封 code:NETWORK 防 Failed to fetch 泄露, 14 处 toast+withLoading 全接入;(B3-small)onDragOver null targetId 注释兜底末端+抽 applyDrop 鼠标/键盘共用;(K1)tier.html 卡片 :tabindex isAdmin?0:-1/:aria-grabbed/:aria-label/@keydown, tierlistPage.js onCardKeydown(Enter 抓取/方向键移 dropIndicator/Enter 提交/Esc 取消, Space 不拦截保留原生 click 开详情—键盘用户重排+开详情两能力并存), 非 admin tabindex=-1 不可 Tab 且 onCardKeydown 早退, 鼠标/键盘互斥双向早退, renderer 复用 .dragging 高亮;(S2)自托管 marked 18.0.5+dompurify 3.4.11 到 vendor/(.min.js 命名入 eslint 豁免, 内容为上游未压缩 ESM), markdown.js 重写为 186 行薄封装+完整 renderer 复刻 md-* 全套类(style.css 依赖), isSafeUrl 前移到 renderer.link/image, renderer.html 转义裸 HTML, DOMPurify 浏览器侧纵深防御(Node 无 DOM 降级不抛), 删自实现 parser 445→186 行, renderMarkdown 签名与 2 x-html 调用点不变, 测试扩展 6 fuzz(js:/data:/CSS 注释/嵌套/script/style)旧 5 断言字节不变。fetch:vendor 一脚本拉三 vendor(alpine+marked+dompurify)Node 内置 fetch, 各 sha256 校验。trellis-check 验证 4 处 deviation 前提均经读 src/router.js 源码确认成立。lint/test 68 pass 含 9 markdown 全绿。沉淀 spec: vendor .min.js 命名例外(未压缩 ESM 亦可)+friendlyErrorMessage 分层语义(5xx 合成 vs 4xx 保留)。AC1-AC11 验证通过, AC12 经用户现场验收(键盘拖拽/Esc/Space=开详情/非 admin 不可 Tab/背景注入/错误 toast 友好/markdown 多行段落间距)。已知 parity gap: ==高亮==/^上标^/~下标~ 非 GFM 标记不再生成, 若真实 review 数据用到会视觉退化, 留后续补救。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e0ecc1a` | (see git log) |
+| `9ded589` | (see git log) |
+| `65f00c5` | (see git log) |
+| `f028393` | (see git log) |
+| `6339474` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
