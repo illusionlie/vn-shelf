@@ -24,13 +24,11 @@ Vendor minified bundles (`public/js/vendor/*.min.js`) and `.cjs` helper scripts 
 
 ## Required Patterns
 
-- **Self-hosted vendor with reproducible fetch script.** To add a runtime front-end lib: place the minified bundle under `public/js/vendor/<name>.min.js`, record its locked version as a root field in `package.json` (e.g. `alpineVersion`), and add a `fetch:vendor`-style script that re-downloads by that version and prints a sha256 for upgrade audit.
+- **Self-hosted vendor with reproducible fetch script.** To add a runtime front-end lib: place the bundle under `public/js/vendor/<name>.min.js`, record its locked version as a root field in `package.json` (e.g. `alpineVersion`/`markedVersion`/`purifyVersion`), and add a `fetch:vendor` script that downloads by those versions and prints a sha256 per file for upgrade audit. The `.min.js` suffix is the lint-ignore entry — name consistently to fall under `eslint.config.js` `**/*.min.js` ignore. NOTE: `.min.js` here means "lint-ignored vendor file", not literally minified — when upstream publishes only unminified ESM (marked `lib/marked.esm.js`, dompurify `dist/purify.es.mjs`), the unminified ESM is saved AS `name.min.js`, flagged in the fetch script; renderer/callers `import` from it normally. ONE `fetch:vendor` script can pull multiple libs; alpine+marked+dompurify all live behind `public/js/vendor/fetch-vendor.cjs`.
 - **`apiRequest` default header survival.** Default headers that must survive caller-supplied `options` are applied AFTER spreading `options`, never via a leading `headers` key that `...options` later overwrites.
+- **Friendly error toasts via `friendlyErrorMessage(error, prefix)`.** User-facing error toasts MUST NOT leak raw technical text (`Failed to fetch` / `HTTP <status>` / server stack). Call `friendlyErrorMessage(error, prefix)` (in `api.js`): it returns `${prefix}：${friendly}` for 5xx/network/unknown (synthesized generic copy) and `${prefix}：${serverOrLocalMessage}` for 4xx/local-validation throws that already carry authored Chinese user-facing text. Premise: `src/utils.js errorResponse(message, status)` returns `{success, error}` with NO `code` field and the `error` string is already friendly — so 4xx messages are MORE precise preserved verbatim than a generic map. The raw `error.message` is only ever `console.warn`'d, never toasted unless it's a friendly authored string. `apiRequest` network failure is wrapped into `createApiError(0, {error:'网络请求失败', code:'NETWORK'})` so `Failed to fetch` never reaches a toast.
 - **Native `confirm()` is forbidden for new flows.** Use the global `await this.$store.app.confirm({ title, message, confirmText, cancelText, danger })` Promise dialog instead (the `confirmDialog` component injected by `public/js/layout.js`). Native `confirm()` blocks the UI, is un-stylable, and is keyboard-inaccessible; the ambiguous “OK=merge / Cancel=replace” antipattern is not allowed — use two explicit text buttons via `confirmText`/`cancelText`.
 - **Modals need `role="dialog" aria-modal="true" aria-labelledby`** (on the panel `.modal`, NOT the `.modal-overlay` backdrop) + a focus trap (`trapFocus` from `utils.js`) on open + focus restore on close. `@keydown.escape` lives on the panel with `.stop` so a stacked confirmDialog does NOT cascade-close the content modal behind it — never rely on `window`-level Esc listener registration order.
-
-- **Self-hosted vendor with reproducible fetch script.** To add a runtime front-end lib: place the minified bundle under `public/js/vendor/<name>.min.js`, record its locked version as a root field in `package.json` (e.g. `alpineVersion`), and add a `fetch:vendor`-style script that re-downloads by that version and prints a sha256 for upgrade audit.
-- **`apiRequest` default header survival.** Default headers that must survive caller-supplied `options` are applied AFTER spreading `options`, never via a leading `headers` key that `...options` later overwrites.
 
 ---
 
@@ -46,7 +44,7 @@ Vendor minified bundles (`public/js/vendor/*.min.js`) and `.cjs` helper scripts 
 Front-end changes must pass these before commit:
 
 - `npm run lint && npm run test` exit 0.
-- No runtime third-party CDN; vendor self-hosted with `fetch:vendor` reproducible.
+- No runtime third-party CDN; vendor self-hosted with `fetch:vendor` reproducible (see Required Patterns for the `.min.js` naming convention covering unminified ESM bundles).
 - No native `confirm()` / `alert()` in new flows — use `$store.app.confirm`.
 - Clickable `<div>` has `role=button tabindex=0 + @keydown.enter.space + :aria-label`, or is a native `<button>`.
 - Modal has `role=dialog aria-modal aria-labelledby` on the panel + `trapFocus` on open + focus restore on close + panel-level Esc with `.stop`.
