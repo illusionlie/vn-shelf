@@ -1,0 +1,6 @@
+{"file": "AGENTS.md", "reason": "Project instructions: no-build deploy, static-assets-first, play-time field conventions, lint/test commands."}
+{"file": "docs/frontend-improvements.md", "reason": "Design source: B4 batch (K1/B3-small/S2/S3/S4) + decision log (D-S marked+DOMPurify, keep md-code-* classes)."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend pre-development checklist + guidelines index."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "B1/B3 spec contracts: vendor self-host + fetch:vendor; forbid runtime CDN/native confirm; modal role."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "B2 appearance Store flow must not break; api.js createApiError feeds S4 friendlyErrorMessage."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "vendor layout convention for marked/purify bundles."}

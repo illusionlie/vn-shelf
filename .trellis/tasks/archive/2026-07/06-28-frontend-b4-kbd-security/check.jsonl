@@ -1,0 +1,6 @@
+{"file": "AGENTS.md", "reason": "Verify changes respect no-build-step deploy + static-assets-first + conventions."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality gate: lint/test, forbidden patterns (header merge, Date.now id, runtime CDN, native confirm), vendor self-host contract."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify appearance Store + api createApiError flow preserved; S4 friendlyErrorMessage wires in cleanly."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend quality/check checklist reference."}
+{"file": ".trellis/tasks/06-28-frontend-b4-kbd-security/prd.md", "reason": "Acceptance criteria AC1-AC12 to verify against."}
+{"file": ".trellis/tasks/06-28-frontend-b4-kbd-security/implement.md", "reason": "Step review gates G1-G6 + validation commands to confirm."}
