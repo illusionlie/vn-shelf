@@ -1,445 +1,186 @@
 /**
- * 增强版 Markdown 渲染模块
- * 支持常用 Markdown 语法，保持轻量级和安全性
+ * Markdown 渲染模块（薄封装）
+ *
+ * 实现：marked（GFM + breaks）+ 自定义 renderer 复刻原自实现解析器的 `md-*` 类名输出，
+ * 再过 DOMPurify 做纵深防御净化。删除了原手写 escapeHtml/isSafeUrl/parseInline/parseBlock
+ * /parseDocument 等解析逻辑——安全兜底由 renderer 侧 URL/HTML 过滤 + DOMPurify 共同承担。
+ *
+ * 设计要点：
+ * - `renderMarkdown(text) => html` 签名不变（2 个 x-html 调用点与安全测试均依赖）。
+ * - renderer.code/codespan 复刻 `md-code-block`/`md-code[ language-x]`/`md-code-inline`，
+ *   语言名经 `/^[a-z0-9]{1,32}$/i` 白名单，非法/标点/超长/无语言名降级为不带 `language-`。
+ * - 其余 renderer（heading/list/link/image/table/blockquote/strong/em/del/...）补回 `md-*` 类，
+ *   保持 style.css `.detail-review-content .md-*` 选择器视觉一致。
+ * - link/image 在 renderer 侧即做 URL 白名单（http/https/mailto/相对/锚点），拒绝 javascript:
+ *   /data:/vbscript: 等；html renderer 转义裸 HTML——二者使安全测试可在无 DOM 的 Node 下验证，
+ *   DOMPurify 在浏览器侧再过一遍作为纵深防御。
+ * - DOMPurify 在无 DOM 环境（Node 测试）下其 default 导出的 sanitize 不可用，renderMarkdown
+ *   探测后降级为直接返回 marked 输出（此时 renderer 侧过滤已保证安全）。
  */
 
-/**
- * 转义 HTML 特殊字符
- * @param {string} text - 原始文本
- * @returns {string} 转义后的文本
- */
-function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
+import { marked, Renderer } from './vendor/marked.min.js';
+import DOMPurify from './vendor/purify.min.js';
 
 /**
- * 检查 URL 是否安全（防止 XSS）
- * 只允许 http、https、mailto 协议和相对路径
- * @param {string} url - 要检查的 URL
+ * URL 安全校验：仅允许 http/https/mailto、相对路径与锚点。
+ * 拒绝 javascript:/data:/vbscript:/file: 等任何其它显式协议，以及协议相对 URL（//host）。
+ * @param {string} url
  * @returns {boolean}
  */
 function isSafeUrl(url) {
   if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
 
-  const trimmedUrl = url.trim();
-  if (!trimmedUrl) return false;
-
-  // 去除控制字符与空白，防止 javascript:\nalert(1) 这类混淆绕过
-  // eslint-disable-next-line no-control-regex
-  const normalizedForProtocol = trimmedUrl.replace(/[\u0000-\u001F\u007F\s]+/g, '');
-  const lowerNormalizedUrl = normalizedForProtocol.toLowerCase();
-
-  // 允许锚点
-  if (lowerNormalizedUrl.startsWith('#')) {
+  if (lower.startsWith('#')) return true;
+  if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('mailto:')) {
     return true;
   }
+  // 绝对路径相对路径放行，但拒绝协议相对 URL（//example.com）
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return true;
+  if (trimmed.startsWith('./') || trimmed.startsWith('../')) return true;
 
-  // 允许相对路径，明确拒绝协议相对 URL（//example.com）
-  if (trimmedUrl.startsWith('/') && !trimmedUrl.startsWith('//')) {
-    return true;
-  }
-  if (trimmedUrl.startsWith('./') || trimmedUrl.startsWith('../')) {
-    return true;
-  }
-
-  // 严格白名单：仅允许 http、https、mailto
-  if (
-    lowerNormalizedUrl.startsWith('http://') ||
-    lowerNormalizedUrl.startsWith('https://') ||
-    lowerNormalizedUrl.startsWith('mailto:')
-  ) {
-    return true;
-  }
-
-  // 任何显式协议（如 javascript:, data:, vbscript:, file:）一律拒绝
-  if (/^[a-z][a-z0-9+.-]*:/i.test(lowerNormalizedUrl)) {
-    return false;
-  }
-
-  // 其余视为无协议的相对路径（如 example.com/path）
+  // 任何其它显式协议一律拒绝；无协议的裸路径（example.com/x）视为相对路径放行
+  if (/^[a-z][a-z0-9+.-]*:/i.test(lower)) return false;
   return true;
 }
 
-/**
- * 解析内联元素（粗体、斜体、删除线、代码、链接、图片）
- * @param {string} text - 已转义的文本
- * @returns {string} 解析后的 HTML
- */
-function parseInline(text) {
-  // 图片 ![alt](url) - 必须在链接之前处理
-  text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
-    const safeAlt = alt.replace(/"/g, '&quot;');
-    // 验证 URL 安全性
-    if (!isSafeUrl(url)) {
-      return '<span class="md-image-unsafe" title="不安全的图片链接已禁用">[图片]</span>';
-    }
-    const safeUrl = url.trim().replace(/"/g, '&quot;');
-    return `<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" class="md-image">`;
-  });
-
-  // 链接 [text](url)
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
-    // 验证 URL 安全性
-    if (!isSafeUrl(url)) {
-      return `<span class="md-link-unsafe" title="不安全的链接已禁用">${linkText}</span>`;
-    }
-    const safeUrl = url.trim().replace(/"/g, '&quot;');
-    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="md-link">${linkText}</a>`;
-  });
-
-  // 粗体 **text** 或 __text__
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="md-strong">$1</strong>');
-  text = text.replace(/__(.+?)__/g, '<strong class="md-strong">$1</strong>');
-
-  // 斜体 *text* 或 _text_（注意避免与粗体冲突）
-  text = text.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em class="md-em">$1</em>');
-  text = text.replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '<em class="md-em">$1</em>');
-
-  // 删除线 ~~text~~
-  text = text.replace(/~~(.+?)~~/g, '<del class="md-del">$1</del>');
-
-  // 行内代码 `code`
-  text = text.replace(/`([^`]+)`/g, '<code class="md-code-inline">$1</code>');
-
-  // 标记文本 ==text==（高亮）
-  text = text.replace(/==(.+?)==/g, '<mark class="md-mark">$1</mark>');
-
-  // 上标 ^text^
-  text = text.replace(/\^([^^]+)\^/g, '<sup class="md-sup">$1</sup>');
-
-  // 下标 ~text~（注意与删除线区分）
-  text = text.replace(/(?<!~)~(?!~)([^~]+)(?<!~)~(?!~)/g, '<sub class="md-sub">$1</sub>');
-
-  return text;
+/** 双引号转义用于属性值拼接 */
+function escapeAttr(value) {
+  return String(value || '').replace(/"/g, '&quot;');
 }
 
-/**
- * 解析多行文本为行数组
- * @param {string} text - 原始文本
- * @returns {string[]} 行数组
- */
-function parseLines(text) {
-  return text.split('\n');
-}
+const renderer = new Renderer();
 
-const CODE_BLOCK_LANG_PATTERN = /^[A-Za-z0-9_-]+$/;
-const CODE_BLOCK_LANG_MAX_LENGTH = 32;
+// 代码块：复刻 `<pre class="md-code-block"><code class="md-code[ language-x]">${text}</code></pre>`
+// marked 已对 text 做转义，无需手动 escape。
+renderer.code = function code({ text, lang }) {
+  const safeLang = /^[a-z0-9]{1,32}$/i.test(lang || '') ? lang : '';
+  const langClass = safeLang ? ` language-${safeLang}` : '';
+  return `<pre class="md-code-block"><code class="md-code${langClass}">${text}</code></pre>`;
+};
 
-/**
- * 安全净化代码块语言名（用于 class 拼接）
- * 仅允许字母、数字、下划线、短横线，超长或非法输入降级为空。
- * @param {string} lang - 原始语言名
- * @returns {string} 安全语言名或空字符串
- */
-function sanitizeCodeBlockLanguage(lang) {
-  if (typeof lang !== 'string') return '';
+renderer.codespan = function codespan({ text }) {
+  return `<code class="md-code-inline">${text}</code>`;
+};
 
-  const normalizedLang = lang.trim();
-  if (!normalizedLang) return '';
+renderer.heading = function heading({ tokens, depth }) {
+  return `<h${depth} class="md-heading md-h${depth}">${this.parser.parseInline(tokens)}</h${depth}>`;
+};
 
-  if (normalizedLang.length > CODE_BLOCK_LANG_MAX_LENGTH) {
-    return '';
+renderer.hr = function hr() {
+  return '<hr class="md-hr">';
+};
+
+renderer.blockquote = function blockquote({ tokens }) {
+  return `<blockquote class="md-blockquote">${this.parser.parse(tokens)}</blockquote>`;
+};
+
+renderer.paragraph = function paragraph({ tokens }) {
+  return `<p class="md-paragraph">${this.parser.parseInline(tokens)}</p>`;
+};
+
+renderer.strong = function strong({ tokens }) {
+  return `<strong class="md-strong">${this.parser.parseInline(tokens)}</strong>`;
+};
+
+renderer.em = function em({ tokens }) {
+  return `<em class="md-em">${this.parser.parseInline(tokens)}</em>`;
+};
+
+renderer.del = function del({ tokens }) {
+  return `<del class="md-del">${this.parser.parseInline(tokens)}</del>`;
+};
+
+renderer.br = function br() {
+  return '<br class="md-br">';
+};
+
+renderer.link = function link({ href, title, tokens }) {
+  const text = this.parser.parseInline(tokens);
+  if (!isSafeUrl(href)) {
+    return `<span class="md-link-unsafe" title="不安全的链接已禁用">${text}</span>`;
   }
+  const titleAttr = title ? ` title="${escapeAttr(title)}"` : '';
+  return `<a href="${escapeAttr(href)}"${titleAttr} target="_blank" rel="noopener noreferrer" class="md-link">${text}</a>`;
+};
 
-  if (!CODE_BLOCK_LANG_PATTERN.test(normalizedLang)) {
-    return '';
+renderer.image = function image({ href, title, text }) {
+  if (!isSafeUrl(href)) {
+    return '<span class="md-image-unsafe" title="不安全的图片链接已禁用">[图片]</span>';
   }
+  const titleAttr = title ? ` title="${escapeAttr(title)}"` : '';
+  return `<img src="${escapeAttr(href)}" alt="${escapeAttr(text)}"${titleAttr} loading="lazy" class="md-image">`;
+};
 
-  return normalizedLang;
-}
+renderer.list = function list(e) {
+  const tag = e.ordered ? 'ol' : 'ul';
+  const listClass = e.ordered ? 'md-list md-list-ordered' : 'md-list md-list-unordered';
+  let body = '';
+  for (const item of e.items) {
+    body += this.listitem(item);
+  }
+  const startAttr = e.ordered && e.start != null && e.start !== 1 ? ` start="${e.start}"` : '';
+  return `<${tag} class="${listClass}"${startAttr}>\n${body}\n</${tag}>`;
+};
+
+renderer.listitem = function listitem(e) {
+  const content = this.parser.parse(e.tokens);
+  if (e.task) {
+    // 任务列表项：marked 的 checkbox token 已在 e.tokens 内被 parse 为 <input>，
+    // 用 .md-task label 包裹以复刻原样式。
+    return `<li class="md-list-item md-task-item"><label class="md-task">${content}</label></li>\n`;
+  }
+  return `<li class="md-list-item">${content}</li>\n`;
+};
+
+renderer.table = function table(e) {
+  let header = '';
+  for (const cell of e.header) header += this.tablecell(cell);
+  let body = '';
+  for (const row of e.rows) {
+    let cells = '';
+    for (const cell of row) cells += this.tablecell(cell);
+    body += this.tablerow({ text: cells });
+  }
+  return `<table class="md-table">\n<tr class="md-row md-row-header">\n${header}\n</tr>\n${body}\n</table>`;
+};
+
+renderer.tablerow = function tablerow({ text }) {
+  return `<tr class="md-row">\n${text}\n</tr>\n`;
+};
+
+renderer.tablecell = function tablecell(e) {
+  const content = this.parser.parseInline(e.tokens);
+  const tag = e.header ? 'th' : 'td';
+  const alignAttr = e.align ? ` align="${e.align}"` : '';
+  return `<${tag} class="md-cell"${alignAttr}>${content}</${tag}>\n`;
+};
+
+// 裸 HTML 视为文本转义（与原自实现一致：原解析器对非 Markdown 行经 escapeHtml 后落段落），
+// 既保持渲染样式又避免 XSS；浏览器侧 DOMPurify 再过一遍作纵深防御。
+renderer.html = function html({ text }) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+};
+
+marked.use({ renderer, breaks: true, gfm: true });
 
 /**
- * 渲染 Markdown 文本
+ * 渲染 Markdown 文本为 HTML 字符串。
  * @param {string} text - Markdown 文本
  * @returns {string} HTML 字符串
  */
 export function renderMarkdown(text) {
   if (!text) return '';
-
-  // 预处理：统一换行符
-  const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  // 分行处理
-  const lines = parseLines(normalizedText);
-  const result = [];
-  let i = 0;
-
-  // 处理代码块状态
-  let inCodeBlock = false;
-  let codeBlockContent = [];
-  let codeBlockLang = '';
-
-  // 处理列表状态
-  let inList = false;
-  let listType = ''; // 'ul' or 'ol'
-  let listItems = [];
-
-  // 处理引用块状态
-  let inBlockquote = false;
-  let blockquoteLines = [];
-
-  // 处理表格状态
-  let inTable = false;
-  let tableRows = [];
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmedLine = line.trim();
-
-    // === 代码块处理 ===
-    if (trimmedLine.startsWith('```')) {
-      if (!inCodeBlock) {
-        // 开始代码块
-        inCodeBlock = true;
-        codeBlockLang = sanitizeCodeBlockLanguage(trimmedLine.slice(3));
-        codeBlockContent = [];
-      } else {
-        // 结束代码块
-        inCodeBlock = false;
-        const langClass = codeBlockLang ? ` language-${codeBlockLang}` : '';
-        const escapedContent = escapeHtml(codeBlockContent.join('\n'));
-        result.push(`<pre class="md-code-block"><code class="md-code${langClass}">${escapedContent}</code></pre>`);
-        codeBlockLang = '';
-        codeBlockContent = [];
-      }
-      i++;
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeBlockContent.push(line);
-      i++;
-      continue;
-    }
-
-    // === 空行处理 ===
-    if (trimmedLine === '') {
-      // 关闭列表
-      if (inList) {
-        flushList(result, listItems, listType);
-        inList = false;
-        listItems = [];
-        listType = '';
-      }
-      // 关闭引用块
-      if (inBlockquote) {
-        flushBlockquote(result, blockquoteLines);
-        inBlockquote = false;
-        blockquoteLines = [];
-      }
-      // 关闭表格
-      if (inTable) {
-        flushTable(result, tableRows);
-        inTable = false;
-        tableRows = [];
-      }
-      i++;
-      continue;
-    }
-
-    // === 标题处理 ===
-    const headingMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      // 关闭之前的块级元素
-      if (inList) { flushList(result, listItems, listType); inList = false; listItems = []; listType = ''; }
-      if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-      if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-      const level = headingMatch[1].length;
-      const content = parseInline(escapeHtml(headingMatch[2]));
-      result.push(`<h${level} class="md-heading md-h${level}">${content}</h${level}>`);
-      i++;
-      continue;
-    }
-
-    // === 水平分割线 ===
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmedLine)) {
-      if (inList) { flushList(result, listItems, listType); inList = false; listItems = []; listType = ''; }
-      if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-      if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-      result.push('<hr class="md-hr">');
-      i++;
-      continue;
-    }
-
-    // === 引用块处理 ===
-    if (trimmedLine.startsWith('>')) {
-      // 关闭其他块级元素
-      if (inList) { flushList(result, listItems, listType); inList = false; listItems = []; listType = ''; }
-      if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-      if (!inBlockquote) {
-        inBlockquote = true;
-        blockquoteLines = [];
-      }
-      // 移除开头的 > 和可选空格
-      blockquoteLines.push(trimmedLine.replace(/^>\s?/, ''));
-      i++;
-      continue;
-    }
-
-    // === 无序列表处理 ===
-    const ulMatch = trimmedLine.match(/^[-*+]\s+(.+)$/);
-    if (ulMatch) {
-      if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-      if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-      if (!inList || listType !== 'ul') {
-        if (inList) { flushList(result, listItems, listType); }
-        inList = true;
-        listType = 'ul';
-        listItems = [];
-      }
-      listItems.push(parseInline(escapeHtml(ulMatch[1])));
-      i++;
-      continue;
-    }
-
-    // === 有序列表处理 ===
-    const olMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
-    if (olMatch) {
-      if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-      if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-      if (!inList || listType !== 'ol') {
-        if (inList) { flushList(result, listItems, listType); }
-        inList = true;
-        listType = 'ol';
-        listItems = [];
-      }
-      listItems.push(parseInline(escapeHtml(olMatch[2])));
-      i++;
-      continue;
-    }
-
-    // === 任务列表处理 ===
-    const taskMatch = trimmedLine.match(/^[-*+]\s+\[([ xX])\]\s+(.+)$/);
-    if (taskMatch) {
-      if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-      if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-      if (!inList) {
-        inList = true;
-        listType = 'ul';
-        listItems = [];
-      }
-      const checked = taskMatch[1].toLowerCase() === 'x' ? ' checked' : '';
-      const content = parseInline(escapeHtml(taskMatch[2]));
-      listItems.push(`<label class="md-task"><input type="checkbox"${checked} disabled>${content}</label>`);
-      i++;
-      continue;
-    }
-
-    // === 表格处理 ===
-    if (trimmedLine.includes('|')) {
-      // 检查是否是表格行
-      const tableMatch = trimmedLine.match(/^\|?(.+)\|?$/);
-      if (tableMatch) {
-        const cells = tableMatch[1].split('|').map(cell => cell.trim());
-
-        // 检查是否是分隔行
-        if (cells.every(cell => /^[-:]+$/.test(cell))) {
-          // 这是分隔行，跳过（对齐方式暂不处理）
-          i++;
-          continue;
-        }
-
-        if (!inTable) {
-          if (inList) { flushList(result, listItems, listType); inList = false; listItems = []; listType = ''; }
-          if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-          inTable = true;
-          tableRows = [];
-        }
-        tableRows.push(cells);
-        i++;
-        continue;
-      }
-    }
-
-    // === 普通段落 ===
-    // 关闭其他块级元素
-    if (inList) { flushList(result, listItems, listType); inList = false; listItems = []; listType = ''; }
-    if (inBlockquote) { flushBlockquote(result, blockquoteLines); inBlockquote = false; blockquoteLines = []; }
-    if (inTable) { flushTable(result, tableRows); inTable = false; tableRows = []; }
-
-    // 处理段落中的换行（两个空格或反斜杠结尾）
-    let paragraphContent = parseInline(escapeHtml(trimmedLine));
-
-    // 检查是否需要软换行
-    if (trimmedLine.endsWith('  ') || trimmedLine.endsWith('\\')) {
-      paragraphContent = paragraphContent.replace(/( {2}|\\)$/, '<br class="md-br">');
-    }
-
-    result.push(`<p class="md-paragraph">${paragraphContent}</p>`);
-    i++;
+  const raw = marked.parse(text);
+  // 无 DOM 环境（Node 测试）下 DOMPurify.sanitize 不可用，降级返回 marked 输出
+  // （此时 renderer 侧 URL/HTML 过滤已保证安全）。
+  if (DOMPurify && typeof DOMPurify.sanitize === 'function') {
+    return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
   }
-
-  // 处理未关闭的块级元素
-  if (inCodeBlock) {
-    const langClass = codeBlockLang ? ` language-${codeBlockLang}` : '';
-    const escapedContent = escapeHtml(codeBlockContent.join('\n'));
-    result.push(`<pre class="md-code-block"><code class="md-code${langClass}">${escapedContent}</code></pre>`);
-  }
-  if (inList) {
-    flushList(result, listItems, listType);
-  }
-  if (inBlockquote) {
-    flushBlockquote(result, blockquoteLines);
-  }
-  if (inTable) {
-    flushTable(result, tableRows);
-  }
-
-  return result.join('\n');
-}
-
-/**
- * 刷新列表到结果
- */
-function flushList(result, items, type) {
-  if (items.length === 0) return;
-
-  const tag = type === 'ol' ? 'ol' : 'ul';
-  const listClass = type === 'ol' ? 'md-list md-list-ordered' : 'md-list md-list-unordered';
-
-  const listItems = items.map(item => {
-    // 检查是否已经是任务列表项
-    if (item.startsWith('<label')) {
-      return `<li class="md-list-item md-task-item">${item}</li>`;
-    }
-    return `<li class="md-list-item">${item}</li>`;
-  }).join('\n');
-
-  result.push(`<${tag} class="${listClass}">\n${listItems}\n</${tag}>`);
-}
-
-/**
- * 刷新引用块到结果
- */
-function flushBlockquote(result, lines) {
-  if (lines.length === 0) return;
-
-  // 递归处理引用块内容（支持嵌套 Markdown）
-  const content = renderMarkdown(lines.join('\n'));
-  result.push(`<blockquote class="md-blockquote">${content}</blockquote>`);
-}
-
-/**
- * 刷新表格到结果
- */
-function flushTable(result, rows) {
-  if (rows.length === 0) return;
-
-  const tableRows = rows.map((row, index) => {
-    const tag = index === 0 ? 'th' : 'td';
-    const cells = row.map(cell => `<${tag} class="md-cell">${parseInline(escapeHtml(cell))}</${tag}>`).join('');
-    const rowClass = index === 0 ? 'md-row md-row-header' : 'md-row';
-    return `<tr class="${rowClass}">${cells}</tr>`;
-  }).join('\n');
-
-  result.push(`<table class="md-table">\n${tableRows}\n</table>`);
+  return raw;
 }
