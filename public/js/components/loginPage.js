@@ -2,7 +2,7 @@
  * VN Shelf 登录页组件
  */
 
-import { authAPI } from '../api.js';
+import { authAPI, friendlyErrorMessage } from '../api.js';
 
 export function loginPage() {
   return {
@@ -49,7 +49,9 @@ export function loginPage() {
         await authAPI.login(this.password);
         window.location.href = '/';
       } catch (error) {
-        this.error = error.message;
+        // authAPI.init/login 的 4xx 返回中文友好文案（密码错误/密码长度至少6位等），
+        // friendlyErrorMessage 会保留；5xx/网络错误统一友好文案，不暴露技术文本。
+        this.error = friendlyErrorMessage(error, '登录失败');
       } finally {
         this.isLoading = false;
       }

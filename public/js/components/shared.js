@@ -5,7 +5,7 @@
  * 方法内的 this 指向宿主组件实例。
  */
 
-import { vnAPI } from '../api.js';
+import { friendlyErrorMessage, vnAPI } from '../api.js';
 import {
   DEFAULT_TRANSLATION_URL,
   getFromIndexedDB,
@@ -119,7 +119,7 @@ export function createDetailModal() {
           }
         });
       } catch (error) {
-        this.$store.app.addToast('加载详情失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '加载详情失败'), 'error');
       }
     },
 

@@ -2,7 +2,7 @@
  * VN Shelf 主页书架组件
  */
 
-import { vnAPI } from '../api.js';
+import { friendlyErrorMessage, vnAPI } from '../api.js';
 import { renderMarkdown } from '../markdown.js';
 import { debounce, formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
 
@@ -39,7 +39,7 @@ export function vnShelf() {
         this.vnList = res.data || [];
         this.filteredList = this.vnList;
       } catch (error) {
-        this.$store.app.addToast('加载失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '加载失败'), 'error');
       } finally {
         this.isLoading = false;
       }
@@ -235,7 +235,9 @@ export function vnShelf() {
         this.closeEdit();
         await this.loadVNList();
       } catch (error) {
-        this.$store.app.addToast('保存失败: ' + error.message, 'error');
+        // normalizePlayTimeInput 的本地校验 throw（友好文案，无 status）会被
+        // friendlyErrorMessage 第 4 支保留；vnAPI 的服务端错误走 5xx/4xx 分支。
+        this.$store.app.addToast(friendlyErrorMessage(error, '保存失败'), 'error');
       }
     },
 
@@ -254,7 +256,7 @@ export function vnShelf() {
         this.closeDetail();
         await this.loadVNList();
       } catch (error) {
-        this.$store.app.addToast('删除失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '删除失败'), 'error');
       }
     },
 

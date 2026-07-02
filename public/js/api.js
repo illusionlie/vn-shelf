@@ -19,6 +19,94 @@ function createApiError(status, payload = {}) {
 }
 
 /**
+ * 后端错误 code → 用户友好文案映射表。
+ * 与 createApiError 同源：后端返回的 {code} 经 createApiError 劝入 error.code，
+ * 前端约定 code 字段优先于 message。
+ */
+const FRIENDLY_CODE_MAP = {
+  UNAUTHORIZED: '请先登录',
+  FORBIDDEN: '没有权限执行此操作',
+  NOT_FOUND: '资源不存在',
+  VALIDATION: '输入内容有误',
+  CONFLICT: '操作冲突，请刷新后重试',
+  RATE_LIMIT: '操作过于频繁，请稍后再试',
+  SERVER_ERROR: '服务器暂时不可用，请稍后重试',
+  NETWORK: '网络连接失败，请检查后重试'
+};
+
+/**
+ * createApiError 的 `HTTP <status>` 兑底 message 识别。后端 errorResponse 返回的
+ * 中文友好文案不会匹配此模式，可安全区分“技术兑底串”与“服务端友好串”。
+ */
+const HTTP_FALLBACK_RE = /^HTTP \d{3}$/i;
+
+/**
+ * 将 API 错误转换为用户面友好 toast 文案。
+ *
+ * 设计原则（与后端实际行为对齐）：
+ * - 后端 `errorResponse(message, status)` 返回 `{success:false, error: message}`，
+ *   **不含 code 字段**，且 message 均为中文友好文案（如 `密码错误`/`未授权`/`VN 不存在`/`密码长度至少6位`）。
+ * - 因此“技术文本透传”的真实风险面是：5xx 未处理异常的裸 message、网络层 `Failed to fetch`、
+ *   以及 createApiError 的 `HTTP <status>` 兑底串——本函数仅对这些情形生成通用友好文案，
+ *   不暴露原始文本。
+ * - 对 4xx（含本地校验 throw）的友好 message，直接沿用比泛化映射更精准（`密码错误` 优于 `请先登录`）。
+ *
+ * 解析顺序：
+ *   1. `error.code` 命中映射表 → 用映射文案
+ *   2. 网络错误（status===0 且无可用友好 message）→ NETWORK 文案
+ *   3. 5xx → SERVER_ERROR 文案（隐藏可能的后端异常文本）
+ *   4. 存在非 `HTTP xxx` 兑底的 message（4xx 服务端友好文案或本地校验友好串）→ 沿用
+ *   5. 按 status 映射兑底，最后退回 `<prefix>`
+ *
+ * 注意：本地 throw new Error('友好文案') 的校验错误也会走第 4 支（status=0、message 为友好串），
+ * 会被保留；但 JSON.parse 等技术异常的 message（如 'Unexpected token...'）同样是 status=0 +
+ * 非 HTTP 兑底串，会被误保留——因此调用方对“本地解析/校验”应单独捕获并产出友好文案，
+ * 不要依赖本函数过滤技术文本（见 settingsPage.importData 的分层 catch）。
+ *
+ * @param {{code?:string|null,status?:number,message?:string}|Error} error
+ * @param {string} [prefix='操作失败'] - 业务前缀（如“保存失败”、“加载失败”）
+ * @returns {string} 友好 toast 文案
+ */
+export function friendlyErrorMessage(error, prefix = '操作失败') {
+  const code = error?.code || null;
+  const status = Number(error?.status) || 0;
+  const message = error?.message || '';
+  const hasFriendlyMessage = Boolean(message) && !HTTP_FALLBACK_RE.test(message);
+
+  console.warn('[friendlyErrorMessage]', { prefix, code, status, error: message || String(error) });
+
+  // 1. code 优先（NETWORK 经 apiRequest 网络层封装填入）
+  if (code && FRIENDLY_CODE_MAP[code]) {
+    return `${prefix}：${FRIENDLY_CODE_MAP[code]}`;
+  }
+
+  // 2. 网络层失败（status=0 且无服务端友好 message）
+  if (status === 0 && !hasFriendlyMessage) {
+    return `${prefix}：${FRIENDLY_CODE_MAP.NETWORK}`;
+  }
+
+  // 3. 5xx：后端可能透传未处理异常的裸 message，统一友好文案不暴露
+  if (status >= 500) {
+    return `${prefix}：${FRIENDLY_CODE_MAP.SERVER_ERROR}`;
+  }
+
+  // 4. 4xx 服务端友好文案 / 本地校验友好串：沿用
+  if (hasFriendlyMessage) {
+    return `${prefix}：${message}`;
+  }
+
+  // 5. 按 status 映射兑底
+  if (status === 401) return `${prefix}：${FRIENDLY_CODE_MAP.UNAUTHORIZED}`;
+  if (status === 403) return `${prefix}：${FRIENDLY_CODE_MAP.FORBIDDEN}`;
+  if (status === 404) return `${prefix}：${FRIENDLY_CODE_MAP.NOT_FOUND}`;
+  if (status === 409) return `${prefix}：${FRIENDLY_CODE_MAP.CONFLICT}`;
+  if (status === 429) return `${prefix}：${FRIENDLY_CODE_MAP.RATE_LIMIT}`;
+
+  // 无任何可用信息：只返回前缀，绝不拼接裸技术文本
+  return prefix;
+}
+
+/**
  * 发送API请求
  * @param {string} endpoint - 端点
  * @param {Object} options - 请求选项
@@ -36,7 +124,18 @@ async function apiRequest(endpoint, options = {}) {
     config.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(url, config);
+  let response;
+  try {
+    response = await fetch(url, config);
+  } catch (networkError) {
+    // 网络层失败（离线/DNS/断网）：统一封装为 NETWORK 错误，避免裸 'Failed to fetch'
+    // 技术文本透传到 friendlyErrorMessage。
+    console.warn('[api] network request failed', {
+      endpoint,
+      error: networkError?.message || String(networkError)
+    });
+    throw createApiError(0, { error: '网络请求失败', code: 'NETWORK' });
+  }
 
   let data = {};
   try {

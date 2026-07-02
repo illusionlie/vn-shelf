@@ -2,7 +2,7 @@
  * VN Shelf 设置页组件
  */
 
-import { authAPI, configAPI, indexAPI, dataAPI } from '../api.js';
+import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI } from '../api.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
   initTranslations,
@@ -72,7 +72,7 @@ export function settingsPage() {
           backgroundBlur: 4
         };
       } catch (error) {
-        this.$store.app.addToast('加载配置失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '加载配置失败'), 'error');
       }
     },
 
@@ -156,7 +156,7 @@ export function settingsPage() {
         this.$store.app.addToast(`索引已启动，共${res.data.total}个条目`);
         await this.loadIndexStatus();
       } catch (error) {
-        this.$store.app.addToast('启动索引失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '启动索引失败'), 'error');
       } finally {
         this.isLoading = false;
       }
@@ -174,7 +174,7 @@ export function settingsPage() {
         URL.revokeObjectURL(url);
         this.$store.app.addToast('导出成功');
       } catch (error) {
-        this.$store.app.addToast('导出失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '导出失败'), 'error');
       }
     },
 
@@ -184,10 +184,21 @@ export function settingsPage() {
 
       try {
         const text = await file.text();
-        const data = JSON.parse(text);
+
+        // 文件读取 / JSON 解析 / 结构校验：均为本地可控错误，产出友好文案直出，
+        // 不走 friendlyErrorMessage（JSON.parse 的 'Unexpected token...' 是技术文本，
+        // 会绕过 friendlyErrorMessage 的 5xx/网络过滤，所以这里单独捕获并替换为友好提示）。
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          this.$store.app.addToast('导入失败：文件不是有效的 JSON', 'error');
+          return;
+        }
 
         if (!data.entries || !Array.isArray(data.entries)) {
-          throw new Error('无效的导入文件格式');
+          this.$store.app.addToast('导入失败：无效的导入文件格式', 'error');
+          return;
         }
 
         const choice = await this.$store.app.confirm({
@@ -200,7 +211,6 @@ export function settingsPage() {
         });
         // true=null 语义：true=合并、false=替换、null=取消导入（放弃不弹错）
         if (choice === null) {
-          event.target.value = '';
           return;
         }
         const mode = choice ? 'merge' : 'replace';
@@ -215,11 +225,12 @@ export function settingsPage() {
         const actionText = mode === 'merge' ? '合并' : '替换';
         this.$store.app.addToast(`导入成功（${actionText}），共${data.entries.length}个条目`);
       } catch (error) {
-        this.$store.app.addToast('导入失败: ' + error.message, 'error');
+        // 服务端导入错误（5xx/网络/4xx 友好文案）经 friendlyErrorMessage 处理
+        this.$store.app.addToast(friendlyErrorMessage(error, '导入失败'), 'error');
+      } finally {
+        // 清空文件输入
+        event.target.value = '';
       }
-
-      // 清空文件输入
-      event.target.value = '';
     },
 
     async logout() {
@@ -227,7 +238,7 @@ export function settingsPage() {
         await authAPI.logout();
         window.location.href = '/login';
       } catch (error) {
-        this.$store.app.addToast('退出失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '退出失败'), 'error');
       }
     },
 
@@ -323,7 +334,7 @@ export function settingsPage() {
         this.translationCacheStatus = null;
         this.$store.app.addToast('翻译缓存已清除');
       } catch (error) {
-        this.$store.app.addToast('清除缓存失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '清除缓存失败'), 'error');
       }
     },
 

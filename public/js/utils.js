@@ -1,3 +1,5 @@
+import { friendlyErrorMessage } from './api.js';
+
 /**
  * VN Shelf 工具函数模块
  */
@@ -236,7 +238,7 @@ export async function withLoading(ctx, asyncFn, { successMsg = '', errorPrefix =
     return result;
   } catch (error) {
     console.warn('[withLoading]', { errorPrefix, error: error?.message || String(error) });
-    ctx.$store?.app?.addToast(`${errorPrefix}: ${error?.message || error}`, 'error');
+    ctx.$store?.app?.addToast(friendlyErrorMessage(error, errorPrefix), 'error');
   } finally {
     ctx.isLoading = false;
   }

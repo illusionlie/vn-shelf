@@ -2,7 +2,7 @@
  * VN Shelf 统计页组件
  */
 
-import { statsAPI } from '../api.js';
+import { friendlyErrorMessage, statsAPI } from '../api.js';
 
 export function statsPage() {
   return {
@@ -22,7 +22,7 @@ export function statsPage() {
         const res = await statsAPI.get();
         this.stats = res.data || res;
       } catch (error) {
-        this.$store.app.addToast('加载统计失败: ' + error.message, 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, '加载统计失败'), 'error');
       } finally {
         this.isLoading = false;
       }
