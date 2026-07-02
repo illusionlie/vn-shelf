@@ -3,7 +3,9 @@
  */
 
 import { friendlyErrorMessage, vnAPI, tierAPI } from '../api.js';
+import { UNTIERED_KEY, DEFAULT_TIER_COLOR, MAX_BATCH_TIER_UPDATES } from '../constants.js';
 import { renderMarkdown } from '../markdown.js';
+import { computeTierDiff } from '../tier-diff.js';
 import { formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
 
 import { createDetailModal, createTagsView } from './shared.js';
@@ -23,7 +25,7 @@ export function tierlistPage() {
     editingTier: null,
     tierForm: {
       name: '',
-      color: '#ff4757'
+      color: DEFAULT_TIER_COLOR
     },
     isSavingTier: false,
 
@@ -36,7 +38,6 @@ export function tierlistPage() {
     keyboardDragging: false,
     keyboardGrabbedVN: null,
 
-    MAX_BATCH_TIER_UPDATES: 200,
     _initialized: false,
 
     async init() {
@@ -160,11 +161,11 @@ export function tierlistPage() {
     },
 
     resolveTierKey(tierId) {
-      return tierId || '__untiered__';
+      return tierId || UNTIERED_KEY;
     },
 
     getItemsByTierKey(tierKey) {
-      if (tierKey === '__untiered__') {
+      if (tierKey === UNTIERED_KEY) {
         return this.untieredVN || [];
       }
       return this.tieredVN[tierKey] || [];
@@ -189,7 +190,7 @@ export function tierlistPage() {
       this.editingTier = null;
       this.tierForm = {
         name: '',
-        color: '#ff4757'
+        color: DEFAULT_TIER_COLOR
       };
       if (!this.showTierEdit) {
         lockPageScroll();
@@ -202,7 +203,7 @@ export function tierlistPage() {
       this.editingTier = tier;
       this.tierForm = {
         name: tier?.name || '',
-        color: tier?.color || '#ff4757'
+        color: tier?.color || DEFAULT_TIER_COLOR
       };
       if (!this.showTierEdit) {
         lockPageScroll();
@@ -349,7 +350,7 @@ export function tierlistPage() {
      * @returns {string[]}
      */
     orderedTierKeys() {
-      return [...this.tiers.map(t => t.id), '__untiered__'];
+      return [...this.tiers.map(t => t.id), UNTIERED_KEY];
     },
 
     /**
@@ -540,10 +541,15 @@ export function tierlistPage() {
         return;
       }
 
-      for (let index = 0; index < payloads.length; index += this.MAX_BATCH_TIER_UPDATES) {
-        const chunk = payloads.slice(index, index + this.MAX_BATCH_TIER_UPDATES);
-        await vnAPI.batchUpdateTier(chunk);
+      // 分片：扁平 payloads 列表按 MAX_BATCH_TIER_UPDATES 切片，各 chunk 互不相交，
+      // 并行提交安全；顺序语义上各片独立落库，最终全片结果一致。
+      const chunks = [];
+      for (let i = 0; i < payloads.length; i += MAX_BATCH_TIER_UPDATES) {
+        chunks.push(payloads.slice(i, i + MAX_BATCH_TIER_UPDATES));
       }
+      // 任一 chunk 失败即 reject 整体 Promise，调用方（applyDrop）catch 触发 loadVNList 回滚，
+      // 行为与原串行版一致（串行任一失败同样 reject）。
+      await Promise.all(chunks.map(chunk => vnAPI.batchUpdateTier(chunk)));
     },
 
     /**
@@ -554,73 +560,13 @@ export function tierlistPage() {
      * 键盘走 resetKeyboardDrag）。
      *
      * @param {string} draggedId - 被移动的 VN id
-     * @param {string} targetTierKey - 目标 tier key（'__untiered__' 或 tier.id）
+     * @param {string} targetTierKey - 目标 tier key（UNTIERED_KEY 或 tier.id）
      * @param {number|undefined} insertIndex - 期望插入位置；undefined 时兑底到末尾
      */
     async applyDrop(draggedId, targetTierKey, insertIndex) {
-      const vn = this.allVN.find(item => item.id === draggedId);
-      if (!vn) return;
-
-      const targetTierId = targetTierKey === '__untiered__' ? null : targetTierKey;
-      const sourceTierId = vn.tierId || null;
-      const sourceTierKey = this.resolveTierKey(sourceTierId);
-      const orderedTargetItems = [...this.getItemsByTierKey(targetTierKey)];
-
-      if (insertIndex === undefined || !Number.isFinite(Number(insertIndex))) {
-        insertIndex = orderedTargetItems.filter(item => item.id !== draggedId).length;
-      }
-
-      const payloadMap = new Map();
-      const addPayload = (id, nextTierId, nextTierSort = undefined) => {
-        if (typeof id !== 'string' || !id) return;
-        payloadMap.set(id, { id, tierId: nextTierId, tierSort: nextTierSort });
-      };
-
-      const collectReorderDiff = (beforeItems, afterItems, tierIdForItems) => {
-        const beforeIndexMap = new Map(beforeItems.map((item, index) => [item.id, index]));
-        afterItems.forEach((item, index) => {
-          const prevIndex = beforeIndexMap.get(item.id);
-          if (prevIndex !== index) {
-            addPayload(item.id, tierIdForItems, index);
-          }
-        });
-      };
-
-      if (!targetTierId) {
-        if (sourceTierId !== null) {
-          addPayload(draggedId, null, undefined);
-
-          const sourceBefore = [...this.getItemsByTierKey(sourceTierKey)];
-          const sourceAfter = sourceBefore.filter(item => item.id !== draggedId);
-          collectReorderDiff(sourceBefore, sourceAfter, sourceTierId);
-        }
-      } else {
-        const targetBefore = [...orderedTargetItems];
-        const targetAfter = orderedTargetItems.filter(item => item.id !== draggedId);
-
-        insertIndex = Math.max(0, Math.min(insertIndex, targetAfter.length));
-        targetAfter.splice(insertIndex, 0, vn);
-
-        const nextOrderIds = targetAfter.map(item => item.id);
-        const prevOrderIds = targetBefore.map(item => item.id);
-        const sameOrder = sourceTierId === targetTierId &&
-          nextOrderIds.length === prevOrderIds.length &&
-          nextOrderIds.every((id, idx) => id === prevOrderIds[idx]);
-
-        if (sameOrder) {
-          return;
-        }
-
-        collectReorderDiff(targetBefore, targetAfter, targetTierId);
-
-        if (sourceTierId && sourceTierId !== targetTierId) {
-          const sourceBefore = [...this.getItemsByTierKey(sourceTierKey)];
-          const sourceAfter = sourceBefore.filter(item => item.id !== draggedId);
-          collectReorderDiff(sourceBefore, sourceAfter, sourceTierId);
-        }
-      }
-
-      const payloads = Array.from(payloadMap.values());
+      // diff 计算抽离为纯函数 computeTierDiff（见 public/js/tier-diff.js），便于单测。
+      // 此处只负责提交、本地状态同步与失败回滚。
+      const payloads = computeTierDiff({ allVN: this.allVN, draggedId, targetTierKey, insertIndex });
       if (payloads.length === 0) {
         return;
       }
