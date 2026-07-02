@@ -180,7 +180,12 @@ export function initProgressBar() {
   const progressFill = progressBar?.querySelector('.progress-fill');
   if (!progressFill) return;
 
+  // 守卫：bfcache 重现或重复 init 时，若进度条已隐藏则不再启动动画，
+  // 避免已完成却再跑一遍进度条导致闪烁。
+  if (progressBar.classList.contains('hidden')) return;
+
   let progress = 0;
+  let finished = false;
   const interval = setInterval(() => {
     progress += Math.random() * 15;
     if (progress >= 90) {
@@ -190,25 +195,30 @@ export function initProgressBar() {
     progressFill.style.width = progress + '%';
   }, 200);
 
-  // 页面加载完成时
-  window.addEventListener('load', () => {
+  const finish = () => {
+    if (finished) return;
+    finished = true;
     clearInterval(interval);
-    if (progressFill) {
-      progressFill.style.width = '100%';
-      setTimeout(() => {
-        if (progressBar) progressBar.classList.add('hidden');
-      }, 500);
-    }
-  });
-
-  // Fallback: 3秒后隐藏
-  setTimeout(() => {
-    clearInterval(interval);
-    if (progressFill) progressFill.style.width = '100%';
+    progressFill.style.width = '100%';
     setTimeout(() => {
       if (progressBar) progressBar.classList.add('hidden');
     }, 500);
-  }, 3000);
+  };
+
+  // 主源 1：window load。若 DOM 已 complete（脚本晚于 load 触发）立即完成。
+  if (document.readyState === 'complete') {
+    finish();
+  } else {
+    window.addEventListener('load', finish, { once: true });
+  }
+
+  // 主源 2：bfcache 前进后退触发 pageshow（persisted=true 表示从 bfcache 恢复）。
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) finish();
+  }, { once: true });
+
+  // 兜底：极端情况下 5s 强制完成（单次，finished 守卫保证不重复）。
+  setTimeout(finish, 5000);
 }
 
 
