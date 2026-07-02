@@ -1071,7 +1071,7 @@ async function handleUpdateVNTier(request, env, id, auth) {
 
 async function handleGetStats(request, env) {
   const list = await getVNList(env);
-  return jsonResponse(list.stats);
+  return successResponse(list.stats);
 }
 
 // ============ 索引接口 ============

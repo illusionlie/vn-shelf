@@ -20,7 +20,7 @@ export function statsPage() {
       this.isLoading = true;
       try {
         const res = await statsAPI.get();
-        this.stats = res.data || res;
+        this.stats = res.data;
       } catch (error) {
         this.$store.app.addToast(friendlyErrorMessage(error, '加载统计失败'), 'error');
       } finally {
