@@ -115,6 +115,40 @@ export async function initBackground() {
   }
 }
 
+/**
+ * 校验背景图 URL 安全性：仅允许 http/https 协议（含同源相对路径），
+ * 拒绝换行 / 分号 / CSS 注释等可越权写入额外 CSS 的字符，拒绝 data: / javascript: 等协议。
+ *
+ * - 相对路径（`./bg.webp`、`/bg.webp`）经 `new URL(url, origin)` 解析为同源 http(s)，通过。
+ * - 旧实现仅转义 `"`/`\`，未拦换行与 CSS 注释，存在 CSS 注入面；本批次收紧到 http/https 白名单。
+ * - 原 data: URI 背景用例按 PRD 收紧不再放行（recon 未发现 data: 背景配置）。
+ *
+ * @param {string} raw - 原始 backgroundUrl 配置值
+ * @returns {string|null} 安全的绝对 URL；不合法时返回 null（调用方应跳过渲染）
+ */
+function safeBackgroundUrl(raw) {
+  const url = String(raw || '').trim();
+  if (!url) return null;
+
+  // 拒绝换行 / 回车 / 分号 / CSS 注释起始，防止越权追加额外 CSS 声明
+  if (/[\n\r;]/.test(url) || url.includes('/*')) {
+    console.warn('[theme] backgroundUrl rejected: contains newline/semicolon/comment', { url });
+    return null;
+  }
+
+  try {
+    const u = new URL(url, window.location.origin);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      console.warn('[theme] backgroundUrl rejected: non-http(s) protocol', { protocol: u.protocol });
+      return null;
+    }
+    return u.href;
+  } catch {
+    console.warn('[theme] backgroundUrl rejected: invalid URL', { url });
+    return null;
+  }
+}
+
 export function applyBackground(config) {
   if (!config || !config.backgroundUrl) {
     document.body.style.backgroundImage = '';
@@ -123,7 +157,15 @@ export function applyBackground(config) {
     return;
   }
 
-  const safeUrl = config.backgroundUrl.replace(/["\\]/g, '\\$&');
+  const safeUrl = safeBackgroundUrl(config.backgroundUrl);
+  if (!safeUrl) {
+    // 不合法 URL 不渲染背景，避免把未净化的字符串写入 body style
+    document.body.style.backgroundImage = '';
+    document.body.classList.remove('has-bg-image');
+    applyBackgroundOverlay();
+    return;
+  }
+
   document.body.style.backgroundImage = `url("${safeUrl}")`;
   document.body.classList.add('has-bg-image');
   applyBackgroundOverlay();
