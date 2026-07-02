@@ -36,6 +36,7 @@
 - **现状**：`this.stats = res.data || res` 的兜底揭示后端 `/api/stats` 等接口信封与其它 `{data}` 包裹不一致。
 - **影响**：前端处处防御性兜底，类型语义模糊。
 - **修复方法**：统一后端信封为 `{success, data, ...}`（或前端 `apiRequest` 统一解包），删除前端 `|| res` 兜底。**此项偏后端，本计划标记为关联项，不在前端批次内单独执行**，仅记录。
+- **进展（2026-07-03，B5a T5-M3）**：`/api/stats` 已统一为 `successResponse(list.stats)`，前端 `statsPage.js` 删除 `|| res` 兜底改用 `res.data`，A3 在 stats 一处闭环。本轮未全量扫描其它接口信封，余下不一致留作观察项。
 - **验收**：所有 `apiRequest` 调用点对返回形态有统一假设，无 `|| res` 残留。
 
 #### A4. `settingsPage` 四处 `save*` 样板重复
@@ -305,13 +306,13 @@
 - **T4-S4** · 错误 toast 友好化（code→文案） · [约定 code 表；`withLoading` 兜底；`shared.js:95`/`vnShelf.js:142`/settings 多处] · 用户面无裸 stack · 依赖 T2-A4 · 低 · M
 
 ### 批次 B5
-- **T5-P4** · Tier 分片并行提交 · [`tierlistPage.js:285`] · 顺序语义不变、耗时下降 · 无 · 中 · S
+- **T5-P4** ✅（2026-07-03 B5a）· Tier 分片并行提交 · [`tierlistPage.js:285`] · 顺序语义不变、耗时下降 · 无 · 中 · S
 - **T5-P5** · CSS 拆分 + 断点补全 · [`public/css/style.css` → base + 组件] · 首屏体积下降、断点合理 · 无 · 中 · L
-- **T5-P6** · 进度条单轨逻辑 · [`utils.js:74`] · bfcache/前进后退正确 · 无 · 低 · S
-- **T5-M1** · `computeTierDiff` 纯函数化 + 单测；markdown 语法测试 · [`tierlistPage.js`、`tests/`] · 新增用例全绿 · 依赖 T4-K1 · 中 · M
-- **T5-M2** · `constants.js` 统一魔法字符串（与后端常量同源） · [`public/js/constants.js`、`tierlistPage.js`、`router.js` 注释] · 单一来源 · 无 · 低 · M
+- **T5-P6** ✅（2026-07-03 B5a）· 进度条单轨逻辑 · [`utils.js:74`] · bfcache/前进后退正确 · 无 · 低 · S
+- **T5-M1** ✅（2026-07-03 B5a）· `computeTierDiff` 纯函数化 + 单测；markdown 语法测试 · [`tierlistPage.js`、`tests/`] · 新增用例全绿 · 依赖 T4-K1 · 中 · M
+- **T5-M2** ✅（2026-07-03 B5a）· `constants.js` 统一魔法字符串（与后端常量同源） · [`public/js/constants.js`、`tierlistPage.js`、`router.js` 注释] · 单一来源 · 无 · 低 · M
 - **T5-U3** · i18n 框架接入 + 文案迁移 · [`public/js/i18n.js` + 词典] · 切语言 toast 状态随变 · 无 · 中 · L
-- **T5-M3/A3** · Store 承载 translations/config；删除 `|| res` 兜底 · 受 B2/M3 前置 · 无 · 中 · M
+- **T5-M3/A3** ✅（2026-07-03 B5a，stats 一处闭环）· Store 承载 translations/config；删除 `|| res` 兜底 · 受 B2/M3 前置 · 无 · 中 · M
 - 人工走查：键盘 Tab 全屏走查（含模态、拖拽、卡片、toast、表单）→ 出走查报告。
 
 ### 验收门禁
