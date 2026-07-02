@@ -97,22 +97,28 @@
             </div>
             <div
               class="tier-items"
+              role="list"
+              :aria-label="tier.name"
               :class="{ 'drag-over': dragOverTierId === tier.id }"
               @dragover="onDragOver(tier.id, $event)"
               @dragleave="onDragLeave(tier.id, $event)"
               @drop="onDrop(tier.id, $event)"
             >
               <template x-for="(vn, index) in getTierItems(tier.id)" :key="vn.id">
-                <div class="tier-vn-slot">
+                <div class="tier-vn-slot" role="listitem">
                   <div class="tier-drop-indicator" x-show="isDropBefore(tier.id, index)"></div>
                   <button
                     type="button"
                     class="tier-vn-card"
                     :class="{ dragging: draggedVN?.id === vn.id }"
                     :draggable="$store.app.isAdmin"
+                    :tabindex="$store.app.isAdmin ? 0 : -1"
+                    :aria-grabbed="keyboardDragging && draggedVN?.id === vn.id ? 'true' : 'false'"
+                    :aria-label="(vn.titleCn || vn.titleJa || vn.title) + ' · ' + tier.name"
                     @dragstart="onDragStart(vn, $event)"
                     @dragend="onDragEnd()"
                     @click="openDetail(vn)"
+                    @keydown="onCardKeydown(vn, $event)"
                     :data-vn-id="vn.id"
                     x-data="{ showNsfw: false }"
                   >
@@ -159,22 +165,28 @@
             <h2 class="settings-section-title">未分类</h2>
             <div
               class="untiered-grid"
+              role="list"
+              aria-label="未分类"
               :class="{ 'drag-over': dragOverTierId === '__untiered__' }"
               @dragover="onDragOver('__untiered__', $event)"
               @dragleave="onDragLeave('__untiered__', $event)"
               @drop="onDropToUntiered($event)"
             >
               <template x-for="(vn, index) in untieredVN" :key="vn.id">
-                <div class="tier-vn-slot">
+                <div class="tier-vn-slot" role="listitem">
                   <div class="tier-drop-indicator" x-show="isDropBefore(null, index)"></div>
                   <button
                     type="button"
                     class="tier-vn-card"
                     :class="{ dragging: draggedVN?.id === vn.id }"
                     draggable="true"
+                    :tabindex="$store.app.isAdmin ? 0 : -1"
+                    :aria-grabbed="keyboardDragging && draggedVN?.id === vn.id ? 'true' : 'false'"
+                    :aria-label="(vn.titleCn || vn.titleJa || vn.title) + ' · 未分类'"
                     @dragstart="onDragStart(vn, $event)"
                     @dragend="onDragEnd()"
                     @click="openDetail(vn)"
+                    @keydown="onCardKeydown(vn, $event)"
                     :data-vn-id="vn.id"
                     x-data="{ showNsfw: false }"
                   >
