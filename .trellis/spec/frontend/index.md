@@ -14,12 +14,12 @@ This directory contains guidelines for frontend development. Fill in each file w
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition | Partial（shared.js mixin 约定已沉淀） |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
+| [Directory Structure](./directory-structure.md) | Module organization and file layout | Filled (B1: vendor layout; project structure) |
+| [Component Guidelines](./component-guidelines.md) | Component patterns, mixin composition, a11y | Filled (shared.js mixin + props/styling/a11y/mistakes) |
+| [Hook Guidelines](./hook-guidelines.md) | Stateful logic extraction in Alpine.js (no React hooks) | Filled (Alpine equivalents of React hooks; mixin factories; data fetching) |
+| [State Management](./state-management.md) | Local state, global store, server state | Filled (B2: appearance Store + Promise dedupe + config endpoint split + IDB cache) |
+| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns, a11y | Filled (B1/B3/B4: vendor self-host, header merge, Date.now id, native confirm, modal role/Esc, keyboard div, friendlyError layering, code-review checklist) |
+| [Type Safety](./type-safety.md) | Runtime validation in plain JS (no TypeScript) | Filled (defensive read patterns, form normalization, array/number guards) |
 
 ---
 

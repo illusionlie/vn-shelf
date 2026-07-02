@@ -64,30 +64,36 @@ export function myPage() {
 
 ## Props Conventions
 
-<!-- How props should be defined and typed -->
+This project has **no props** — Alpine.data components are factory functions returning plain objects, mounted via HTML `x-data="componentName()"`. Parent↔child data flow happens through:
 
-(To be filled by the team)
+- **`Alpine.store('app')`** for cross-component/cross-page shared state (`isAdmin`, `isLoading`, `toasts`, `appearance`, `_confirmDialog`, the `confirm()` Promise API). See `state-management.md`.
+- **`x-model`** binding HTML inputs directly to component fields (no controlled-prop plumbing).
+- **Mixin factories** (`createTagsView()` / `createDetailModal()` in `shared.js`) for composing shared logic into a page component via object spread — see "Component Structure" above.
+
+Do NOT invent a prop-passing API; Alpine's reactivity model doesn't need one. If two components on the same page must coordinate, promote the shared field to `Alpine.store('app')` rather than threading it through the DOM.
 
 ---
 
 ## Styling Patterns
 
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
-
-(To be filled by the team)
+- **Single global stylesheet**: `public/css/style.css` (~1900 lines), served as-is by Worker Assets. No CSS-modules, Tailwind, styled-components, or build-time processing.
+- **Class naming**: BEM-ish scoped by component (`.vn-card`, `.vn-card-image-wrapper`, `.modal`, `.modal-header`, `.tier-vn-card`, `.toast`, `.toast-error`). Convention: block-element-modifier via hyphens; state classes `.active` / `.dragging` / `.hidden` toggled by Alpine `:class`.
+- **Alpine binds DOM ↔ field**: prefers `x-show` / `:class` / `:style` over imperative DOM ops. Inline `:style` is allowed only for truly dynamic per-instance values (e.g. NSFW overlay radius, dragged-card transform) — structural styling goes in `style.css`.
+- **Dark mode**: `body.dark-mode` class (set by `theme.js` from `localStorage.theme`) overrides CSS variables; do not write `prefers-color-scheme` media queries — the toggle is manual.
+- **Focus-visible**: every interactive element should have a visible `:focus-visible` outline. The project has historically under-covered this (B3 audit found only ~7 focus selectors) — when adding new interactive elements, add the `:focus-visible` rule alongside the install.
 
 ---
 
 ## Accessibility
 
-<!-- A11y requirements and patterns -->
-
-(To be filled by the team)
+See `.trellis/spec/frontend/quality-guidelines.md` — a11y is fully codified there (forbidden native `confirm()`, modal `role=dialog` + `trapFocus` + panel-level Esc, `@click` divs need `role+tabindex+@keydown`, icon buttons need `aria-label`, toggles need `aria-expanded`/`aria-controls`, `aria-live` for toasts). Do not duplicate those rules here; apply them whenever you build a new component.
 
 ---
 
 ## Common Mistakes
 
-<!-- Component-related mistakes your team has made -->
-
-(To be filled by the team)
+- **Duplicating shared logic across page components.** `vnShelf.js` and `tierlistPage.js` once each had ~80 lines of identical tag-config/detail-modal code, drifted into two method names (`getDisplayTags` vs `getDetailTags`) and broke HTML bindings. Always spread `createTagsView()` / `createDetailModal()` from `shared.js` instead.
+- **Binding `this` in `x-init` expressions.** `$store.app._confirmDialog = this` did NOT bind the component instance — `this` in an `x-init` Alpine expression resolves to the outer evaluation context (often `window`), so `.show` was `undefined`. Bind store handshakes inside the component's `init()` method where `this` is the instance (B3 bug).
+- **Routing `settingsPage.loadConfig` through the appearance Store.** `/api/config/appearance` is public and excludes auth-only fields (`hasVndbApiToken`/`hasPassword`). Settings UI reads those, so `loadConfig` must stay on authenticated `/api/config` — don't unify onto the appearance Store (B2 learned this).
+- **Adding a per-page toast/progress/background block.** These shared shell elements are injected by `public/js/layout.js` `injectShell()` (B3). Copy-pasting them per HTML page is a DRY violation and a fall-back path drift risk.
+- **Reaching for native `confirm()` in a new flow.** Forbidden per quality-guidelines — use `await this.$store.app.confirm({...})`. Native confirm blocks, is un-stylable, and its OK/Cancel semantics are ambiguous (import mode 「OK=合并 / Cancel=替换」 antipattern).
