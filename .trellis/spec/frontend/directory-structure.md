@@ -21,9 +21,13 @@ public/
 ├── *.html                 # MPA entries (index/login/settings/stats/tier)
 ├── css/style.css
 └── js/
-    ├── app.js             # Alpine global store + component registration
+    ├── app.js             # Alpine global store + component registration (calls initI18n() first)
     ├── api.js             # apiRequest + API namespace wrappers
+    ├── i18n.js            # UI i18n: t()/setLocale()/getLocale()/initI18n()
+    ├── locales/           # UI dictionaries as JS modules (zh-CN.js full, en.js placeholder)
     ├── utils.js / theme.js / markdown.js / translations.js
+    │                      # NOTE: translations.js = VNDB tags domain translation (IndexedDB + remote dict),
+    │                      #       a SEPARATE system from i18n.js — never merge them
     ├── components/        # per-page Alpine.data components
     └── vendor/            # self-hosted runtime deps (committed)
         ├── alpine.min.js

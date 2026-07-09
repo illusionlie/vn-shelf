@@ -1,1 +1,3 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "检查迁移未破坏 friendlyErrorMessage 分层与既有禁用模式"}
+{"file": ".trellis/tasks/07-03-frontend-b5b-i18n/prd.md", "reason": "AC1–AC7 验收清单"}
+{"file": ".trellis/tasks/07-03-frontend-b5b-i18n/implement.md", "reason": "阶段 3 验证命令与迁移完整性 grep 抽查"}

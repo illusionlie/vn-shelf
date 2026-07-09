@@ -1,1 +1,4 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "新增 i18n.js 与 locales/ 目录需符合前端模块组织约定"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "friendlyErrorMessage 分层约定与禁用模式；迁移 api.js 文案时必须保持解析顺序"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "locale 持久化沿用 Store/localStorage 既有模式"}
+{"file": ".trellis/tasks/07-03-frontend-b5b-i18n/design.md", "reason": "i18n API 契约、词典承载与回退链设计"}
