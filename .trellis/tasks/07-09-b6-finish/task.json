@@ -1,0 +1,31 @@
+{
+  "id": "b6-finish",
+  "name": "b6-finish",
+  "title": "B6 收尾批次（i18n 完善 / API 信封 / 响应式细化）",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "illusionlie",
+  "assignee": "illusionlie",
+  "createdAt": "2026-07-09",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-09-b6a-i18n-finish",
+    "07-09-b6b-html-i18n",
+    "07-09-b6c-api-envelope",
+    "07-09-b6d-responsive"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
