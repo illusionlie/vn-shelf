@@ -263,3 +263,39 @@ B5a 工程化清理5交付物:(T5-M2)新增 constants.js 统一 UNTIERED_KEY/DEF
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: B5c CSS 拆分完成 + B5 父任务收尾
+
+**Date**: 2026-07-09
+**Task**: B5c CSS 拆分完成 + B5 父任务收尾
+**Branch**: `master`
+
+### Summary
+
+style.css（1928 行）拆为 7 模块（base/forms/cards-detail/tier/stats/login/settings），五页按需 <link>（顺序契约 base→forms→cards-detail→页面）；700px 断点迁 768 + 480/1024 保守增补 18 条；等值性脚本复核 283 条规则零漂移；每页阻塞 CSS 降至 42%–94%。偏离记录：Modal 与 settings-section 上移 base（JS 注入/跨页复用）。spec 沉淀 CSS 模块归属与 link 顺序契约。B5c 与父任务 B5 均归档，路线表 T5-U3/T5-P5 标记完成，批次 B5 全部收官。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e28479c` | (see git log) |
+| `b0d7842` | (see git log) |
+| `089c478` | (see git log) |
+| `0872037` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
