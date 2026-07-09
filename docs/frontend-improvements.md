@@ -133,7 +133,15 @@
 - **现状**：完全无 `keydown`/`aria-grabbed`/`aria-dropeffect`，键盘用户无法重排 Tier。
 - **影响**：核心功能对键盘用户不可达。
 - **修复方法**：为 `.tier-vn-card` 加 `tabindex="0"` + `role="button"`；监听 `ArrowLeft/ArrowRight` 移动当前节点、`Enter` 开始抓取、方向键在抓取态移动、`Esc` 取消；拖拽中用 `aria-grabbed="true"`；Tier 容器 `role="list"` + `aria-label`。
-- **验收**：纯键盘可完成"把某 VN 从 A tier 移到 B tier 并改顺序"；屏幕阅读器播报位置变化。
+- **验收**：纯键盘可完成“把某 VN 从 A tier 移到 B tier 并改顺序”；屏幕阅读者播报位置变化。
+
+#### K1.5 鼠标拖拽向上自动滚动不触发（浏览器限制）
+- **定位**：`public/js/components/tierlistPage.js onDragOver`（鼠标拖拽路径）。
+- **现状**：B4 已加键盘拖拽（K1 修复），鼠标拖拽可正常向下/左右自动滚动，但向上自动滚动在浏览器原生 Drag and Drop API 下不触发或徫钝（Chrome/Edge 已观测）。
+- **影响**：长 Tier 子列表向上拖动到列表顶部区域需难以触发自动向上滚，只能手动先滚后拖。
+- **修复方法**：在 `onDragOver` 内根据 `event.clientY` 距视口顶边距离手动 `window.scrollBy(0, -step)`（自行实现滚动，不依赖浏览器自动滚动）；可加竖直滚动热区阈值（如距顶边 < 80px 以固定步长向上滚）。并考虑容器为 window 还为 `.tier-list` scroll container。
+- **验收**：鼠标拖拽时拖至视口近顶边时页面向上自动滚动；向下机制保留。
+- **状态**：OBA（2026-07-03 B5a 冒烟发现，非 B5a 引入；属 B4 鼠标拖拽路径遗留，与 K1 键盘路径无关）。留单独小任务推进。
 
 #### K2. 卡片点击不可键盘聚焦
 - **定位**：`public/index.html:154 @click="openDetail(vn)"`、`public/tier.html:120`。
