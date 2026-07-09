@@ -2,6 +2,8 @@
  * API封装模块
  */
 
+import { t } from './i18n.js';
+
 const API_BASE = '/api';
 
 /**
@@ -19,19 +21,22 @@ function createApiError(status, payload = {}) {
 }
 
 /**
- * 后端错误 code → 用户友好文案映射表。
+ * 后端错误 code → 用户友好文案词典 key 映射表（文案经 t() 取自 locales）。
  * 与 createApiError 同源：后端返回的 {code} 经 createApiError 劝入 error.code，
  * 前端约定 code 字段优先于 message。
+ *
+ * i18n 边界（AC5）：本映射表只覆盖前端自产的通用文案。后端 errorResponse 的
+ * 4xx 中文友好 message（无 code 字段）在下方第 4 支原样透传，不做翻译。
  */
 const FRIENDLY_CODE_MAP = {
-  UNAUTHORIZED: '请先登录',
-  FORBIDDEN: '没有权限执行此操作',
-  NOT_FOUND: '资源不存在',
-  VALIDATION: '输入内容有误',
-  CONFLICT: '操作冲突，请刷新后重试',
-  RATE_LIMIT: '操作过于频繁，请稍后再试',
-  SERVER_ERROR: '服务器暂时不可用，请稍后重试',
-  NETWORK: '网络连接失败，请检查后重试'
+  UNAUTHORIZED: 'error.unauthorized',
+  FORBIDDEN: 'error.forbidden',
+  NOT_FOUND: 'error.notFound',
+  VALIDATION: 'error.validation',
+  CONFLICT: 'error.conflict',
+  RATE_LIMIT: 'error.rateLimit',
+  SERVER_ERROR: 'error.serverError',
+  NETWORK: 'error.network'
 };
 
 /**
@@ -67,7 +72,7 @@ const HTTP_FALLBACK_RE = /^HTTP \d{3}$/i;
  * @param {string} [prefix='操作失败'] - 业务前缀（如“保存失败”、“加载失败”）
  * @returns {string} 友好 toast 文案
  */
-export function friendlyErrorMessage(error, prefix = '操作失败') {
+export function friendlyErrorMessage(error, prefix = t('prefix.operationFailed')) {
   const code = error?.code || null;
   const status = Number(error?.status) || 0;
   const message = error?.message || '';
@@ -77,30 +82,31 @@ export function friendlyErrorMessage(error, prefix = '操作失败') {
 
   // 1. code 优先（NETWORK 经 apiRequest 网络层封装填入）
   if (code && FRIENDLY_CODE_MAP[code]) {
-    return `${prefix}：${FRIENDLY_CODE_MAP[code]}`;
+    return `${prefix}：${t(FRIENDLY_CODE_MAP[code])}`;
   }
 
   // 2. 网络层失败（status=0 且无服务端友好 message）
   if (status === 0 && !hasFriendlyMessage) {
-    return `${prefix}：${FRIENDLY_CODE_MAP.NETWORK}`;
+    return `${prefix}：${t(FRIENDLY_CODE_MAP.NETWORK)}`;
   }
 
   // 3. 5xx：后端可能透传未处理异常的裸 message，统一友好文案不暴露
   if (status >= 500) {
-    return `${prefix}：${FRIENDLY_CODE_MAP.SERVER_ERROR}`;
+    return `${prefix}：${t(FRIENDLY_CODE_MAP.SERVER_ERROR)}`;
   }
 
-  // 4. 4xx 服务端友好文案 / 本地校验友好串：沿用
+  // 4. 4xx 服务端友好文案 / 本地校验友好串：沿用。
+  //    i18n 边界（AC5）：后端 4xx 中文 message 原样透传，不经词典翻译。
   if (hasFriendlyMessage) {
     return `${prefix}：${message}`;
   }
 
   // 5. 按 status 映射兑底
-  if (status === 401) return `${prefix}：${FRIENDLY_CODE_MAP.UNAUTHORIZED}`;
-  if (status === 403) return `${prefix}：${FRIENDLY_CODE_MAP.FORBIDDEN}`;
-  if (status === 404) return `${prefix}：${FRIENDLY_CODE_MAP.NOT_FOUND}`;
-  if (status === 409) return `${prefix}：${FRIENDLY_CODE_MAP.CONFLICT}`;
-  if (status === 429) return `${prefix}：${FRIENDLY_CODE_MAP.RATE_LIMIT}`;
+  if (status === 401) return `${prefix}：${t(FRIENDLY_CODE_MAP.UNAUTHORIZED)}`;
+  if (status === 403) return `${prefix}：${t(FRIENDLY_CODE_MAP.FORBIDDEN)}`;
+  if (status === 404) return `${prefix}：${t(FRIENDLY_CODE_MAP.NOT_FOUND)}`;
+  if (status === 409) return `${prefix}：${t(FRIENDLY_CODE_MAP.CONFLICT)}`;
+  if (status === 429) return `${prefix}：${t(FRIENDLY_CODE_MAP.RATE_LIMIT)}`;
 
   // 无任何可用信息：只返回前缀，绝不拼接裸技术文本
   return prefix;
@@ -134,7 +140,7 @@ async function apiRequest(endpoint, options = {}) {
       endpoint,
       error: networkError?.message || String(networkError)
     });
-    throw createApiError(0, { error: '网络请求失败', code: 'NETWORK' });
+    throw createApiError(0, { error: t('error.networkRequestFailed'), code: 'NETWORK' });
   }
 
   let data = {};

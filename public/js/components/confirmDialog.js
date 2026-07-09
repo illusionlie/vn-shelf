@@ -15,6 +15,7 @@
  * 关闭时还原焦点到触发元素。Esc 关闭等价于取消。
  */
 
+import { t } from '../i18n.js';
 import { trapFocus } from '../utils.js';
 
 export function confirmDialog() {
@@ -22,8 +23,8 @@ export function confirmDialog() {
     visible: false,
     title: '',
     message: '',
-    confirmText: '确定',
-    cancelText: '取消',
+    confirmText: t('common.ok'),
+    cancelText: t('common.cancel'),
     danger: false,
     thirdText: '',
     _resolve: null,
@@ -65,8 +66,8 @@ export function confirmDialog() {
     show({
       title = '',
       message = '',
-      confirmText = '确定',
-      cancelText = '取消',
+      confirmText = t('common.ok'),
+      cancelText = t('common.cancel'),
       danger = false,
       thirdText = ''
     } = {}) {

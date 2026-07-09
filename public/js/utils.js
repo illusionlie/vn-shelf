@@ -1,11 +1,12 @@
 import { friendlyErrorMessage } from './api.js';
+import { t } from './i18n.js';
 
 /**
  * VN Shelf 工具函数模块
  */
 
 export function formatUserPlayTime(user) {
-  if (!user) return '未记录';
+  if (!user) return t('common.notRecorded');
 
   const rawHours = Number(user.playTimeHours);
   const rawPartMinutes = Number(user.playTimePartMinutes);
@@ -13,7 +14,7 @@ export function formatUserPlayTime(user) {
   const hasPartMinutes = Number.isFinite(rawPartMinutes) && rawPartMinutes >= 0;
 
   if (!hasHours && !hasPartMinutes) {
-    return '未记录';
+    return t('common.notRecorded');
   }
 
   const inputHours = hasHours ? Math.floor(rawHours) : 0;
@@ -21,19 +22,19 @@ export function formatUserPlayTime(user) {
   const normalizedTotalMinutes = inputHours * 60 + inputPartMinutes;
 
   if (normalizedTotalMinutes <= 0) {
-    return '未记录';
+    return t('common.notRecorded');
   }
 
   const displayHours = Math.floor(normalizedTotalMinutes / 60);
   const displayPartMinutes = normalizedTotalMinutes % 60;
 
   if (displayHours > 0 && displayPartMinutes > 0) {
-    return `${displayHours}小时${displayPartMinutes}分钟`;
+    return t('time.hoursMinutes', { h: displayHours, m: displayPartMinutes });
   }
   if (displayHours > 0) {
-    return `${displayHours}小时`;
+    return t('time.hours', { h: displayHours });
   }
-  return `${displayPartMinutes}分钟`;
+  return t('time.minutes', { m: displayPartMinutes });
 }
 
 // =========== 滚动锁定 ============
@@ -240,7 +241,7 @@ export function initProgressBar() {
  * @param {string} [opts.errorPrefix='操作失败'] - 失败 toast 文案前缀
  * @returns {Promise<*>} asyncFn 的返回值；失败时返回 undefined
  */
-export async function withLoading(ctx, asyncFn, { successMsg = '', errorPrefix = '操作失败' } = {}) {
+export async function withLoading(ctx, asyncFn, { successMsg = '', errorPrefix = t('prefix.operationFailed') } = {}) {
   ctx.isLoading = true;
   try {
     const result = await asyncFn();

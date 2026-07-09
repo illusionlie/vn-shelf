@@ -3,6 +3,7 @@
  */
 
 import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI } from '../api.js';
+import { t } from '../i18n.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
   initTranslations,
@@ -72,7 +73,7 @@ export function settingsPage() {
           backgroundBlur: 4
         };
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '加载配置失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadConfigFailed')), 'error');
       }
     },
 
@@ -128,17 +129,17 @@ export function settingsPage() {
         await configAPI.update({ vndbApiToken: this.vndbApiToken });
         this.vndbApiToken = '';
         await this.loadConfig();
-      }, { successMsg: 'VNDB API Token已保存', errorPrefix: '保存失败' });
+      }, { successMsg: t('toast.vndbTokenSaved'), errorPrefix: t('prefix.saveFailed') });
     },
 
     async changePassword() {
       if (!this.newPassword || this.newPassword.length < 6) {
-        this.$store.app.addToast('密码长度至少6位', 'error');
+        this.$store.app.addToast(t('validation.passwordMin'), 'error');
         return;
       }
 
       if (this.newPassword !== this.confirmPassword) {
-        this.$store.app.addToast('两次输入的密码不一致', 'error');
+        this.$store.app.addToast(t('validation.passwordMismatch'), 'error');
         return;
       }
 
@@ -146,17 +147,17 @@ export function settingsPage() {
         await configAPI.update({ newPassword: this.newPassword });
         this.newPassword = '';
         this.confirmPassword = '';
-      }, { successMsg: '密码已更新', errorPrefix: '更新失败' });
+      }, { successMsg: t('toast.passwordUpdated'), errorPrefix: t('prefix.updateFailed') });
     },
 
     async startIndex() {
       this.isLoading = true;
       try {
         const res = await indexAPI.start();
-        this.$store.app.addToast(`索引已启动，共${res.data.total}个条目`);
+        this.$store.app.addToast(t('toast.indexStarted', { total: res.data.total }));
         await this.loadIndexStatus();
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '启动索引失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.startIndexFailed')), 'error');
       } finally {
         this.isLoading = false;
       }
@@ -172,9 +173,9 @@ export function settingsPage() {
         a.download = `vn-shelf-export-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        this.$store.app.addToast('导出成功');
+        this.$store.app.addToast(t('toast.exportOk'));
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '导出失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.exportFailed')), 'error');
       }
     },
 
@@ -192,22 +193,22 @@ export function settingsPage() {
         try {
           data = JSON.parse(text);
         } catch {
-          this.$store.app.addToast('导入失败：文件不是有效的 JSON', 'error');
+          this.$store.app.addToast(t('toast.importInvalidJson'), 'error');
           return;
         }
 
         if (!data.entries || !Array.isArray(data.entries)) {
-          this.$store.app.addToast('导入失败：无效的导入文件格式', 'error');
+          this.$store.app.addToast(t('toast.importInvalidFormat'), 'error');
           return;
         }
 
         const choice = await this.$store.app.confirm({
-          title: '导入模式',
-          message: '合并：保留现有数据并追加；替换：清空现有数据后写入。',
-          confirmText: '合并',
-          cancelText: '替换',
+          title: t('confirm.importTitle'),
+          message: t('confirm.importMessage'),
+          confirmText: t('confirm.importMerge'),
+          cancelText: t('confirm.importReplace'),
           danger: false,
-          thirdText: '取消导入'
+          thirdText: t('confirm.importAbort')
         });
         // true=null 语义：true=合并、false=替换、null=取消导入（放弃不弹错）
         if (choice === null) {
@@ -222,11 +223,11 @@ export function settingsPage() {
           applyBackground(data.appearance);
         }
 
-        const actionText = mode === 'merge' ? '合并' : '替换';
-        this.$store.app.addToast(`导入成功（${actionText}），共${data.entries.length}个条目`);
+        const actionText = mode === 'merge' ? t('confirm.importMerge') : t('confirm.importReplace');
+        this.$store.app.addToast(t('toast.importOk', { action: actionText, total: data.entries.length }));
       } catch (error) {
         // 服务端导入错误（5xx/网络/4xx 友好文案）经 friendlyErrorMessage 处理
-        this.$store.app.addToast(friendlyErrorMessage(error, '导入失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.importFailed')), 'error');
       } finally {
         // 清空文件输入
         event.target.value = '';
@@ -238,25 +239,25 @@ export function settingsPage() {
         await authAPI.logout();
         window.location.href = '/login';
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '退出失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.logoutFailed')), 'error');
       }
     },
 
     formatStatus(status) {
       const map = {
-        idle: '空闲',
-        starting: '启动中',
-        running: '运行中',
-        completed: '已完成',
-        failed: '失败',
-        partial: '部分完成',
-        start_failed: '启动失败'
+        idle: t('status.idle'),
+        starting: t('status.starting'),
+        running: t('status.running'),
+        completed: t('status.completed'),
+        failed: t('status.failed'),
+        partial: t('status.partial'),
+        start_failed: t('status.startFailed')
       };
       return map[status] || status;
     },
 
     formatDateTime(dateStr) {
-      if (!dateStr) return '未知';
+      if (!dateStr) return t('common.unknown');
       const date = new Date(dateStr);
       if (Number.isNaN(date.getTime())) {
         console.warn('[settings] formatDateTime received invalid date', { dateStr });
@@ -275,7 +276,7 @@ export function settingsPage() {
     },
 
     formatDate(dateStr) {
-      if (!dateStr) return '未知';
+      if (!dateStr) return t('common.unknown');
       const date = new Date(dateStr);
       if (Number.isNaN(date.getTime())) {
         console.warn('[settings] formatDate received invalid date', { dateStr });
@@ -317,14 +318,14 @@ export function settingsPage() {
 
         // 失效 appearance 缓存，使其它标签页/组件即时读到新 tags 配置
         await this.$store.app.loadAppearance({ force: true });
-      }, { successMsg: 'Tags 设置已保存', errorPrefix: '保存失败' });
+      }, { successMsg: t('toast.tagsConfigSaved'), errorPrefix: t('prefix.saveFailed') });
     },
 
     async clearTranslationCache() {
       const ok = await this.$store.app.confirm({
-        title: '清除翻译缓存',
-        message: '下次使用时需要重新下载翻译数据。',
-        confirmText: '清除',
+        title: t('confirm.clearCacheTitle'),
+        message: t('confirm.clearCacheMessage'),
+        confirmText: t('confirm.clearCacheAction'),
         danger: true
       });
       if (!ok) return;
@@ -332,9 +333,9 @@ export function settingsPage() {
       try {
         await clearTranslationsCache();
         this.translationCacheStatus = null;
-        this.$store.app.addToast('翻译缓存已清除');
+        this.$store.app.addToast(t('toast.translationCacheCleared'));
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '清除缓存失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.clearCacheFailed')), 'error');
       }
     },
 
@@ -360,7 +361,7 @@ export function settingsPage() {
         const cfg = await this.$store.app.loadAppearance({ force: true });
         setBackgroundConfig(cfg);
         applyBackground(cfg);
-      }, { successMsg: '外观设置已保存', errorPrefix: '保存失败' });
+      }, { successMsg: t('toast.appearanceSaved'), errorPrefix: t('prefix.saveFailed') });
     }
   };
 }

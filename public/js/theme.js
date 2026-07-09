@@ -2,6 +2,8 @@
  * VN Shelf 主题与背景模块
  */
 
+import { t } from './i18n.js';
+
 // ========== 主题 ===========
 
 function createThemeIcon(isDark) {
@@ -54,7 +56,7 @@ function updateThemeToggleButtons() {
   const themeToggleButtons = document.querySelectorAll('.theme-toggle-btn');
 
   themeToggleButtons.forEach(button => {
-    button.setAttribute('aria-label', isDark ? '切换到亮色主题' : '切换到暗色主题');
+    button.setAttribute('aria-label', isDark ? t('theme.switchToLight') : t('theme.switchToDark'));
 
     const oldIcon = button.querySelector('svg');
     if (oldIcon) {

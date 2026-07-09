@@ -18,6 +18,7 @@
  *   探测后降级为直接返回 marked 输出（此时 renderer 侧过滤已保证安全）。
  */
 
+import { t } from './i18n.js';
 import { marked, Renderer } from './vendor/marked.min.js';
 import DOMPurify from './vendor/purify.min.js';
 
@@ -100,7 +101,7 @@ renderer.br = function br() {
 renderer.link = function link({ href, title, tokens }) {
   const text = this.parser.parseInline(tokens);
   if (!isSafeUrl(href)) {
-    return `<span class="md-link-unsafe" title="不安全的链接已禁用">${text}</span>`;
+    return `<span class="md-link-unsafe" title="${escapeAttr(t('markdown.unsafeLink'))}">${text}</span>`;
   }
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : '';
   return `<a href="${escapeAttr(href)}"${titleAttr} target="_blank" rel="noopener noreferrer" class="md-link">${text}</a>`;
@@ -108,7 +109,7 @@ renderer.link = function link({ href, title, tokens }) {
 
 renderer.image = function image({ href, title, text }) {
   if (!isSafeUrl(href)) {
-    return '<span class="md-image-unsafe" title="不安全的图片链接已禁用">[图片]</span>';
+    return `<span class="md-image-unsafe" title="${escapeAttr(t('markdown.unsafeImage'))}">${t('markdown.imagePlaceholder')}</span>`;
   }
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : '';
   return `<img src="${escapeAttr(href)}" alt="${escapeAttr(text)}"${titleAttr} loading="lazy" class="md-image">`;

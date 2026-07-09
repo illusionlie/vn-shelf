@@ -6,6 +6,7 @@
  */
 
 import { friendlyErrorMessage, vnAPI } from '../api.js';
+import { t } from '../i18n.js';
 import {
   DEFAULT_TRANSLATION_URL,
   getFromIndexedDB,
@@ -119,7 +120,7 @@ export function createDetailModal() {
           }
         });
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '加载详情失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadDetailFailed')), 'error');
       }
     },
 

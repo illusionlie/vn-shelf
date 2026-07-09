@@ -3,6 +3,7 @@
  */
 
 import { friendlyErrorMessage, vnAPI } from '../api.js';
+import { t } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import { debounce, formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
 
@@ -39,7 +40,7 @@ export function vnShelf() {
         this.vnList = res.data || [];
         this.filteredList = this.vnList;
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '加载失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadFailed')), 'error');
       } finally {
         this.isLoading = false;
       }
@@ -175,10 +176,10 @@ export function vnShelf() {
       const rawPartMinutes = Number(this.editForm.playTimePartMinutes);
 
       if (!Number.isFinite(rawHours) || rawHours < 0) {
-        throw new Error('游玩时长小时必须是非负数字');
+        throw new Error(t('validation.playTimeHoursInvalid'));
       }
       if (!Number.isFinite(rawPartMinutes) || rawPartMinutes < 0) {
-        throw new Error('游玩时长分钟必须是非负数字');
+        throw new Error(t('validation.playTimeMinutesInvalid'));
       }
 
       return {
@@ -218,7 +219,7 @@ export function vnShelf() {
             finishDate: this.editForm.finishDate,
             tags: tags
           });
-          this.$store.app.addToast('添加成功');
+          this.$store.app.addToast(t('toast.addOk'));
         } else {
           await vnAPI.update(this.editForm.id, {
             titleCn: this.editForm.titleCn,
@@ -230,33 +231,33 @@ export function vnShelf() {
             finishDate: this.editForm.finishDate,
             tags: tags
           });
-          this.$store.app.addToast('更新成功');
+          this.$store.app.addToast(t('toast.updateOk'));
         }
         this.closeEdit();
         await this.loadVNList();
       } catch (error) {
         // normalizePlayTimeInput 的本地校验 throw（友好文案，无 status）会被
         // friendlyErrorMessage 第 4 支保留；vnAPI 的服务端错误走 5xx/4xx 分支。
-        this.$store.app.addToast(friendlyErrorMessage(error, '保存失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.saveFailed')), 'error');
       }
     },
 
     async deleteVN() {
       const ok = await this.$store.app.confirm({
-        title: '删除条目',
-        message: '确定要删除这个条目吗？',
-        confirmText: '删除',
+        title: t('confirm.deleteVnTitle'),
+        message: t('confirm.deleteVnMessage'),
+        confirmText: t('confirm.deleteAction'),
         danger: true
       });
       if (!ok) return;
 
       try {
         await vnAPI.delete(this.selectedVN.id);
-        this.$store.app.addToast('删除成功');
+        this.$store.app.addToast(t('toast.deleteOk'));
         this.closeDetail();
         await this.loadVNList();
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '删除失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.deleteFailed')), 'error');
       }
     },
 

@@ -3,6 +3,7 @@
  */
 
 import { friendlyErrorMessage, statsAPI } from '../api.js';
+import { t } from '../i18n.js';
 
 export function statsPage() {
   return {
@@ -22,19 +23,19 @@ export function statsPage() {
         const res = await statsAPI.get();
         this.stats = res.data;
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '加载统计失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadStatsFailed')), 'error');
       } finally {
         this.isLoading = false;
       }
     },
 
     formatMinutes(minutes) {
-      if (!minutes) return '0小时';
+      if (!minutes) return t('time.hours', { h: 0 });
       const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `${hours}小时`;
+      if (hours < 24) return t('time.hours', { h: hours });
       const days = Math.floor(hours / 24);
       const remainHours = hours % 24;
-      return `${days}天${remainHours}小时`;
+      return t('time.daysHours', { d: days, h: remainHours });
     },
 
     formatRating(rating) {

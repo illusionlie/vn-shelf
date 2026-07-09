@@ -3,6 +3,7 @@
  */
 
 import { authAPI, friendlyErrorMessage } from '../api.js';
+import { t } from '../i18n.js';
 
 export function loginPage() {
   return {
@@ -32,7 +33,7 @@ export function loginPage() {
 
     async handleSubmit() {
       if (!this.password) {
-        this.error = '请输入密码';
+        this.error = t('validation.passwordRequired');
         return;
       }
 
@@ -51,7 +52,7 @@ export function loginPage() {
       } catch (error) {
         // authAPI.init/login 的 4xx 返回中文友好文案（密码错误/密码长度至少6位等），
         // friendlyErrorMessage 会保留；5xx/网络错误统一友好文案，不暴露技术文本。
-        this.error = friendlyErrorMessage(error, '登录失败');
+        this.error = friendlyErrorMessage(error, t('prefix.loginFailed'));
       } finally {
         this.isLoading = false;
       }

@@ -4,6 +4,7 @@
 
 import { friendlyErrorMessage, vnAPI, tierAPI } from '../api.js';
 import { UNTIERED_KEY, DEFAULT_TIER_COLOR, MAX_BATCH_TIER_UPDATES } from '../constants.js';
+import { t } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import { computeTierDiff } from '../tier-diff.js';
 import { formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
@@ -55,7 +56,7 @@ export function tierlistPage() {
         ]);
 
         if (!tierLoaded || !vnLoaded) {
-          this.$store.app.addToast('加载 Tier 页面数据失败，请稍后重试', 'error');
+          this.$store.app.addToast(t('toast.tierPageLoadFailed'), 'error');
         }
       } finally {
         this.isLoading = false;
@@ -75,7 +76,7 @@ export function tierlistPage() {
         this.tiers = [];
         this.rebuildTierGroups();
         if (!silent) {
-          this.$store.app.addToast(friendlyErrorMessage(error, '加载 Tier 列表失败'), 'error');
+          this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadTierListFailed')), 'error');
         }
         return false;
       }
@@ -92,7 +93,7 @@ export function tierlistPage() {
         this.allVN = [];
         this.rebuildTierGroups();
         if (!silent) {
-          this.$store.app.addToast(friendlyErrorMessage(error, '加载 VN 列表失败'), 'error');
+          this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadVnListFailed')), 'error');
         }
         return false;
       }
@@ -240,12 +241,12 @@ export function tierlistPage() {
       const color = (this.tierForm.color || '').trim();
 
       if (!name) {
-        this.$store.app.addToast('Tier 名称不能为空', 'error');
+        this.$store.app.addToast(t('validation.tierNameRequired'), 'error');
         return;
       }
 
       if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-        this.$store.app.addToast('Tier 颜色必须是 #RRGGBB 格式', 'error');
+        this.$store.app.addToast(t('validation.tierColorFormat'), 'error');
         return;
       }
 
@@ -253,16 +254,16 @@ export function tierlistPage() {
       try {
         if (this.editingTier?.id) {
           await tierAPI.update(this.editingTier.id, { name, color });
-          this.$store.app.addToast('Tier 已更新');
+          this.$store.app.addToast(t('toast.tierUpdated'));
         } else {
           await tierAPI.create({ name, color });
-          this.$store.app.addToast('Tier 已创建');
+          this.$store.app.addToast(t('toast.tierCreated'));
         }
 
         await this.loadTiers();
         this.closeTierEdit();
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '保存 Tier 失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.saveTierFailed')), 'error');
       } finally {
         this.isSavingTier = false;
       }
@@ -270,19 +271,19 @@ export function tierlistPage() {
 
     async deleteTier(id) {
       const ok = await this.$store.app.confirm({
-        title: '删除 Tier',
-        message: '删除该 Tier 后，其下条目将变为未分类。',
-        confirmText: '删除',
+        title: t('confirm.deleteTierTitle'),
+        message: t('confirm.deleteTierMessage'),
+        confirmText: t('confirm.deleteAction'),
         danger: true
       });
       if (!ok) return;
 
       try {
         await tierAPI.delete(id);
-        this.$store.app.addToast('Tier 已删除');
+        this.$store.app.addToast(t('toast.tierDeleted'));
         await Promise.all([this.loadTiers(), this.loadVNList()]);
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '删除 Tier 失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.deleteTierFailed')), 'error');
       }
     },
 
@@ -302,7 +303,7 @@ export function tierlistPage() {
         this.tiers = nextTiers;
         this.rebuildTierGroups();
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '更新排序失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.updateOrderFailed')), 'error');
       }
     },
 
@@ -588,9 +589,9 @@ export function tierlistPage() {
 
         this.normalizeTierSortForAllVN();
         this.rebuildTierGroups();
-        this.$store.app.addToast('Tier 顺序更新成功');
+        this.$store.app.addToast(t('toast.tierOrderUpdated'));
       } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, '拖拽更新失败'), 'error');
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.dragUpdateFailed')), 'error');
         await this.loadVNList({ silent: true });
       }
     },
