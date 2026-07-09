@@ -1,0 +1,35 @@
+/* ===== Login Page ===== */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  padding-top: 0;
+}
+
+.login-box {
+  background: var(--card-bg-color);
+  backdrop-filter: blur(20px);
+  border-radius: var(--border-radius-lg);
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-medium);
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 32px;
+  color: var(--primary-text-color);
+}
+
+/* ===== Responsive - 480 (紧凑手机) ===== */
+@media screen and (max-width: 480px) {
+  .login-box {
+    padding: 32px 24px;
+  }
+}

@@ -1,0 +1,15 @@
+/* ===== Cache Status ===== */
+.cache-status {
+  padding: 16px;
+  background: var(--tag-bg-color);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.cache-status p {
+  margin-bottom: 8px;
+}
+
+.cache-status p:last-child {
+  margin-bottom: 0;
+}
