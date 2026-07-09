@@ -19,7 +19,13 @@ Front-end lives entirely under `public/` and is served as static assets (no buil
 ```
 public/
 ├── *.html                 # MPA entries (index/login/settings/stats/tier)
-├── css/style.css
+├── css/                   # split CSS modules, per-page <link> (no single style.css)
+│   ├── base.css           # variables/dark-mode/reset/header/nav/buttons/toast/modal/
+│   │                      # settings-section/empty/loading — everything injected shells
+│   │                      # (layout.js) or 3+ pages need; ALWAYS linked first
+│   ├── forms.css          # form-* + radio/checkbox (index/login/settings/tier)
+│   ├── cards-detail.css   # vn-card/modal-detail/markdown/nsfw (index + tier)
+│   └── tier|stats|login|settings.css  # page-specific sections
 └── js/
     ├── app.js             # Alpine global store + component registration (calls initI18n() first)
     ├── api.js             # apiRequest + API namespace wrappers
