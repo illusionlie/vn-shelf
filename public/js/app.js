@@ -10,9 +10,14 @@ import { settingsPage } from './components/settingsPage.js';
 import { statsPage } from './components/statsPage.js';
 import { tierlistPage } from './components/tierlistPage.js';
 import { vnShelf } from './components/vnShelf.js';
+import { initI18n } from './i18n.js';
 import { injectShell } from './layout.js';
 import { initTheme, toggleTheme, initBackground } from './theme.js';
 import { initProgressBar, toggleMobileMenu } from './utils.js';
+
+// i18n 初始化：读 localStorage 语言偏好，非默认语言异步预载词典
+// （加载完成前 t() 回退 zh-CN，不阻塞首帧；须在 Alpine 组件注册前调用）
+initI18n();
 
 // 在 Alpine 初始化前注入公共壳层（进度条 / 背景遮罩 / Toast / confirmDialog）
 injectShell();
