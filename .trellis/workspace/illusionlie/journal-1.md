@@ -191,3 +191,40 @@ B4 批次5交付物落地:(S3)theme.js safeBackgroundUrl 用 new URL+http/https 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: B5a 前端工程化清理
+
+**Date**: 2026-07-09
+**Task**: B5a 前端工程化清理
+**Branch**: `master`
+
+### Summary
+
+B5a 工程化清理5交付物:(T5-M2)新增 constants.js 统一 UNTIERED_KEY/DEFAULT_TIER_COLOR/MAX_BATCH_TIER_UPDATES(带与后端 router.js:35 同源约定注释), tierlistPage.js 5处 __untiered__/3处 #ff4757/删 MAX_BATCH 字段全替换;(T5-P6)initProgressBar 单轨: hidden 早守卫+finished 单次守卫+readyState===complete 快路径+load once+pageshow persisted once+5s单兜底, 删旧双轨load+3s;(T5-P4)applyTierBatchUpdates 串行 for-await 改 Promise.all(chunks.map(vnAPI.batchUpdateTier)), chunks 互不相交并行安全, 任一 reject 整体 reject 触发 applyDrop catch+loadVNList 回滚语义与串行一致;(T5-M3)src/router.js handleGetStats jsonResponse(list.stats) 改 successResponse(list.stats) 统一 /api/stats 信封为 {success,message,data}, statsPage.js res.data||res 改 res.data 删兜底, 闭环 A3 stats 一处(successResponse 已 import 于 router.js:32 无需补);(T5-M1)抽 public/js/tier-diff.js 纯函数 computeTierDiff({allVN,draggedId,targetTierKey,insertIndex}) 返回 payloads 无 this/无API/无副作用, 内部 groupItemsByTier 复刻 rebuildTierGroups+getItemsByTierKey 排序语义(tierSort→createdAt), 依赖后端删 Tier 清空归属不变量(router handleDeleteTier→clearTierAssignments 置 tier_id=null)故孤 tierId 不可达, tierlistPage applyDrop 改调 computeTierDiff; 新增 tests/public/tier-diff.test.mjs(11用例: 同tier排序/原位空返/跨tier/移untiered/已在untiered/末位/空tier/undefined兜底/250超200索引200边界/draggedId未找到空/结构自检)+tests/public/markdown.syntax.test.mjs(14用例: 粗体/斜体/删除线/链接target+rel/图片alt+loading/无序+有序start属性含start=3分支/代码块带+无语言/引用/表格md-row+md-cell/分割线/段落)用 markdown.security cache-bust in-place import 模式(因 markdown.js import vendor 相对路径)。lint/test 93 pass 全绿(68原+25新)。trellis-check 核验4处偏差前提均经读源码确认成立(vnAPI.batchUpdateTier 方法名真实/implement.md 笔误/deleteTier→clearTierAssignments 不变量/statsAPI 唯一消费/markdown Node 无 DOM 降级)。AC1-AC8+AC10 验证通过, AC9 五页冒烟待用户本地(含 Tier 200+ 批量拖拽/断网回滚/进度条 bfcache/统计页数据)。父任务 B5 仍 planning(B5b i18n+ B5c CSS 未做), 本轮仅归 B5a, B5b/B5c 留下轮。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e3b2767` | (see git log) |
+| `4323bcf` | (see git log) |
+| `e3e60cc` | (see git log) |
+| `d75f55a` | (see git log) |
+| `215978e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

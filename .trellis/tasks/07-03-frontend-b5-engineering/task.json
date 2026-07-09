@@ -1,0 +1,30 @@
+{
+  "id": "frontend-b5-engineering",
+  "name": "frontend-b5-engineering",
+  "title": "B5 前端工程化收尾",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "illusionlie",
+  "assignee": "illusionlie",
+  "createdAt": "2026-07-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-03-frontend-b5a-cleanup",
+    "07-03-frontend-b5b-i18n",
+    "07-03-frontend-b5c-css"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
