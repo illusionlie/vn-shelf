@@ -228,3 +228,38 @@ B5a 工程化清理5交付物:(T5-M2)新增 constants.js 统一 UNTIERED_KEY/DEF
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: B5b 前端 i18n 框架接入完成
+
+**Date**: 2026-07-09
+**Task**: B5b 前端 i18n 框架接入完成
+**Branch**: `master`
+
+### Summary
+
+自托管 i18n 框架落地：i18n.js（t/setLocale/getLocale/initI18n，回退链 当前语言→zh-CN→key）+ locales/zh-CN.js 87 词条 + en.js 空框架 + 8 单测；16 文件 UI 文案等值迁移 t()（toast/formatStatus/校验/确认框），friendlyErrorMessage 分支序不变，后端 4xx message 不翻译边界三处注释。AC1-AC7 全过（含手工走查），spec 沉淀 i18n 约定。后续：en 词典填充+key-diff 单测+设置页切换入口另立小任务；HTML 静态文案留灰度批次。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f78a6cd` | (see git log) |
+| `1274dff` | (see git log) |
+| `62913f9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
