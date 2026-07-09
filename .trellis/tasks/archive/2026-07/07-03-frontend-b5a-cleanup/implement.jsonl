@@ -1,0 +1,7 @@
+{"file": "AGENTS.md", "reason": "Project instructions: no-build deploy, static-assets-first, lint/test commands, API route boundaries for stats batch."}
+{"file": "docs/frontend-improvements.md", "reason": "Design source: B5a (T5-P4/P6/M1/M2/M3) definitions + decision log; A3 backend envelope note."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend pre-development checklist; now-filled layer overview."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Sedimented contracts: vendor self-host, header merge, Date.now id, native confirm, friendlyErrorMessage layering (S4 friendlyError rule affects any new error toast in tests/cleanup)."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Appearance Store (B2) intact; apiRequest envelope contract — verify res.data path for stats."}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "factory/mixin patterns + withRouting + apiRequest namespace rules — tier-diff.js should follow module-level pure function convention."}
+{"file": "src/utils.js", "reason": "successResponse/errorResponse/jsonResponse envelope definitions — Step 4 stats信封统一 depends on successResponse signature."}
