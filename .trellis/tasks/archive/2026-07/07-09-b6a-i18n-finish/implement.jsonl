@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "i18n t() 契约（两级 key、{name} 插值、回退链、setLocale 持久化+懒加载、initI18n 时机）、词典承载为 JS 模块的约定、后端 message 不翻译边界、刷新生效 by design 守则——本任务的全部改动都受这节约束"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "settings 页组件结构与 Alpine factory 惯例；新增语言分区的 radio-group + @change 形态须与既有控件一致"}

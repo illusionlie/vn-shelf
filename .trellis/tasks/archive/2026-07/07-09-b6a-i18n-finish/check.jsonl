@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验收依据：i18n t() 契约与刷新生效守则不被破坏、UI 动态文案不新增硬编码、Testing Requirements（lint+test 门禁、新测试用 node --test）、code review checklist"}
