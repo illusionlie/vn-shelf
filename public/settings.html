@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>设置 - VN Shelf</title>
+  <title data-i18n="meta.settingsTitle">VN Shelf</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/forms.css">
   <link rel="stylesheet" href="css/settings.css">
@@ -24,7 +24,7 @@
           class="banner-github-link"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="打开 VN Shelf GitHub 仓库"
+          data-i18n-aria-label="nav.githubRepo"
           title="GitHub"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -34,10 +34,10 @@
       </div>
       <div class="header-actions">
         <nav class="banner-nav desktop-only">
-          <a href="/">首页</a>
+          <a href="/" data-i18n="nav.home"></a>
           <a href="/tier">Tier List</a>
-          <a href="/stats">统计</a>
-          <a href="/settings" class="active">设置</a>
+          <a href="/stats" data-i18n="nav.stats"></a>
+          <a href="/settings" class="active" data-i18n="nav.settings"></a>
         </nav>
         <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
           <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -61,10 +61,10 @@
             </svg>
           </button>
           <div id="more-menu" class="more-menu" role="menu">
-            <a href="/" role="menuitem">首页</a>
+            <a href="/" role="menuitem" data-i18n="nav.home"></a>
             <a href="/tier" role="menuitem">Tier List</a>
-            <a href="/stats" role="menuitem">统计</a>
-            <a href="/settings" role="menuitem">设置</a>
+            <a href="/stats" role="menuitem" data-i18n="nav.stats"></a>
+            <a href="/settings" role="menuitem" data-i18n="nav.settings"></a>
           </div>
         </div>
       </div>
@@ -73,7 +73,7 @@
 
   <!-- 主内容 -->
   <main class="container">
-    <h1 class="page-title">⚙️ 设置</h1>
+    <h1 class="page-title" data-i18n="settings.pageTitle"></h1>
 
     <!-- VNDB API设置 -->
     <section class="settings-section">
@@ -86,75 +86,73 @@
             type="password"
             class="form-input"
             x-model="vndbApiToken"
-            placeholder="输入新的API Token"
+            data-i18n-placeholder="settings.tokenPlaceholder"
           >
-          <button class="btn btn-primary" @click="saveVndbToken()" :disabled="isLoading">
-            保存
+          <button class="btn btn-primary" @click="saveVndbToken()" :disabled="isLoading" data-i18n="common.save">
           </button>
         </div>
         <p class="form-hint">
-          当前状态: <span x-text="config.hasVndbApiToken ? '已配置' : '未配置'"></span>
-          - 在 <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> 获取Token
+          <span data-i18n="settings.tokenStatusLabel"></span> <span x-text="config.hasVndbApiToken ? $t('settings.configured') : $t('settings.notConfigured')"></span>
+          <span data-i18n="settings.tokenGetPrefix"></span> <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> <span data-i18n="settings.tokenGetSuffix"></span>
         </p>
       </div>
     </section>
 
     <!-- 密码设置 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">管理员密码</h2>
+      <h2 class="settings-section-title" data-i18n="common.adminPassword"></h2>
 
       <div class="form-group">
-        <label class="form-label">新密码</label>
+        <label class="form-label" data-i18n="settings.newPasswordLabel"></label>
         <input
           type="password"
           class="form-input"
           x-model="newPassword"
-          placeholder="至少6位密码"
+          data-i18n-placeholder="common.passwordMinPlaceholder"
           minlength="6"
         >
       </div>
 
       <div class="form-group">
-        <label class="form-label">确认密码</label>
+        <label class="form-label" data-i18n="settings.confirmPasswordLabel"></label>
         <input
           type="password"
           class="form-input"
           x-model="confirmPassword"
-          placeholder="再次输入密码"
+          data-i18n-placeholder="settings.confirmPasswordPlaceholder"
         >
       </div>
 
-      <button class="btn btn-primary" @click="changePassword()" :disabled="isLoading">
-        修改密码
+      <button class="btn btn-primary" @click="changePassword()" :disabled="isLoading" data-i18n="settings.changePassword">
       </button>
     </section>
 
     <!-- 索引管理 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">数据索引</h2>
+      <h2 class="settings-section-title" data-i18n="settings.indexSectionTitle"></h2>
 
       <template x-if="indexStatus">
         <div class="mb-4">
           <p class="text-muted">
-            状态: <strong x-text="formatStatus(indexStatus.status)"></strong>
+            <span data-i18n="settings.statusLabel"></span> <strong x-text="formatStatus(indexStatus.status)"></strong>
             <span x-show="isIndexTaskActive(indexStatus.status)">
-              - 进度: <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
+              <span data-i18n="settings.progressLabel"></span> <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
             </span>
           </p>
           <p class="text-muted" x-show="indexStatus.startedAt">
-            开始时间: <span x-text="formatDateTime(indexStatus.startedAt)"></span>
+            <span data-i18n="settings.startedAtLabel"></span> <span x-text="formatDateTime(indexStatus.startedAt)"></span>
           </p>
           <p class="text-muted" x-show="indexStatus.completedAt">
-            完成时间: <span x-text="formatDateTime(indexStatus.completedAt)"></span>
+            <span data-i18n="settings.completedAtLabel"></span> <span x-text="formatDateTime(indexStatus.completedAt)"></span>
           </p>
           <p class="text-muted" x-show="indexStatus.lastReconciledAt">
-            最近进度刷新: <span x-text="formatDateTime(indexStatus.lastReconciledAt)"></span>
+            <span data-i18n="settings.lastReconciledLabel"></span> <span x-text="formatDateTime(indexStatus.lastReconciledAt)"></span>
           </p>
           <p class="text-muted" x-show="indexStatus.error">
-            说明: <span x-text="indexStatus.error"></span>
+            <span data-i18n="settings.noteLabel"></span> <span x-text="indexStatus.error"></span>
           </p>
           <p class="text-muted" x-show="indexStatus.failed?.length > 0">
-            失败: <span x-text="indexStatus.failed.join(', ')"></span>
+            <span data-i18n="settings.failedLabel"></span> <span x-text="indexStatus.failed.join(', ')"></span>
           </p>
         </div>
       </template>
@@ -164,36 +162,34 @@
           class="btn btn-primary"
           @click="startIndex()"
           :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
+          data-i18n="settings.startIndexButton"
         >
-          批量更新索引
         </button>
-        <button class="btn btn-secondary" @click="loadIndexStatus()">
-          刷新状态
+        <button class="btn btn-secondary" @click="loadIndexStatus()" data-i18n="settings.refreshStatus">
         </button>
       </div>
 
-      <p class="form-hint mt-4">
-        批量索引会从VNDB重新获取所有条目的信息，适用于VNDB数据更新后同步。
+      <p class="form-hint mt-4" data-i18n="settings.indexHint">
       </p>
     </section>
 
     <!-- Tags 设置 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">Tags 显示</h2>
+      <h2 class="settings-section-title" data-i18n="settings.tagsSectionTitle"></h2>
 
       <div class="form-group">
-        <label class="form-label">Tags 来源</label>
+        <label class="form-label" data-i18n="settings.tagsSourceLabel"></label>
         <div class="radio-group">
           <label class="radio-label">
             <input type="radio" name="tagsMode" value="vndb" x-model="config.tagsMode" @change="saveTagsConfig()">
-            <span>使用 VNDB Tags</span>
+            <span data-i18n="settings.tagsModeVndb"></span>
           </label>
           <label class="radio-label">
             <input type="radio" name="tagsMode" value="manual" x-model="config.tagsMode" @change="saveTagsConfig()">
-            <span>使用手动 Tags</span>
+            <span data-i18n="settings.tagsModeManual"></span>
           </label>
         </div>
-        <p class="form-hint">VNDB Tags 从 VNDB 自动获取；手动 Tags 在编辑条目时自行添加。</p>
+        <p class="form-hint" data-i18n="settings.tagsModeHint"></p>
       </div>
 
       <!-- VNDB Tags 翻译设置 -->
@@ -201,44 +197,42 @@
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" x-model="config.translateTags" @change="saveTagsConfig()">
-            <span>启用中文翻译</span>
+            <span data-i18n="settings.translateTagsLabel"></span>
           </label>
-          <p class="form-hint">将 VNDB 的英文 Tags 翻译为中文显示。</p>
+          <p class="form-hint" data-i18n="settings.translateTagsHint"></p>
         </div>
       </template>
 
       <!-- 翻译文件 URL -->
       <template x-if="config.tagsMode === 'vndb' && config.translateTags">
         <div class="form-group">
-          <label class="form-label">翻译文件 URL</label>
+          <label class="form-label" data-i18n="settings.translationUrlLabel"></label>
           <div style="display: flex; gap: 12px;">
             <input
               type="url"
               class="form-input"
               x-model="config.translationUrl"
-              placeholder="留空使用默认翻译源"
+              data-i18n-placeholder="settings.translationUrlPlaceholder"
             >
-            <button class="btn btn-secondary" @click="saveTagsConfig()" :disabled="isLoading">
-              保存
+            <button class="btn btn-secondary" @click="saveTagsConfig()" :disabled="isLoading" data-i18n="common.save">
             </button>
           </div>
-          <p class="form-hint">支持自定义翻译文件，留空使用默认翻译源。</p>
+          <p class="form-hint" data-i18n="settings.translationUrlHint"></p>
 
           <!-- 翻译缓存状态 -->
           <template x-if="translationCacheStatus">
             <div class="cache-status mt-4">
               <p class="text-muted">
-                缓存状态:
-                <strong x-text="translationCacheStatus.version || '未知'"></strong>
+                <span data-i18n="settings.cacheStatusLabel"></span>
+                <strong x-text="translationCacheStatus.version || $t('common.unknown')"></strong>
                 <span x-show="translationCacheStatus.updatedAt">
-                  - 更新于 <span x-text="formatDate(translationCacheStatus.updatedAt)"></span>
+                  <span data-i18n="settings.updatedAtPrefix"></span> <span x-text="formatDate(translationCacheStatus.updatedAt)"></span>
                 </span>
               </p>
               <p class="text-muted">
-                已缓存 <strong x-text="translationCacheStatus.count || 0"></strong> 条翻译
+                <span data-i18n="settings.cachedCountPrefix"></span> <strong x-text="translationCacheStatus.count || 0"></strong> <span data-i18n="settings.cachedCountSuffix"></span>
               </p>
-              <button class="btn btn-secondary btn-sm mt-2" @click="clearTranslationCache()">
-                清除缓存
+              <button class="btn btn-secondary btn-sm mt-2" @click="clearTranslationCache()" data-i18n="settings.clearCache">
               </button>
             </div>
           </template>
@@ -248,31 +242,31 @@
 
     <!-- 外观设置 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">外观设置</h2>
+      <h2 class="settings-section-title" data-i18n="settings.appearanceSectionTitle"></h2>
 
       <div class="form-group">
-        <label class="form-label">背景图片 URL</label>
+        <label class="form-label" data-i18n="settings.backgroundUrlLabel"></label>
         <div style="display: flex; gap: 12px;">
           <input
             type="url"
             class="form-input"
             x-model="config.backgroundUrl"
-            placeholder="输入背景图片链接，留空则不使用背景图"
+            data-i18n-placeholder="settings.backgroundUrlPlaceholder"
           >
           <button
             class="btn btn-secondary"
             @click="config.backgroundUrl = ''; previewBackground()"
             :disabled="!config.backgroundUrl"
+            data-i18n="common.clear"
           >
-            清除
           </button>
         </div>
-        <p class="form-hint">支持任意图片直链，推荐使用高分辨率图片以获得最佳效果。</p>
+        <p class="form-hint" data-i18n="settings.backgroundUrlHint"></p>
       </div>
 
       <div class="form-group">
         <label class="form-label">
-          遮罩透明度: <span x-text="Math.round((config.backgroundOverlay ?? 0.5) * 100) + '%'"></span>
+          <span data-i18n="settings.overlayOpacityLabel"></span> <span x-text="Math.round((config.backgroundOverlay ?? 0.5) * 100) + '%'"></span>
         </label>
         <input
           type="range"
@@ -283,12 +277,12 @@
           x-model.number="config.backgroundOverlay"
           @input="previewBackground()"
         >
-        <p class="form-hint">控制背景图上方遮罩层的不透明度，数值越高文字越清晰。</p>
+        <p class="form-hint" data-i18n="settings.overlayOpacityHint"></p>
       </div>
 
       <div class="form-group">
         <label class="form-label">
-          模糊度: <span x-text="(config.backgroundBlur ?? 4) + 'px'"></span>
+          <span data-i18n="settings.blurLabel"></span> <span x-text="(config.backgroundBlur ?? 4) + 'px'"></span>
         </label>
         <input
           type="range"
@@ -299,17 +293,16 @@
           x-model.number="config.backgroundBlur"
           @input="previewBackground()"
         >
-        <p class="form-hint">控制背景图的模糊程度，0 为不模糊。</p>
+        <p class="form-hint" data-i18n="settings.blurHint"></p>
       </div>
 
-      <button class="btn btn-primary" @click="saveAppearanceConfig()" :disabled="isLoading">
-        保存外观设置
+      <button class="btn btn-primary" @click="saveAppearanceConfig()" :disabled="isLoading" data-i18n="settings.saveAppearance">
       </button>
     </section>
 
     <!-- 语言设置 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">语言 / Language</h2>
+      <h2 class="settings-section-title" data-i18n="settings.languageSectionTitle"></h2>
 
       <div class="form-group">
         <div class="radio-group">
@@ -322,21 +315,20 @@
             <span>English</span>
           </label>
         </div>
-        <p class="form-hint">切换后页面将自动刷新 / The page will reload after switching.</p>
+        <p class="form-hint" data-i18n="settings.languageHint"></p>
       </div>
     </section>
 
     <!-- 数据导入导出 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">数据管理</h2>
+      <h2 class="settings-section-title" data-i18n="settings.dataSectionTitle"></h2>
 
       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <button class="btn btn-secondary" @click="exportData()">
-          导出数据
+        <button class="btn btn-secondary" @click="exportData()" data-i18n="settings.exportData">
         </button>
 
         <label class="btn btn-secondary" style="cursor: pointer;">
-          导入数据
+          <span data-i18n="settings.importData"></span>
           <input
             type="file"
             accept=".json"
@@ -346,17 +338,15 @@
         </label>
       </div>
 
-      <p class="form-hint mt-4">
-        导出的数据为JSON格式，可用于备份或迁移。导入时选择"合并"会保留现有数据，选择"替换"会清空现有数据。
+      <p class="form-hint mt-4" data-i18n="settings.dataHint">
       </p>
     </section>
 
     <!-- 退出登录 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">账户</h2>
+      <h2 class="settings-section-title" data-i18n="settings.accountSectionTitle"></h2>
 
-      <button class="btn btn-danger" @click="logout()">
-        退出登录
+      <button class="btn btn-danger" @click="logout()" data-i18n="settings.logout">
       </button>
     </section>
   </main>

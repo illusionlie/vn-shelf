@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>登录 - VN Shelf</title>
+  <title data-i18n="meta.loginTitle">VN Shelf</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/forms.css">
   <link rel="stylesheet" href="css/login.css">
@@ -22,63 +22,63 @@
       <template x-if="isInitialized === false">
         <form @submit.prevent="handleSubmit()">
           <div class="form-group">
-            <label class="form-label">设置管理员密码 *</label>
-            <input 
-              type="password" 
-              class="form-input" 
+            <label class="form-label" data-i18n="login.setPasswordLabel"></label>
+            <input
+              type="password"
+              class="form-input"
               x-model="password"
-              placeholder="至少6位密码"
+              data-i18n-placeholder="common.passwordMinPlaceholder"
               required
               minlength="6"
             >
           </div>
-          
+
           <div class="form-group">
-            <label class="form-label">VNDB API Token (可选)</label>
-            <input 
-              type="text" 
-              class="form-input" 
+            <label class="form-label" data-i18n="login.vndbTokenLabel"></label>
+            <input
+              type="text"
+              class="form-input"
               x-model="vndbApiToken"
-              placeholder="可在设置中稍后配置"
+              data-i18n-placeholder="login.vndbTokenPlaceholder"
             >
             <p class="form-hint">
-              在 <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> 获取API Token
+              <span data-i18n="login.tokenHintPrefix"></span> <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> <span data-i18n="login.tokenHintSuffix"></span>
             </p>
           </div>
-          
+
           <p class="form-error" x-text="error" x-show="error"></p>
-          
+
           <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
-            <span x-show="isLoading">初始化中...</span>
-            <span x-show="!isLoading">初始化并登录</span>
+            <span x-show="isLoading" data-i18n="login.initializing"></span>
+            <span x-show="!isLoading" data-i18n="login.initAndLogin"></span>
           </button>
         </form>
       </template>
-      
+
       <!-- 登录表单 -->
       <template x-if="isInitialized === true">
         <form @submit.prevent="handleSubmit()">
           <div class="form-group">
-            <label class="form-label">管理员密码</label>
-            <input 
-              type="password" 
-              class="form-input" 
+            <label class="form-label" data-i18n="common.adminPassword"></label>
+            <input
+              type="password"
+              class="form-input"
               x-model="password"
-              placeholder="请输入密码"
+              data-i18n-placeholder="validation.passwordRequired"
               required
               autofocus
             >
           </div>
-          
+
           <p class="form-error" x-text="error" x-show="error"></p>
-          
+
           <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
-            <span x-show="isLoading">登录中...</span>
-            <span x-show="!isLoading">登录</span>
+            <span x-show="isLoading" data-i18n="login.loggingIn"></span>
+            <span x-show="!isLoading" data-i18n="login.submit"></span>
           </button>
-          
+
           <p class="text-center text-muted mt-4">
-            <a href="/">返回首页</a>
+            <a href="/" data-i18n="login.backToHome"></a>
           </p>
         </form>
       </template>

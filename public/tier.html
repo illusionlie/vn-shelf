@@ -25,7 +25,7 @@
           class="banner-github-link"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="打开 VN Shelf GitHub 仓库"
+          data-i18n-aria-label="nav.githubRepo"
           title="GitHub"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -35,11 +35,11 @@
       </div>
       <div class="header-actions">
         <nav class="banner-nav desktop-only">
-          <a href="/">首页</a>
+          <a href="/" data-i18n="nav.home"></a>
           <a href="/tier" class="active">Tier List</a>
-          <a href="/stats">统计</a>
-          <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
-          <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          <a href="/stats" data-i18n="nav.stats"></a>
+          <template x-if="$store.app.isAdmin"><a href="/settings" data-i18n="nav.settings"></a></template>
+          <template x-if="!$store.app.isAdmin"><a href="/login" data-i18n="nav.login"></a></template>
         </nav>
         <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
           <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -63,11 +63,11 @@
             </svg>
           </button>
           <div id="more-menu" class="more-menu" role="menu">
-            <a href="/" role="menuitem">首页</a>
+            <a href="/" role="menuitem" data-i18n="nav.home"></a>
             <a href="/tier" class="active" role="menuitem">Tier List</a>
-            <a href="/stats" role="menuitem">统计</a>
-            <template x-if="$store.app.isAdmin"><a href="/settings" role="menuitem">设置</a></template>
-            <template x-if="!$store.app.isAdmin"><a href="/login" role="menuitem">登录</a></template>
+            <a href="/stats" role="menuitem" data-i18n="nav.stats"></a>
+            <template x-if="$store.app.isAdmin"><a href="/settings" role="menuitem" data-i18n="nav.settings"></a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login" role="menuitem" data-i18n="nav.login"></a></template>
           </div>
         </div>
       </div>
@@ -88,8 +88,8 @@
         <template x-if="tiers.length === 0">
           <div class="empty-state">
             <div class="empty-state-icon">🏷️</div>
-            <div class="empty-state-title">暂无 Tier</div>
-            <p class="text-muted">管理员可先创建 Tier，再拖拽 VN 封面进行分类</p>
+            <div class="empty-state-title" data-i18n="tier.emptyTitle"></div>
+            <p class="text-muted" data-i18n="tier.emptyHint"></p>
           </div>
         </template>
 
@@ -131,7 +131,7 @@
                       :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
                       @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                     >
-                    <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" title="点击显示">
+                    <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" data-i18n-title="common.clickToShow">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
                     </div>
                   </button>
@@ -141,7 +141,7 @@
               <div class="tier-drop-indicator tier-drop-indicator-end" x-show="isDropAtEnd(tier.id)"></div>
 
               <template x-if="getTierItems(tier.id).length === 0">
-                <div class="tier-empty">拖拽条目到此处</div>
+                <div class="tier-empty" data-i18n="tier.dropHere"></div>
               </template>
             </div>
 
@@ -149,27 +149,27 @@
               <div class="tier-row-actions">
                 <button class="btn btn-secondary btn-sm" @click="moveTier(tier.id, -1)">↑</button>
                 <button class="btn btn-secondary btn-sm" @click="moveTier(tier.id, 1)">↓</button>
-                <button class="btn btn-secondary btn-sm" @click="openTierEdit(tier)">编辑</button>
-                <button class="btn btn-danger btn-sm" @click="deleteTier(tier.id)">删除</button>
+                <button class="btn btn-secondary btn-sm" @click="openTierEdit(tier)" data-i18n="common.edit"></button>
+                <button class="btn btn-danger btn-sm" @click="deleteTier(tier.id)" data-i18n="common.delete"></button>
               </div>
             </template>
           </section>
         </template>
 
         <template x-if="$store.app.isAdmin">
-          <button class="tier-add-placeholder" @click="openCreateTier()" title="新建 Tier">
+          <button class="tier-add-placeholder" @click="openCreateTier()" data-i18n-title="tier.newTier">
             <span class="tier-add-placeholder-icon">+</span>
-            <span class="tier-add-placeholder-text">新建 Tier</span>
+            <span class="tier-add-placeholder-text" data-i18n="tier.newTier"></span>
           </button>
         </template>
 
         <template x-if="$store.app.isAdmin">
           <section class="untiered-section">
-            <h2 class="settings-section-title">未分类</h2>
+            <h2 class="settings-section-title" data-i18n="tier.untiered"></h2>
             <div
               class="untiered-grid"
               role="list"
-              aria-label="未分类"
+              data-i18n-aria-label="tier.untiered"
               :class="{ 'drag-over': dragOverTierId === '__untiered__' }"
               @dragover="onDragOver('__untiered__', $event)"
               @dragleave="onDragLeave('__untiered__', $event)"
@@ -185,7 +185,7 @@
                     draggable="true"
                     :tabindex="$store.app.isAdmin ? 0 : -1"
                     :aria-grabbed="keyboardDragging && draggedVN?.id === vn.id ? 'true' : 'false'"
-                    :aria-label="(vn.titleCn || vn.titleJa || vn.title) + ' · 未分类'"
+                    :aria-label="(vn.titleCn || vn.titleJa || vn.title) + ' · ' + $t('tier.untiered')"
                     @dragstart="onDragStart(vn, $event)"
                     @dragend="onDragEnd()"
                     @click="openDetail(vn)"
@@ -199,7 +199,7 @@
                       :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
                       @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                     >
-                    <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" title="点击显示">
+                    <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" data-i18n-title="common.clickToShow">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
                     </div>
                   </button>
@@ -209,7 +209,7 @@
               <div class="tier-drop-indicator tier-drop-indicator-end" x-show="isDropAtEnd(null)"></div>
 
               <template x-if="untieredVN.length === 0">
-                <div class="tier-empty">暂无未分类条目</div>
+                <div class="tier-empty" data-i18n="tier.untieredEmpty"></div>
               </template>
             </div>
           </section>
@@ -224,8 +224,8 @@
       <template x-if="selectedVN">
         <div>
           <div class="modal-header">
-            <h2 id="detailModalTitle" class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
-            <button class="modal-close" aria-label="关闭" @click="closeDetail()">&times;</button>
+            <h2 id="detailModalTitle" class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || $t('common.details')"></h2>
+            <button class="modal-close" data-i18n-aria-label="common.close" @click="closeDetail()">&times;</button>
           </div>
 
           <div class="modal-body">
@@ -243,7 +243,7 @@
                   x-show="selectedVN.vndb?.imageNsfw && !showNsfw"
                   @click.stop="showNsfw = true"
                   style="border-radius:var(--border-radius-md);"
-                  title="点击显示"
+                  data-i18n-title="common.clickToShow"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
                 </div>
@@ -251,13 +251,13 @@
               <div class="detail-info">
                 <h1 class="detail-title">
                   <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
-                  <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" title="全年龄作品">全年龄</span>
+                  <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>
                 </h1>
                 <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>
                 <p class="detail-company" x-text="selectedVN.vndb?.developers?.join(', ') || ''" x-show="selectedVN.vndb?.developers?.length"></p>
 
                 <div class="detail-stars-group" x-show="selectedVN.vndb?.rating">
-                  <span class="detail-stars-label">VNDB评分</span>
+                  <span class="detail-stars-label" data-i18n="common.vndbRating"></span>
                   <div class="detail-stars vndb-rating">
                     <div class="stars-container">
                       <template x-for="i in 10" :key="i">
@@ -269,7 +269,7 @@
                 </div>
 
                 <div class="detail-stars-group" x-show="selectedVN.user?.personalRating">
-                  <span class="detail-stars-label">个人评分</span>
+                  <span class="detail-stars-label" data-i18n="common.personalRating"></span>
                   <div class="detail-stars personal-rating">
                     <div class="stars-container">
                       <template x-for="i in 10" :key="i">
@@ -282,11 +282,11 @@
 
                 <div class="detail-meta">
                   <div class="detail-meta-item">
-                    <span class="detail-meta-label">游戏时长</span>
-                    <span class="detail-meta-value" x-text="selectedVN.vndb?.length || '未知'"></span>
+                    <span class="detail-meta-label" data-i18n="common.gameLength"></span>
+                    <span class="detail-meta-value" x-text="selectedVN.vndb?.length || $t('common.unknown')"></span>
                   </div>
                   <div class="detail-meta-item">
-                    <span class="detail-meta-label">我的游玩时长</span>
+                    <span class="detail-meta-label" data-i18n="common.myPlayTime"></span>
                     <span class="detail-meta-value" x-text="formatUserPlayTime(selectedVN.user)"></span>
                   </div>
                 </div>
@@ -294,7 +294,7 @@
             </div>
 
             <div class="detail-tags" x-show="getDisplayTags(selectedVN).length">
-              <h4 class="detail-tags-title">标签</h4>
+              <h4 class="detail-tags-title" data-i18n="common.tags"></h4>
               <div class="detail-tags-list">
                 <template x-for="tag in getDisplayTags(selectedVN).slice(0, 15)" :key="tag">
                   <span class="detail-tag" x-text="tag"></span>
@@ -303,7 +303,7 @@
             </div>
 
             <div class="detail-review" x-show="selectedVN.user?.review">
-              <h3 class="detail-review-title">简评</h3>
+              <h3 class="detail-review-title" data-i18n="common.review"></h3>
               <div class="detail-review-content" x-html="renderMarkdown(selectedVN.user?.review || '')"></div>
             </div>
           </div>
@@ -316,25 +316,25 @@
   <div class="modal-overlay" :class="{ active: showTierEdit }" @click.self="closeTierEdit()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeTierEdit()">
     <div class="modal tier-edit-modal" x-ref="tierEditModal" x-show="showTierEdit" x-transition role="dialog" aria-modal="true" aria-labelledby="tierEditModalTitle">
       <div class="modal-header">
-        <h2 id="tierEditModalTitle" class="modal-title" x-text="editingTier ? '编辑 Tier' : '创建 Tier'"></h2>
-        <button class="modal-close" aria-label="关闭" @click="closeTierEdit()">&times;</button>
+        <h2 id="tierEditModalTitle" class="modal-title" x-text="editingTier ? $t('tier.editTier') : $t('tier.createTier')"></h2>
+        <button class="modal-close" data-i18n-aria-label="common.close" @click="closeTierEdit()">&times;</button>
       </div>
 
       <div class="modal-body">
         <form @submit.prevent="saveTier()">
           <div class="form-group">
-            <label class="form-label">Tier 名称</label>
+            <label class="form-label" data-i18n="tier.nameLabel"></label>
             <input
               type="text"
               class="form-input"
               x-model="tierForm.name"
-              placeholder="例如：S"
+              data-i18n-placeholder="tier.namePlaceholder"
               required
             >
           </div>
 
           <div class="form-group">
-            <label class="form-label">Tier 颜色</label>
+            <label class="form-label" data-i18n="tier.colorLabel"></label>
             <input
               type="color"
               class="tier-color-input"
@@ -351,8 +351,8 @@
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeTierEdit()">取消</button>
-            <button type="submit" class="btn btn-primary" :disabled="isSavingTier" x-text="isSavingTier ? '保存中...' : '保存'"></button>
+            <button type="button" class="btn btn-secondary" @click="closeTierEdit()" data-i18n="common.cancel"></button>
+            <button type="submit" class="btn btn-primary" :disabled="isSavingTier" x-text="isSavingTier ? $t('common.saving') : $t('common.save')"></button>
           </div>
         </form>
       </div>

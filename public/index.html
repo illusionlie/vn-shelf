@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VN Shelf - 视觉小说书架</title>
-  <meta name="description" content="记录我玩过的视觉小说">
+  <title data-i18n="meta.indexTitle">VN Shelf</title>
+  <meta name="description" content="" data-i18n-content="meta.indexDescription">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/forms.css">
   <link rel="stylesheet" href="css/cards-detail.css">
@@ -25,7 +25,7 @@
           class="banner-github-link"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="打开 VN Shelf GitHub 仓库"
+          data-i18n-aria-label="nav.githubRepo"
           title="GitHub"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -35,11 +35,11 @@
       </div>
       <div class="header-actions">
         <nav class="banner-nav desktop-only">
-          <a href="/" class="active">首页</a>
+          <a href="/" class="active" data-i18n="nav.home"></a>
           <a href="/tier">Tier List</a>
-          <a href="/stats">统计</a>
-          <template x-if="$store.app.isAdmin"><a href="/settings">设置</a></template>
-          <template x-if="!$store.app.isAdmin"><a href="/login">登录</a></template>
+          <a href="/stats" data-i18n="nav.stats"></a>
+          <template x-if="$store.app.isAdmin"><a href="/settings" data-i18n="nav.settings"></a></template>
+          <template x-if="!$store.app.isAdmin"><a href="/login" data-i18n="nav.login"></a></template>
         </nav>
         <button class="theme-toggle-btn" @click="toggleTheme()" aria-label="Toggle Theme">
           <svg class="light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -63,11 +63,11 @@
             </svg>
           </button>
           <div id="more-menu" class="more-menu" role="menu">
-            <a href="/" role="menuitem">首页</a>
+            <a href="/" role="menuitem" data-i18n="nav.home"></a>
             <a href="/tier" role="menuitem">Tier List</a>
-            <a href="/stats" role="menuitem">统计</a>
-            <template x-if="$store.app.isAdmin"><a href="/settings" role="menuitem">设置</a></template>
-            <template x-if="!$store.app.isAdmin"><a href="/login" role="menuitem">登录</a></template>
+            <a href="/stats" role="menuitem" data-i18n="nav.stats"></a>
+            <template x-if="$store.app.isAdmin"><a href="/settings" role="menuitem" data-i18n="nav.settings"></a></template>
+            <template x-if="!$store.app.isAdmin"><a href="/login" role="menuitem" data-i18n="nav.login"></a></template>
           </div>
         </div>
       </div>
@@ -75,18 +75,18 @@
     <!-- 控制条 -->
     <div class="controls-bar">
       <div class="search-container">
-        <input type="text" class="search-input" placeholder="搜索视觉小说..." aria-label="搜索视觉小说" x-model="searchQuery" @input="debouncedSearch()">
+        <input type="text" class="search-input" data-i18n-placeholder="index.searchPlaceholder" data-i18n-aria-label="index.searchAriaLabel" x-model="searchQuery" @input="debouncedSearch()">
       </div>
-      <select class="sort-select" aria-label="排序方式" x-model="sortBy" @change="handleSortChange()">
-        <option value="created_desc">最新录入</option>
-        <option value="created_asc">最早录入</option>
-        <option value="rating_desc">VNDB评分 ↓</option>
-        <option value="rating_asc">VNDB评分 ↑</option>
-        <option value="personal_desc">个人评分 ↓</option>
-        <option value="personal_asc">个人评分 ↑</option>
+      <select class="sort-select" data-i18n-aria-label="index.sortAriaLabel" x-model="sortBy" @change="handleSortChange()">
+        <option value="created_desc" data-i18n="index.sortCreatedDesc"></option>
+        <option value="created_asc" data-i18n="index.sortCreatedAsc"></option>
+        <option value="rating_desc" data-i18n="index.sortRatingDesc"></option>
+        <option value="rating_asc" data-i18n="index.sortRatingAsc"></option>
+        <option value="personal_desc" data-i18n="index.sortPersonalDesc"></option>
+        <option value="personal_asc" data-i18n="index.sortPersonalAsc"></option>
       </select>
       <template x-if="$store.app.isAdmin">
-        <button class="btn btn-primary" @click="openEdit()">+ 添加</button>
+        <button class="btn btn-primary" @click="openEdit()" data-i18n="index.addButton"></button>
       </template>
     </div>
   </header>
@@ -104,13 +104,13 @@
     <template x-if="!isLoading && filteredList.length === 0">
       <div class="empty-state">
         <div class="empty-state-icon">📚</div>
-        <div class="empty-state-title">暂无条目</div>
+        <div class="empty-state-title" data-i18n="index.emptyTitle"></div>
         <p class="text-muted">
           <template x-if="$store.app.isAdmin">
-            <span>点击右上角"添加"按钮添加第一个视觉小说</span>
+            <span data-i18n="index.emptyHintAdmin"></span>
           </template>
           <template x-if="!$store.app.isAdmin">
-            <span>管理员尚未添加任何视觉小说</span>
+            <span data-i18n="index.emptyHintGuest"></span>
           </template>
         </p>
       </div>
@@ -128,10 +128,10 @@
               :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
               @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
             >
-            <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" title="点击显示">
+            <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" data-i18n-title="common.clickToShow">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
             </div>
-            <span class="all-age-badge" x-show="vn.allAge" title="全年龄作品">全年龄</span>
+            <span class="all-age-badge" x-show="vn.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>
           </div>
           <div class="vn-card-content">
             <h3 class="vn-card-title">
@@ -162,8 +162,8 @@
       <template x-if="selectedVN">
         <div>
           <div class="modal-header">
-            <h2 id="detailModalTitle" class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || '详情'"></h2>
-            <button class="modal-close" aria-label="关闭" @click="closeDetail()">&times;</button>
+            <h2 id="detailModalTitle" class="modal-title" x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title || $t('common.details')"></h2>
+            <button class="modal-close" data-i18n-aria-label="common.close" @click="closeDetail()">&times;</button>
           </div>
 
           <div class="modal-body">
@@ -181,7 +181,7 @@
                   x-show="selectedVN.vndb?.imageNsfw && !showNsfw"
                   @click.stop="showNsfw = true"
                   style="border-radius:var(--border-radius-md);"
-                  title="点击显示"
+                  data-i18n-title="common.clickToShow"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
                 </div>
@@ -193,7 +193,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     class="detail-title-link"
-                    title="在 VNDB 中查看"
+                    data-i18n-title="index.viewOnVndb"
                   >
                     <span x-text="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn || selectedVN.vndb?.titleJa || selectedVN.vndb?.title"></span>
                   </a>
@@ -202,7 +202,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     class="vndb-link-btn"
-                    title="跳转到 VNDB 条目"
+                    data-i18n-title="index.goToVndb"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -210,14 +210,14 @@
                       <line x1="10" y1="14" x2="21" y2="3"></line>
                     </svg>
                   </a>
-                  <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" title="全年龄作品">全年龄</span>
+                  <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>
                 </h1>
                 <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>
                 <p class="detail-company" x-text="selectedVN.vndb?.developers?.join(', ') || ''" x-show="selectedVN.vndb?.developers?.length"></p>
 
                 <!-- VNDB评分 -->
                 <div class="detail-stars-group" x-show="selectedVN.vndb?.rating">
-                  <span class="detail-stars-label">VNDB评分</span>
+                  <span class="detail-stars-label" data-i18n="common.vndbRating"></span>
                   <div class="detail-stars vndb-rating">
                     <div class="stars-container">
                       <template x-for="i in 10" :key="i">
@@ -230,7 +230,7 @@
 
                 <!-- 个人评分 -->
                 <div class="detail-stars-group" x-show="selectedVN.user?.personalRating">
-                  <span class="detail-stars-label">个人评分</span>
+                  <span class="detail-stars-label" data-i18n="common.personalRating"></span>
                   <div class="detail-stars personal-rating">
                     <div class="stars-container">
                       <template x-for="i in 10" :key="i">
@@ -243,18 +243,18 @@
 
                 <div class="detail-meta">
                   <div class="detail-meta-item">
-                    <span class="detail-meta-label">游戏时长</span>
-                    <span class="detail-meta-value" x-text="selectedVN.vndb?.length || '未知'"></span>
+                    <span class="detail-meta-label" data-i18n="common.gameLength"></span>
+                    <span class="detail-meta-value" x-text="selectedVN.vndb?.length || $t('common.unknown')"></span>
                   </div>
                   <div class="detail-meta-item">
-                    <span class="detail-meta-label">我的游玩时长</span>
+                    <span class="detail-meta-label" data-i18n="common.myPlayTime"></span>
                     <span class="detail-meta-value" x-text="formatUserPlayTime(selectedVN.user)"></span>
                   </div>
                 </div>
               </div>
             </div>
             <div class="detail-tags" x-show="getDisplayTags(selectedVN).length">
-              <h4 class="detail-tags-title">标签</h4>
+              <h4 class="detail-tags-title" data-i18n="common.tags"></h4>
               <div class="detail-tags-list">
                 <template x-for="tag in getDisplayTags(selectedVN).slice(0, 15)" :key="tag">
                   <span class="detail-tag" x-text="tag"></span>
@@ -263,14 +263,14 @@
             </div>
 
             <div class="detail-review" x-show="selectedVN.user?.review">
-              <h3 class="detail-review-title">简评</h3>
+              <h3 class="detail-review-title" data-i18n="common.review"></h3>
               <div class="detail-review-content" x-html="renderMarkdown(selectedVN.user?.review || '')"></div>
             </div>
           </div>
 
           <div class="modal-footer" x-show="$store.app.isAdmin">
-            <button class="btn btn-secondary" @click="openEdit(selectedVN)">编辑</button>
-            <button class="btn btn-danger" @click="deleteVN()">删除</button>
+            <button class="btn btn-secondary" @click="openEdit(selectedVN)" data-i18n="common.edit"></button>
+            <button class="btn btn-danger" @click="deleteVN()" data-i18n="common.delete"></button>
           </div>
         </div>
       </template>
@@ -281,8 +281,8 @@
   <div class="modal-overlay" :class="{ active: showEdit }" @click.self="closeEdit()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeEdit()">
     <div class="modal" x-ref="editModal" x-show="showEdit" x-transition role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
       <div class="modal-header">
-        <h2 id="editModalTitle" class="modal-title" x-text="editForm.isNew ? '添加条目' : '编辑条目'"></h2>
-        <button class="modal-close" aria-label="关闭" @click="closeEdit()">&times;</button>
+        <h2 id="editModalTitle" class="modal-title" x-text="editForm.isNew ? $t('index.addEntry') : $t('index.editEntry')"></h2>
+        <button class="modal-close" data-i18n-aria-label="common.close" @click="closeEdit()">&times;</button>
       </div>
 
       <div class="modal-body">
@@ -294,25 +294,25 @@
                 type="text"
                 class="form-input"
                 x-model="editForm.vndbId"
-                placeholder="例如: v17"
+                data-i18n-placeholder="index.vndbIdPlaceholder"
                 required
               >
-              <p class="form-hint">在VNDB网站上找到视觉小说的ID，格式为v+数字</p>
+              <p class="form-hint" data-i18n="index.vndbIdHint"></p>
             </div>
           </template>
 
           <div class="form-group">
-            <label class="form-label">中文标题</label>
+            <label class="form-label" data-i18n="index.titleCnLabel"></label>
             <input
               type="text"
               class="form-input"
               x-model="editForm.titleCn"
-              placeholder="游戏的中文译名"
+              data-i18n-placeholder="index.titleCnPlaceholder"
             >
           </div>
 
           <div class="form-group">
-            <label class="form-label">个人评分</label>
+            <label class="form-label" data-i18n="common.personalRating"></label>
             <input
               type="number"
               class="form-input"
@@ -320,12 +320,12 @@
               min="0"
               max="10"
               step="0.1"
-              placeholder="0-10分"
+              data-i18n-placeholder="index.ratingPlaceholder"
             >
           </div>
 
           <div class="form-group">
-            <label class="form-label">游玩时长（小时 / 分钟）</label>
+            <label class="form-label" data-i18n="index.playTimeLabel"></label>
             <div style="display:flex; gap:10px;">
               <input
                 type="number"
@@ -333,7 +333,7 @@
                 x-model.number="editForm.playTimeHours"
                 min="0"
                 step="1"
-                placeholder="小时"
+                data-i18n-placeholder="index.hoursPlaceholder"
               >
               <input
                 type="number"
@@ -341,22 +341,22 @@
                 x-model.number="editForm.playTimePartMinutes"
                 min="0"
                 step="1"
-                placeholder="分钟"
+                data-i18n-placeholder="index.minutesPlaceholder"
               >
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">简评 (支持Markdown)</label>
+            <label class="form-label" data-i18n="index.reviewLabel"></label>
             <textarea
               class="form-input form-textarea"
               x-model="editForm.review"
-              placeholder="写下你的感想..."
+              data-i18n-placeholder="index.reviewPlaceholder"
             ></textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label">开始日期</label>
+            <label class="form-label" data-i18n="index.startDateLabel"></label>
             <input
               type="date"
               class="form-input"
@@ -365,7 +365,7 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">完成日期</label>
+            <label class="form-label" data-i18n="index.finishDateLabel"></label>
             <input
               type="date"
               class="form-input"
@@ -374,31 +374,31 @@
           </div>
 
           <div class="form-group" x-show="config.tagsMode === 'manual'">
-            <label class="form-label">标签（手动模式）</label>
+            <label class="form-label" data-i18n="index.tagsManualLabel"></label>
             <input
               type="text"
               class="form-input"
               x-model="editForm.tags"
-              placeholder="多个标签用逗号分隔，例如：神作, 催泪, 神曲"
+              data-i18n-placeholder="index.tagsManualPlaceholder"
             >
-            <p class="form-hint">当前为手动标签模式，请输入自定义标签。</p>
+            <p class="form-hint" data-i18n="index.tagsManualHint"></p>
           </div>
 
           <div class="form-group" x-show="config.tagsMode === 'vndb' && !editForm.isNew">
-            <label class="form-label">标签</label>
+            <label class="form-label" data-i18n="common.tags"></label>
             <div class="detail-tags-list static">
               <template x-for="tag in getDisplayTags(selectedVN || editForm).slice(0, 15)" :key="tag">
                 <span class="detail-tag" x-text="tag"></span>
               </template>
             </div>
-            <p class="form-hint">当前为 VNDB 标签模式，标签来自 VNDB 数据。如需自定义标签，请在设置中切换为手动模式。</p>
+            <p class="form-hint" data-i18n="index.tagsVndbHint"></p>
           </div>
         </form>
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="closeEdit()">取消</button>
-        <button class="btn btn-primary" @click="saveEdit()">保存</button>
+        <button class="btn btn-secondary" @click="closeEdit()" data-i18n="common.cancel"></button>
+        <button class="btn btn-primary" @click="saveEdit()" data-i18n="common.save"></button>
       </div>
     </div>
   </div>

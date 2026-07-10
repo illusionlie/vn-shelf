@@ -2,7 +2,7 @@
  * zh-CN 默认词典（静态导入，保证 t() 首帧同步可用）。
  *
  * 结构约定：两级嵌套对象，key 形如 `<域>.<语义名>`：
- * - common.*     通用词（未知/未记录/确定/取消等）
+ * - common.*     通用词（未知/保存/取消/关闭等，跨页复用）
  * - error.*      friendlyErrorMessage 的 code→文案映射
  * - status.*     索引任务状态（settingsPage.formatStatus）
  * - toast.*      成功/提示类 toast
@@ -12,15 +12,42 @@
  * - time.*       时长格式化单位模板
  * - theme.*      主题切换 aria-label
  * - markdown.*   Markdown 渲染安全降级文案
+ * - nav.*        跨页导航链接（B6b，HTML data-i18n）
+ * - meta.*       页面 <title> / meta description（整串成键，不拼接）
+ * - index.*      主页（书架/控制条/编辑弹窗）静态文案
+ * - login.*      登录页静态文案
+ * - settings.*   设置页静态文案
+ * - stats.*      统计页静态文案
+ * - tier.*       Tier List 页静态文案
  *
  * 插值占位符用 `{name}`，由 t(key, params) 替换。
+ * HTML 静态文案（nav/meta/页域）的 zh 值 = 迁移前 HTML 字面量逐字复制（等值替换）。
  */
 export default {
   common: {
     unknown: '未知',
     notRecorded: '未记录',
     ok: '确定',
-    cancel: '取消'
+    cancel: '取消',
+    save: '保存',
+    saving: '保存中...',
+    edit: '编辑',
+    delete: '删除',
+    close: '关闭',
+    colon: '：',
+    details: '详情',
+    clear: '清除',
+    clickToShow: '点击显示',
+    allAge: '全年龄',
+    allAgeTitle: '全年龄作品',
+    vndbRating: 'VNDB评分',
+    personalRating: '个人评分',
+    gameLength: '游戏时长',
+    myPlayTime: '我的游玩时长',
+    tags: '标签',
+    review: '简评',
+    adminPassword: '管理员密码',
+    passwordMinPlaceholder: '至少6位密码'
   },
   error: {
     unauthorized: '请先登录',
@@ -122,5 +149,146 @@ export default {
     unsafeLink: '不安全的链接已禁用',
     unsafeImage: '不安全的图片链接已禁用',
     imagePlaceholder: '[图片]'
+  },
+  nav: {
+    home: '首页',
+    stats: '统计',
+    settings: '设置',
+    login: '登录',
+    githubRepo: '打开 VN Shelf GitHub 仓库'
+  },
+  meta: {
+    indexTitle: 'VN Shelf - 视觉小说书架',
+    indexDescription: '记录我玩过的视觉小说',
+    loginTitle: '登录 - VN Shelf',
+    statsTitle: '统计 - VN Shelf',
+    settingsTitle: '设置 - VN Shelf'
+  },
+  index: {
+    searchPlaceholder: '搜索视觉小说...',
+    searchAriaLabel: '搜索视觉小说',
+    sortAriaLabel: '排序方式',
+    sortCreatedDesc: '最新录入',
+    sortCreatedAsc: '最早录入',
+    sortRatingDesc: 'VNDB评分 ↓',
+    sortRatingAsc: 'VNDB评分 ↑',
+    sortPersonalDesc: '个人评分 ↓',
+    sortPersonalAsc: '个人评分 ↑',
+    addButton: '+ 添加',
+    emptyTitle: '暂无条目',
+    emptyHintAdmin: '点击右上角"添加"按钮添加第一个视觉小说',
+    emptyHintGuest: '管理员尚未添加任何视觉小说',
+    viewOnVndb: '在 VNDB 中查看',
+    goToVndb: '跳转到 VNDB 条目',
+    addEntry: '添加条目',
+    editEntry: '编辑条目',
+    vndbIdPlaceholder: '例如: v17',
+    vndbIdHint: '在VNDB网站上找到视觉小说的ID，格式为v+数字',
+    titleCnLabel: '中文标题',
+    titleCnPlaceholder: '游戏的中文译名',
+    ratingPlaceholder: '0-10分',
+    playTimeLabel: '游玩时长（小时 / 分钟）',
+    hoursPlaceholder: '小时',
+    minutesPlaceholder: '分钟',
+    reviewLabel: '简评 (支持Markdown)',
+    reviewPlaceholder: '写下你的感想...',
+    startDateLabel: '开始日期',
+    finishDateLabel: '完成日期',
+    tagsManualLabel: '标签（手动模式）',
+    tagsManualPlaceholder: '多个标签用逗号分隔，例如：神作, 催泪, 神曲',
+    tagsManualHint: '当前为手动标签模式，请输入自定义标签。',
+    tagsVndbHint: '当前为 VNDB 标签模式，标签来自 VNDB 数据。如需自定义标签，请在设置中切换为手动模式。'
+  },
+  login: {
+    setPasswordLabel: '设置管理员密码 *',
+    vndbTokenLabel: 'VNDB API Token (可选)',
+    vndbTokenPlaceholder: '可在设置中稍后配置',
+    tokenHintPrefix: '在',
+    tokenHintSuffix: '获取API Token',
+    initializing: '初始化中...',
+    initAndLogin: '初始化并登录',
+    loggingIn: '登录中...',
+    submit: '登录',
+    backToHome: '返回首页'
+  },
+  settings: {
+    pageTitle: '⚙️ 设置',
+    tokenPlaceholder: '输入新的API Token',
+    tokenStatusLabel: '当前状态:',
+    configured: '已配置',
+    notConfigured: '未配置',
+    tokenGetPrefix: '- 在',
+    tokenGetSuffix: '获取Token',
+    newPasswordLabel: '新密码',
+    confirmPasswordLabel: '确认密码',
+    confirmPasswordPlaceholder: '再次输入密码',
+    changePassword: '修改密码',
+    indexSectionTitle: '数据索引',
+    statusLabel: '状态:',
+    progressLabel: '- 进度:',
+    startedAtLabel: '开始时间:',
+    completedAtLabel: '完成时间:',
+    lastReconciledLabel: '最近进度刷新:',
+    noteLabel: '说明:',
+    failedLabel: '失败:',
+    startIndexButton: '批量更新索引',
+    refreshStatus: '刷新状态',
+    indexHint: '批量索引会从VNDB重新获取所有条目的信息，适用于VNDB数据更新后同步。',
+    tagsSectionTitle: 'Tags 显示',
+    tagsSourceLabel: 'Tags 来源',
+    tagsModeVndb: '使用 VNDB Tags',
+    tagsModeManual: '使用手动 Tags',
+    tagsModeHint: 'VNDB Tags 从 VNDB 自动获取；手动 Tags 在编辑条目时自行添加。',
+    translateTagsLabel: '启用中文翻译',
+    translateTagsHint: '将 VNDB 的英文 Tags 翻译为中文显示。',
+    translationUrlLabel: '翻译文件 URL',
+    translationUrlPlaceholder: '留空使用默认翻译源',
+    translationUrlHint: '支持自定义翻译文件，留空使用默认翻译源。',
+    cacheStatusLabel: '缓存状态:',
+    updatedAtPrefix: '- 更新于',
+    cachedCountPrefix: '已缓存',
+    cachedCountSuffix: '条翻译',
+    clearCache: '清除缓存',
+    appearanceSectionTitle: '外观设置',
+    backgroundUrlLabel: '背景图片 URL',
+    backgroundUrlPlaceholder: '输入背景图片链接，留空则不使用背景图',
+    backgroundUrlHint: '支持任意图片直链，推荐使用高分辨率图片以获得最佳效果。',
+    overlayOpacityLabel: '遮罩透明度:',
+    overlayOpacityHint: '控制背景图上方遮罩层的不透明度，数值越高文字越清晰。',
+    blurLabel: '模糊度:',
+    blurHint: '控制背景图的模糊程度，0 为不模糊。',
+    saveAppearance: '保存外观设置',
+    languageSectionTitle: '语言 / Language',
+    languageHint: '切换后页面将自动刷新 / The page will reload after switching.',
+    dataSectionTitle: '数据管理',
+    exportData: '导出数据',
+    importData: '导入数据',
+    dataHint: '导出的数据为JSON格式，可用于备份或迁移。导入时选择"合并"会保留现有数据，选择"替换"会清空现有数据。',
+    accountSectionTitle: '账户',
+    logout: '退出登录'
+  },
+  stats: {
+    pageTitle: '📊 游玩统计',
+    totalEntries: '总条目数',
+    totalPlayTime: '总游玩时长',
+    avgVndbRating: '平均VNDB评分',
+    avgPersonalRating: '平均个人评分',
+    aboutTitle: '关于统计',
+    aboutText: '统计数据基于已录入的视觉小说条目计算得出。 平均个人评分仅计算已评分的条目。',
+    emptyTitle: '暂无统计数据',
+    emptyHint: '添加视觉小说条目后即可查看统计'
+  },
+  tier: {
+    emptyTitle: '暂无 Tier',
+    emptyHint: '管理员可先创建 Tier，再拖拽 VN 封面进行分类',
+    dropHere: '拖拽条目到此处',
+    newTier: '新建 Tier',
+    untiered: '未分类',
+    untieredEmpty: '暂无未分类条目',
+    editTier: '编辑 Tier',
+    createTier: '创建 Tier',
+    nameLabel: 'Tier 名称',
+    namePlaceholder: '例如：S',
+    colorLabel: 'Tier 颜色'
   }
 };
