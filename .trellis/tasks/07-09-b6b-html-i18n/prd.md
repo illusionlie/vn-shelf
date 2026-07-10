@@ -32,3 +32,8 @@
 
 - DOM 应用机制：`data-i18n` 自实现扫描 vs 借 Alpine 指令（`x-text="t(...)"`）？前者独立、后者与现有绑定一致但需全量改模板。
 - 依赖 B6a en 词典：可先迁 zh-CN 键、en 待 B6a 补，还是等 B6a 完成再启动？
+
+## B6a 移交的候选项（2026-07-10 check 阶段发现，brainstorm 时决定收编或另立）
+
+- `friendlyErrorMessage` 拼接用硬编码全角冒号 `：`（api.js 8 处），en 模式 toast 呈 "Export failed：..."——分隔符宜随 locale（如 en 用 ": "）。
+- `settingsPage.js` 两处 `toLocaleString('zh-CN', ...)` 日期格式化未随 locale；可改传 `getLocale()`（顺带给 getLocale 一个生产消费者）。
