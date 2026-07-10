@@ -367,3 +367,38 @@ en.js 填充 87 条英文（10 域、占位符逐 key 对齐）；新增 i18n.ke
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: B6b HTML 静态文案 i18n 迁移
+
+**Date**: 2026-07-10
+**Task**: B6b HTML 静态文案 i18n 迁移
+**Branch**: `master`
+
+### Summary
+
+i18n.js 新增 applyI18nDom：data-i18n 方言（textContent+四属性）、<template>.content 递归（42% 文案在模板内，克隆继承译文）、documentElement.lang 同步；app.js 两遍应用（同步遍+then 幂等二遍，明确禁 TLA 的 defer 时序约束）+ Alpine.magic('t') 服务 10 处内联表达式。五页 200 非注释中文行标注迁移，双词典 87→233 键（zh 逐字等值），白名单仅语言 radio 母语标签。收编 B6a 移交：common.colon 分隔符（api.js 9 处，后端 message 透传边界不变）+ 日期 toLocaleString(getLocale())。三项决策（混合机制/then 链容忍 en 短闪/移交全收编）经用户逐项确认；复杂任务三件套（prd/design/implement）齐备；check 零缺陷（144 引用键零缺失、146 新键逐字等值、叶子/互斥零违例），双语走查通过，104/104 全绿。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7da9452` | (see git log) |
+| `5a9f895` | (see git log) |
+| `e36942c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
