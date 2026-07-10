@@ -10,17 +10,26 @@ import { settingsPage } from './components/settingsPage.js';
 import { statsPage } from './components/statsPage.js';
 import { tierlistPage } from './components/tierlistPage.js';
 import { vnShelf } from './components/vnShelf.js';
-import { initI18n } from './i18n.js';
+import { applyI18nDom, initI18n, t } from './i18n.js';
 import { injectShell } from './layout.js';
 import { initTheme, toggleTheme, initBackground } from './theme.js';
 import { initProgressBar, toggleMobileMenu } from './utils.js';
 
 // i18n 初始化：读 localStorage 语言偏好，非默认语言异步预载词典
-// （加载完成前 t() 回退 zh-CN，不阻塞首帧；须在 Alpine 组件注册前调用）
-initI18n();
+// （加载完成前 t() 回退 zh-CN，不阻塞首帧；须在 Alpine 组件注册前调用）。
+// 禁止改为 top-level await：app.js（module）与 alpine.min.js（defer classic）
+// 的执行顺序在 TLA 下不保证，Alpine 可能先启动导致 alpine:init 组件注册全丢。
+const i18nReady = initI18n();
 
 // 在 Alpine 初始化前注入公共壳层（进度条 / 背景遮罩 / Toast / confirmDialog）
 injectShell();
+
+// HTML 静态文案两遍应用（幂等，见 i18n.js applyI18nDom）：
+// 第一遍同步执行——zh-CN 默认用户即终态（等值替换零观感）；
+// 第二遍待词典就绪后重写（含模板源头 + documentElement.lang）——
+// en 用户首屏短暂中文闪现（本地静态 import，几十 ms 量级）为已知取舍（Q2 决策）。
+applyI18nDom();
+i18nReady.then(() => applyI18nDom());
 
 // ============ 全局状态 ============
 
@@ -28,6 +37,10 @@ injectShell();
 let _toastSeq = 0;
 
 document.addEventListener('alpine:init', () => {
+  // $t 魔法属性：供 HTML 内联 Alpine 表达式取词（仅真动态的三元/回退/拼接表达式；
+  // 静态文案一律走 data-i18n 标注 + applyI18nDom 扫描，不进 Alpine 响应图）
+  Alpine.magic('t', () => t);
+
   // 全局Store
   Alpine.store('app', {
     isAdmin: false,

@@ -5,6 +5,7 @@
  * - setLocale(locale)：持久化 localStorage['locale'] + 非默认语言懒加载词典。
  * - getLocale() / getStoredLocale()：分别读取已加载词典的 locale 与持久化的语言偏好。
  * - initI18n()：应用启动时（Alpine 组件注册前）调用。
+ * - applyI18nDom(root?)：扫描 data-i18n 方言标注并应用词典（HTML 静态文案，B6b）。
  *
  * 与 translations.js（VNDB tags 领域翻译，IndexedDB + 远端词典）是两套独立体系，
  * 互不共享任何状态；本模块只管 UI 文案。
@@ -158,4 +159,56 @@ export function initI18n() {
     return setLocale(stored);
   }
   return Promise.resolve();
+}
+
+/**
+ * data-i18n 方言表（固定属性集，不做通用解析器）：标记属性 → 应用目标。
+ * - data-i18n             → el.textContent
+ * - data-i18n-placeholder → placeholder 属性
+ * - data-i18n-aria-label  → aria-label 属性
+ * - data-i18n-title       → title 属性
+ * - data-i18n-content     → content 属性（meta description）
+ */
+const I18N_ATTR_TARGETS = [
+  ['data-i18n-placeholder', 'placeholder'],
+  ['data-i18n-aria-label', 'aria-label'],
+  ['data-i18n-title', 'title'],
+  ['data-i18n-content', 'content']
+];
+
+/**
+ * 扫描并应用 HTML 静态文案的 data-i18n 方言标注（B6b）。
+ *
+ * 规则与动机：
+ * - **叶子规则**：data-i18n 只允许标注"无元素子节点"的元素——textContent 赋值
+ *   会清空整棵子树；含 SVG 图标等子元素的节点应标注其内层文本 span，
+ *   或只用属性型标记（data-i18n-*，不触碰子节点）。
+ * - **模板递归**：querySelectorAll 不会进入 <template>.content（inert 文档片段），
+ *   而大量文案位于 x-for / x-if 模板内（勘察 84/200 行），故对每个 template
+ *   递归处理其 content——模板源头被翻译后，Alpine stamp 出的克隆天然带出译文。
+ * - **幂等**：key 存于 data-i18n* 属性、不被消费，重复调用安全——app.js 以
+ *   "同步第一遍 + 词典就绪后第二遍"两遍应用兜底 en 词典异步加载竞态
+ *   （第二遍同时覆盖模板源头与已 stamp 进文档的克隆节点）。
+ * - 与 Alpine 绑定互斥：同一节点/同一属性上已有 x-text / :placeholder 等
+ *   动态绑定时不得再标 data-i18n*（动态绑定优先）。
+ * - 末尾同步 document.documentElement.lang（AC6，重复设置幂等）。
+ *
+ * @param {Document|DocumentFragment} [root=document] - 扫描根（递归时为 template.content）
+ */
+export function applyI18nDom(root = document) {
+  for (const el of root.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  }
+
+  for (const [marker, target] of I18N_ATTR_TARGETS) {
+    for (const el of root.querySelectorAll(`[${marker}]`)) {
+      el.setAttribute(target, t(el.getAttribute(marker)));
+    }
+  }
+
+  for (const tpl of root.querySelectorAll('template')) {
+    applyI18nDom(tpl.content);
+  }
+
+  document.documentElement.lang = getLocale();
 }
