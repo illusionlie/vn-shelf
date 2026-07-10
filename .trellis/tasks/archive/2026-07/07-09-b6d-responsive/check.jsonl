@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验收依据：AC5 断点契约（480/768/1024、无 700px）与 code review checklist（lint/test 门禁、无 CDN、可访问性项不回归）"}

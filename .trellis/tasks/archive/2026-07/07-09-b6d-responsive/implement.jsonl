@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "CSS 模块归属与 link 顺序契约；断点仅 480/768/1024、responsive 规则跟随组件文件、禁 700px——本任务改 cards-detail.css 栅格值必须遵守"}
