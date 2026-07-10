@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验收依据：i18n 契约不回退（keys 单测双向相等）、无新增硬编码动态文案、a11y 项（aria-label 迁移后不丢）、lint/test 门禁与 code review checklist"}

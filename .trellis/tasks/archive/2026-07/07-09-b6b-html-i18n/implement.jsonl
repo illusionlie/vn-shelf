@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "i18n 契约整节：t() 两级 key/插值/回退链、getStoredLocale 与 getLocale 语义区分、词典 JS 模块承载、新语言操作步骤、刷新生效守则、后端 message 不翻译边界——本任务是该契约的 HTML 扩展，全部新键/机制必须兼容"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine 组件/模板惯例：x-for/x-if 模板结构、shared.js mixin 边界——data-i18n 与 Alpine 指令的互斥规则要贴合既有模板写法"}
