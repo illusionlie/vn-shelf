@@ -82,31 +82,32 @@ export function friendlyErrorMessage(error, prefix = t('prefix.operationFailed')
 
   // 1. code 优先（NETWORK 经 apiRequest 网络层封装填入）
   if (code && FRIENDLY_CODE_MAP[code]) {
-    return `${prefix}：${t(FRIENDLY_CODE_MAP[code])}`;
+    return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP[code])}`;
   }
 
   // 2. 网络层失败（status=0 且无服务端友好 message）
   if (status === 0 && !hasFriendlyMessage) {
-    return `${prefix}：${t(FRIENDLY_CODE_MAP.NETWORK)}`;
+    return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.NETWORK)}`;
   }
 
   // 3. 5xx：后端可能透传未处理异常的裸 message，统一友好文案不暴露
   if (status >= 500) {
-    return `${prefix}：${t(FRIENDLY_CODE_MAP.SERVER_ERROR)}`;
+    return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.SERVER_ERROR)}`;
   }
 
   // 4. 4xx 服务端友好文案 / 本地校验友好串：沿用。
-  //    i18n 边界（AC5）：后端 4xx 中文 message 原样透传，不经词典翻译。
+  //    i18n 边界（AC5）：后端 4xx 中文 message 原样透传，不经词典翻译；
+  //    仅前端自产的前缀与分隔符（common.colon）随 locale，message 本体不动。
   if (hasFriendlyMessage) {
-    return `${prefix}：${message}`;
+    return `${prefix}${t('common.colon')}${message}`;
   }
 
   // 5. 按 status 映射兑底
-  if (status === 401) return `${prefix}：${t(FRIENDLY_CODE_MAP.UNAUTHORIZED)}`;
-  if (status === 403) return `${prefix}：${t(FRIENDLY_CODE_MAP.FORBIDDEN)}`;
-  if (status === 404) return `${prefix}：${t(FRIENDLY_CODE_MAP.NOT_FOUND)}`;
-  if (status === 409) return `${prefix}：${t(FRIENDLY_CODE_MAP.CONFLICT)}`;
-  if (status === 429) return `${prefix}：${t(FRIENDLY_CODE_MAP.RATE_LIMIT)}`;
+  if (status === 401) return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.UNAUTHORIZED)}`;
+  if (status === 403) return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.FORBIDDEN)}`;
+  if (status === 404) return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.NOT_FOUND)}`;
+  if (status === 409) return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.CONFLICT)}`;
+  if (status === 429) return `${prefix}${t('common.colon')}${t(FRIENDLY_CODE_MAP.RATE_LIMIT)}`;
 
   // 无任何可用信息：只返回前缀，绝不拼接裸技术文本
   return prefix;

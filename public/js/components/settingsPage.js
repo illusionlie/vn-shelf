@@ -3,7 +3,7 @@
  */
 
 import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI } from '../api.js';
-import { getStoredLocale, setLocale, t } from '../i18n.js';
+import { getLocale, getStoredLocale, setLocale, t } from '../i18n.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
   initTranslations,
@@ -265,7 +265,7 @@ export function settingsPage() {
         return dateStr;
       }
 
-      return date.toLocaleString('zh-CN', {
+      return date.toLocaleString(getLocale(), {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -284,7 +284,7 @@ export function settingsPage() {
         return dateStr;
       }
 
-      return date.toLocaleDateString('zh-CN', {
+      return date.toLocaleDateString(getLocale(), {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
