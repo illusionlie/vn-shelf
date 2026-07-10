@@ -18,7 +18,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Component Guidelines](./component-guidelines.md) | Component patterns, mixin composition, a11y | Filled (shared.js mixin + props/styling/a11y/mistakes) |
 | [Hook Guidelines](./hook-guidelines.md) | Stateful logic extraction in Alpine.js (no React hooks) | Filled (Alpine equivalents of React hooks; mixin factories; data fetching) |
 | [State Management](./state-management.md) | Local state, global store, server state | Filled (B2: appearance Store + Promise dedupe + config endpoint split + IDB cache) |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns, a11y | Filled (B1/B3/B4: vendor self-host, header merge, Date.now id, native confirm, modal role/Esc, keyboard div, friendlyError layering, code-review checklist; B5b: i18n t() contract + backend-message boundary; B5c: CSS module placement + link-order contract) |
+| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns, a11y | Filled (B1/B3/B4: vendor self-host, header merge, Date.now id, native confirm, modal role/Esc, keyboard div, friendlyError layering, code-review checklist; B5b: i18n t() contract + backend-message boundary; B5c: CSS module placement + link-order contract; B6d: card-grid density tiers + aspect-ratio cover contract) |
 | [Type Safety](./type-safety.md) | Runtime validation in plain JS (no TypeScript) | Filled (defensive read patterns, form normalization, array/number guards) |
 
 ---
