@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-07-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~335 | Active |
+| `journal-1.md` | ~369 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-07-10 | B6a i18n 收尾：en 词典 + key-diff 单测 + 语言切换入口 | `2963f8a`, `9d53179` | `master` |
 | 9 | 2026-07-10 | B6d 卡片缩小 + 三档响应式细化 | `10be2b7`, `67b8591` | `master` |
 | 8 | 2026-07-09 | B5c CSS 拆分完成 + B5 父任务收尾 | `e28479c`, `b0d7842`, `089c478`, `0872037` | `master` |
 | 7 | 2026-07-09 | B5b 前端 i18n 框架接入完成 | `f78a6cd`, `1274dff`, `62913f9` | `master` |

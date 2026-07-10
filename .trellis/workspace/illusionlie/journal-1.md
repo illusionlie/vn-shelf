@@ -333,3 +333,37 @@ cards-detail.css 密度重调：中档(769-1023) minmax 280→180/gap 20/padding
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: B6a i18n 收尾：en 词典 + key-diff 单测 + 语言切换入口
+
+**Date**: 2026-07-10
+**Task**: B6a i18n 收尾：en 词典 + key-diff 单测 + 语言切换入口
+**Branch**: `master`
+
+### Summary
+
+en.js 填充 87 条英文（10 域、占位符逐 key 对齐）；新增 i18n.keys.test.mjs 三组断言（叶子 key 双向相等/占位符集合一致/非空 string）；设置页新增独立「语言/Language」radio 分区，绑定新导出 getStoredLocale()（规避懒加载竞态），@change 后 setLocale+reload；移除 B5b 的 window.setLocale/getLocale 脚手架；适配 i18n.test.mjs 过渡态用例并补回退链覆盖。三项决策（自动 reload/独立分区/移除脚手架）经用户逐项确认，AC3/AC4 走查通过，104/104 全绿。移交 B6b 两候选项：friendlyErrorMessage 全角冒号、toLocaleString 固定 zh-CN。spec 更新 getStoredLocale 语义、双向 key-diff、切换器现实。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2963f8a` | (see git log) |
+| `9d53179` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
