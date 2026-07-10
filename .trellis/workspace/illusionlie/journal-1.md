@@ -299,3 +299,37 @@ style.css（1928 行）拆为 7 模块（base/forms/cards-detail/tier/stats/logi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: B6d 卡片缩小 + 三档响应式细化
+
+**Date**: 2026-07-10
+**Task**: B6d 卡片缩小 + 三档响应式细化
+**Branch**: `master`
+
+### Summary
+
+cards-detail.css 密度重调：中档(769-1023) minmax 280→180/gap 20/padding 16，大档(≥1024) minmax 300→210/gap 24（修复 1024-1100 的 2 列巨卡），封面图三处固定高度统一为 aspect-ratio 7:10；断点集合与手机档不动。768/769 卡宽跳变 2.1×→1.34×，1920→6 列/1366→5 列。四项产品决策（密度/图片策略/Tier 不动/断点保持）经用户逐项确认，AC1/AC4 用户走查通过，lint+test 全绿。spec 沉淀两条：宽屏档 minmax 下限须验算断点右缘列数；封面图禁各档固定高度。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `10be2b7` | (see git log) |
+| `67b8591` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
