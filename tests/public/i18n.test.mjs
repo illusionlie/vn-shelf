@@ -66,13 +66,19 @@ test('t() 缺 key 回退到 key 本身', async () => {
   assert.equal(i18n.t('toast'), 'toast');
 });
 
-test('setLocale(en) 后走回退链：en 词典为空 → 显示 zh-CN', async () => {
+// B6a 前此用例断言「en 词典为空 → 回退 zh-CN」的过渡态；en 填充后改为断言
+// 词典切换 + 英文插值。en 与 zh-CN 的键完整性由 i18n.keys.test.mjs 结构性守护，
+// 加载失败回退 zh-CN 由下方用例覆盖。
+test('setLocale(en) 加载已填充的 en 词典，t() 返回英文', async () => {
   const { i18n } = await loadI18n();
 
   await i18n.setLocale('en');
   assert.equal(i18n.getLocale(), 'en');
-  assert.equal(i18n.t('status.idle'), '空闲');
-  assert.equal(i18n.t('toast.indexStarted', { total: 2 }), '索引已启动，共2个条目');
+  assert.equal(i18n.t('status.idle'), 'Idle');
+  assert.equal(i18n.t('toast.indexStarted', { total: 2 }), 'Index started, 2 items in total');
+  // 非默认词典下缺 key 仍走完整回退链（en → zh-CN → key 本身）：
+  // en 填满后真实词典无法制造单 key 缺口，用不存在的 key 保住该分支的执行覆盖
+  assert.equal(i18n.t('nonexistent.key'), 'nonexistent.key');
 });
 
 test('setLocale 持久化到 localStorage，initI18n 读取偏好', async () => {

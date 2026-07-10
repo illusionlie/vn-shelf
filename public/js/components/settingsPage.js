@@ -3,7 +3,7 @@
  */
 
 import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI } from '../api.js';
-import { t } from '../i18n.js';
+import { getStoredLocale, setLocale, t } from '../i18n.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
   initTranslations,
@@ -27,6 +27,7 @@ export function settingsPage() {
     vndbApiToken: '',
     newPassword: '',
     confirmPassword: '',
+    locale: getStoredLocale(),
     indexStatus: null,
     translationCacheStatus: null,
     isLoading: false,
@@ -362,6 +363,15 @@ export function settingsPage() {
         setBackgroundConfig(cfg);
         applyBackground(cfg);
       }, { successMsg: t('toast.appearanceSaved'), errorPrefix: t('prefix.saveFailed') });
+    },
+
+    /**
+     * 切换 UI 语言：持久化偏好后整页重载（spec：切换刷新生效 by design），
+     * 重载后所有动态文案一致使用新词典。
+     */
+    async changeLocale() {
+      await setLocale(this.locale);
+      window.location.reload();
     }
   };
 }

@@ -3,7 +3,8 @@
  *
  * - t(key, params?)：两级 key 取词 + {name} 插值 + 回退链（当前语言 → zh-CN → key 本身）。
  * - setLocale(locale)：持久化 localStorage['locale'] + 非默认语言懒加载词典。
- * - getLocale() / initI18n()：读取当前 locale；应用启动时（Alpine 组件注册前）调用 initI18n()。
+ * - getLocale() / getStoredLocale()：分别读取已加载词典的 locale 与持久化的语言偏好。
+ * - initI18n()：应用启动时（Alpine 组件注册前）调用。
  *
  * 与 translations.js（VNDB tags 领域翻译，IndexedDB + 远端词典）是两套独立体系，
  * 互不共享任何状态；本模块只管 UI 文案。
@@ -103,6 +104,18 @@ export function getLocale() {
 }
 
 /**
+ * 已持久化的语言偏好（localStorage['locale']，未设置或存储不可用时为默认 'zh-CN'）。
+ *
+ * 与 getLocale() 的区别：getLocale() 反映**已加载词典**对应的 locale，
+ * 懒加载完成前可能仍是 zh-CN；本函数反映**用户偏好**，用于语言切换 UI
+ * 的初始态（如设置页 radio），避免懒加载期间二者不一致导致的竞态。
+ * @returns {string}
+ */
+export function getStoredLocale() {
+  return safeStorageGet(STORAGE_KEY) ?? DEFAULT_LOCALE;
+}
+
+/**
  * 切换语言：先持久化偏好，再懒加载词典（加载完成前继续用当前词典）。
  * 词典加载失败时回退 zh-CN 并 console.warn（不 throw，不炸功能）。
  *
@@ -145,10 +158,4 @@ export function initI18n() {
     return setLocale(stored);
   }
   return Promise.resolve();
-}
-
-// 便于控制台验证（本轮无可见切换 UI，D2）
-if (typeof window !== 'undefined') {
-  window.setLocale = setLocale;
-  window.getLocale = getLocale;
 }
