@@ -194,6 +194,74 @@ return errorResponse('未授权', 401);
 
 ---
 
+## Scenario: D1 Schema 迁移（v0 基线冻结 + 版本化 MIGRATIONS）
+
+### 1. Scope / Trigger
+
+- Trigger：任何需要变更 D1 表结构（加列 / 加索引 / 新表）的任务，或任何改动 `src/db.js` 的变更。
+- 机制来源：任务 `07-11-d1-migration`（2026-07-11）。schema 初始化走 Worker 运行时 `initDB()`，**不使用** wrangler d1 migrations 部署期方案。
+
+### 2. Signatures
+
+```js
+// src/db.js
+SCHEMA_SQL                 // v0 冻结基线（CREATE TABLE IF NOT EXISTS，永不再改表结构）
+MIGRATIONS                 // [{ version, statements: ['<单行 SQL>'] }]，version 从 1 起连续递增
+SCHEMA_VERSION_KEY         // 'schema_version'，settings 表保留键
+LATEST_SCHEMA_VERSION      // 由 MIGRATIONS 推导（空数组 = 0）
+readSchemaVersion(db)      // 缺失/非法 → 0
+applyPendingMigrations(db, migrations, currentVersion)
+```
+
+### 3. Contracts
+
+- **基线冻结不变量**：`SCHEMA_SQL` 永远停留在 v0，任何结构变更只能**追加** `MIGRATIONS` 条目。新装库同样走全量迁移回放——"缺 `schema_version` 键 = v0"是唯一语义，不存在新装/存量分叉。
+- 单迁移原子：迁移 statements 与版本号 upsert 必须在**同一个** `db.batch` 内。
+- 并发容忍：batch 失败 → 重读版本号，已 ≥ 目标版本视为他方已应用并继续；否则抛**原始**错误（重读自身失败时同样抛原始错误，禁止覆盖）。
+- 版本连续性在任何语句执行前校验，跳号显式报错。
+- 全部 SQL 单行书写、经 `prepare` + `batch`（D1 `db.exec()` 多行缺陷，见 db.js 头注 issue 引用）。
+- `schema_version` 为 settings 表保留键，业务代码（getSettings/saveSettings 等）不得读写。
+- 迁移只向前，无 down 脚本；回滚 = 重部署旧版 Worker 代码（全库显式列名读写，多余列无害）。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 全新库 | 基线建表 + 全部迁移按序回放，版本落 `LATEST_SCHEMA_VERSION` |
+| 存量库（无版本键） | 视为 v0，应用全部待做迁移 |
+| 已最新 | 仅一条版本 SELECT，零迁移语句执行 |
+| 并发竞争败者（版本已被推进） | 静默继续，不报错 |
+| batch 失败且版本未推进 | 抛原始迁移错误，WeakSet 不缓存失败态（下次可重试） |
+| MIGRATIONS 跳号/非连续 | 执行前显式报错 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：加列 = 追加 `{ version: N+1, statements: ['ALTER TABLE ... ADD COLUMN ...'] }` + `tests/d1/migrations.test.mjs` 补该迁移的应用断言。
+- Base：不动表结构的变更无需理会本契约。
+- Bad（**禁止**）：直接编辑 `SCHEMA_SQL` 里的 CREATE TABLE 加列——`IF NOT EXISTS` 使存量部署永远收不到该列，线上新旧 schema 静默漂移。
+- Bad：慢迁移（大表数据回填）直接塞进 `initDB` 请求路径——需另行设计后台化方案，独立任务决策。
+
+### 6. Tests Required
+
+- `tests/d1/migrations.test.mjs`：机制用例采用**注入自定义迁移表**方式（不依赖真实 MIGRATIONS 内容）；新增真实迁移时补"该迁移在存量库上正确应用"的用例。
+- 依赖 `initDB` 的既有套件（repository/router/queue）零回归确认。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：直接改基线加列（存量部署收不到）
+const SCHEMA_SQL = [
+  'CREATE TABLE IF NOT EXISTS vn_entries (id TEXT PRIMARY KEY, ..., status TEXT);'
+];
+
+// Correct：基线不动，追加迁移
+const MIGRATIONS = [
+  { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] }
+];
+```
+
+---
+
 ## Convention: wrangler 配置双轨（toml 被 gitignore）
 
 **What**：`wrangler.toml` 含真实 D1 id 等敏感信息，被 `.gitignore` 排除；仓库内被跟踪的模板是 `wrangler.toml.example`。**任何绑定/变量/队列等配置变更必须同时改两份文件**，否则克隆者或 CI 拿到的模板与实际运行配置漂移。
