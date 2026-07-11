@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "后端可执行契约：公开端点 CORS 由 handleRequest 出口统一附加（改信封不得碰 handler header 逻辑）、settings 单请求复用、wrangler 双轨——本任务改 router.js 6 端点与 utils.js 须遵守"}
+{"file": ".trellis/tasks/07-09-b6c-api-envelope/research/backend-shapes.md", "reason": "25 路由逐条现状形态表（行号级），6 偏离端点收编的唯一事实源"}
+{"file": ".trellis/tasks/07-09-b6c-api-envelope/research/frontend-consumers.md", "reason": "21 前端消费点表，6 回填点（C4/5/6/8/10/13）与透明兼容点（C14/15/16）定位"}
+{"file": ".trellis/tasks/07-09-b6c-api-envelope/research/tests-and-spec.md", "reason": "测试断言形态清单 + utils 桩位置 + B5 不可破坏契约边界"}
