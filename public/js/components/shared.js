@@ -109,7 +109,7 @@ export function createDetailModal() {
     async openDetail(vn) {
       try {
         const res = await vnAPI.get(vn.id);
-        this.selectedVN = res;
+        this.selectedVN = res.data;
         if (!this.showDetail) {
           lockPageScroll();
         }

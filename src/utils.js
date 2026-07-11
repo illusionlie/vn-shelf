@@ -57,13 +57,14 @@ export function errorResponse(message, status = 400) {
 }
 
 /**
- * 创建成功响应
+ * 创建成功响应（统一成功信封 { success:true, message, data, ...extra }）
  * @param {*} data - 响应数据
- * @param {string} message - 成功信息
+ * @param {string} message - 成功信息（信息性字段，前端不消费）
+ * @param {Object} extra - 顶层附加字段，仅列表端点使用（如 total / updatedAt）
  * @returns {Response}
  */
-export function successResponse(data = null, message = '操作成功') {
-  return jsonResponse({ success: true, message, data });
+export function successResponse(data = null, message = '操作成功', extra = {}) {
+  return jsonResponse({ success: true, message, data, ...extra });
 }
 
 /**

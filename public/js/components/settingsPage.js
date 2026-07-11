@@ -46,7 +46,7 @@ export function settingsPage() {
 
       try {
         const status = await authAPI.status();
-        if (!status.authenticated) {
+        if (!status.data.authenticated) {
           window.location.href = '/login';
           return;
         }
@@ -80,7 +80,9 @@ export function settingsPage() {
 
     async loadIndexStatus() {
       try {
-        this.indexStatus = await indexAPI.getStatus();
+        // 解包信封 data 层：indexStatus 保持裸 status 对象，
+        // formatStatus / isIndexTaskActive / 模板绑定的字段路径不变
+        this.indexStatus = (await indexAPI.getStatus()).data;
         this.syncIndexStatusPolling();
       } catch (error) {
         console.warn('[settings] load index status failed', {
@@ -166,7 +168,9 @@ export function settingsPage() {
 
     async exportData() {
       try {
-        const data = await dataAPI.export();
+        // 解包信封 data 层后落盘：导出文件内容保持
+        // { version, exportedAt, entries, tierList, appearance } 原格式，历史备份可直接重新导入
+        const { data } = await dataAPI.export();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

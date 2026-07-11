@@ -225,8 +225,8 @@ export function errorResponse(message, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
-export function successResponse(data = null, message = '操作成功') {
-  return jsonResponse({ success: true, message, data });
+export function successResponse(data = null, message = '操作成功', extra = {}) {
+  return jsonResponse({ success: true, message, data, ...extra });
 }
 
 export function isValidVNDBId(id) {
@@ -411,8 +411,9 @@ test('查询索引状态时直接返回当前状态，不触发 reconcile', asyn
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(payload.status, 'running');
-    assert.equal(payload.processed, 1);
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.status, 'running');
+    assert.equal(payload.data.processed, 1);
     assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
     assert.equal(state.sharedKvState.reconcileCalls || 0, 0);
   } finally {
@@ -442,8 +443,9 @@ test('查询索引状态时，非 running 任务不会触发 reconcile', async (
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(payload.status, 'completed');
-    assert.equal(payload.processed, 8);
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.status, 'completed');
+    assert.equal(payload.data.processed, 8);
     assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
     assert.equal(state.sharedKvState.reconcileCalls || 0, 0);
   } finally {
@@ -473,8 +475,9 @@ test('查询索引状态时不会因 reconcile 副作用而报错', async () => 
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(payload.status, 'running');
-    assert.equal(payload.processed, 2);
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.status, 'running');
+    assert.equal(payload.data.processed, 2);
     assert.equal(state.sharedKvState.getIndexStatusCalls, 1);
     assert.equal(state.sharedKvState.reconcileCalls || 0, 0);
   } finally {

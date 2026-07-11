@@ -14,6 +14,7 @@ import {
   reconcileIndexStatusFromItems
 } from './repository.js';
 import { handleRequest } from './router.js';
+import { errorResponse } from './utils.js';
 import { fetchVNDB } from './vndb.js';
 
 const INDEX_MAX_RETRY = 3;
@@ -163,13 +164,9 @@ export default {
       return await handleRequest(request, env, ctx);
     } catch (error) {
       console.error('Worker error:', error);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Internal Server Error'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      // 复用统一错误信封 { success:false, error }，与手写形态逐字节等价
+      // （Content-Type: application/json + status 500，不泄露异常细节）
+      return errorResponse('Internal Server Error', 500);
     }
   },
 

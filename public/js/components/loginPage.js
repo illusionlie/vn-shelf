@@ -21,11 +21,11 @@ export function loginPage() {
         // 这里只检查初始化
         // 因为全局会 checkAuth
         const status = await authAPI.status();
-        if (status.authenticated) {
+        if (status.data.authenticated) {
           window.location.href = '/';
           return;
         }
-        this.isInitialized = status.initialized;
+        this.isInitialized = status.data.initialized;
       } catch (error) {
         this.isInitialized = false;
       }

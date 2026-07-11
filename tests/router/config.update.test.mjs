@@ -152,8 +152,8 @@ export function errorResponse(message, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
-export function successResponse(data = null, message = '操作成功') {
-  return jsonResponse({ success: true, message, data });
+export function successResponse(data = null, message = '操作成功', extra = {}) {
+  return jsonResponse({ success: true, message, data, ...extra });
 }
 
 export function isValidVNDBId(id) {

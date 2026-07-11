@@ -29,7 +29,7 @@ import {
   tryAcquireIndexStartLock,
   releaseIndexStartLock
 } from './repository.js';
-import { jsonResponse, errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
+import { errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
@@ -244,7 +244,7 @@ async function handleAuthStatus(request, env) {
   const initialized = await isInitialized(env);
   const auth = await authMiddleware(request, env);
 
-  return jsonResponse({
+  return successResponse({
     initialized,
     authenticated: auth.authenticated
   });
@@ -366,8 +366,7 @@ async function handleGetVNList(request, env) {
     return order === 'desc' ? valB - valA : valA - valB;
   });
 
-  return jsonResponse({
-    data: items,
+  return successResponse(items, undefined, {
     total: items.length
   });
 }
@@ -379,7 +378,7 @@ async function handleGetVN(request, env, id) {
     return errorResponse('条目不存在', 404);
   }
 
-  return jsonResponse(entry);
+  return successResponse(entry);
 }
 
 function isFieldProvided(value) {
@@ -739,8 +738,7 @@ async function handleDeleteVN(request, env, id, auth) {
 
 async function handleGetTierList(request, env) {
   const tierList = await getTierList(env);
-  return jsonResponse({
-    data: tierList.tiers,
+  return successResponse(tierList.tiers, undefined, {
     total: tierList.tiers.length,
     updatedAt: tierList.updatedAt
   });
@@ -1117,7 +1115,7 @@ async function handleGetIndexStatus(request, env, auth) {
   }
 
   const status = await getIndexTaskStatus(env);
-  return jsonResponse(status);
+  return successResponse(status);
 }
 
 // ============ 配置接口 ============
@@ -1247,7 +1245,9 @@ async function handleExport(request, env, auth) {
   }
 
   const data = await exportData(env);
-  return jsonResponse(data);
+  // 导出内容进入信封 data 层；前端解包后落盘，导出文件格式保持
+  // { version, exportedAt, entries, tierList, appearance } 不变
+  return successResponse(data);
 }
 
 async function handleImport(request, env, auth) {
