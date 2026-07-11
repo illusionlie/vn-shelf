@@ -1,0 +1,36 @@
+name: "❓ 问题咨询 / Question"
+description: "使用相关的疑问或求助 / Ask a question or request help with usage"
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提问前，建议先查阅 [README](../blob/master/README.md) 与 [AGENTS.md](../blob/master/AGENTS.md)。
+        Before asking, please check the [README](../blob/master/README.md) and [AGENTS.md](../blob/master/AGENTS.md).
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: "前置检查 / Preflight checklist"
+      options:
+        - label: "我已查阅文档且未找到答案 / I have checked the docs and couldn't find the answer"
+          required: true
+        - label: "我已搜索过现有 issue / I have searched existing issues"
+          required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "你的问题 / Your question"
+      description: "清晰地描述你想了解的内容 / Describe what you'd like to know"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "背景信息 / Context"
+      description: "你正在尝试做什么？已经试过哪些方法？/ What are you trying to achieve? What have you already tried?"
+    validations:
+      required: false

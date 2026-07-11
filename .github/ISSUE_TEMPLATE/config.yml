@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "📖 使用文档 / Documentation"
+    url: "https://github.com/illusionlie/vn-shelf/blob/master/README.md"
+    about: "先查阅 README 与部署 / 开发指南，可能已有答案。/ Check the README and setup guide first."
+  - name: "🔧 技术与 API 详情 / Technical & API details"
+    url: "https://github.com/illusionlie/vn-shelf/blob/master/AGENTS.md"
+    about: "架构、API 与实现细节见 AGENTS.md。/ Architecture, API and implementation details."
+  - name: "🌐 在线示例 / Live demo"
+    url: "https://vn.illusionlie.com/"
+    about: "查看部署中的 VN Shelf 效果。/ See VN Shelf running in production."

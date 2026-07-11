@@ -1,0 +1,94 @@
+name: "🐛 Bug 报告 / Bug Report"
+description: "报告一个可复现的问题 / Report a reproducible problem"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量填写以下信息，以便快速定位问题。
+        Thanks for the report! Please fill in as much as you can so we can reproduce it quickly.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: "前置检查 / Preflight checklist"
+      options:
+        - label: "我已搜索过现有 issue，确认这不是重复问题 / I have searched existing issues and this is not a duplicate"
+          required: true
+        - label: "我使用的是最新部署版本 / I am running the latest deployed version"
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "问题描述 / Description"
+      description: "清晰简洁地描述这个 bug / A clear and concise description of the bug"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "复现步骤 / Steps to reproduce"
+      description: "让我们能一步步重现问题 / Tell us how to reproduce it, step by step"
+      placeholder: |
+        1. 进入 '...' / Go to '...'
+        2. 点击 '...' / Click on '...'
+        3. 出现错误 / See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "期望行为 / Expected behavior"
+      description: "你原本期望发生什么 / What did you expect to happen"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "实际行为 / Actual behavior"
+      description: "实际发生了什么，可附截图或日志 / What actually happened; screenshots or logs welcome"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "影响范围 / Affected area"
+      description: "问题主要出现在哪个部分 / Which part is mainly affected"
+      options:
+        - "前端界面 / Frontend UI"
+        - "VNDB 数据拉取 / VNDB fetching"
+        - "Tier List"
+        - "认证 / Auth"
+        - "批量索引 / Indexing (Queue)"
+        - "导入导出 / Import & Export"
+        - "统计 / Stats"
+        - "其他 / Other"
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "运行环境 / Environment"
+      description: "浏览器、操作系统、部署方式（本地 wrangler / Cloudflare）等 / Browser, OS, deployment (local wrangler / Cloudflare), etc."
+      placeholder: |
+        - 浏览器 / Browser: Chrome 130
+        - 系统 / OS: Windows 11
+        - 部署 / Deployment: Cloudflare Workers
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "相关日志 / Relevant logs"
+      description: "控制台报错、`npm run tail` 输出等（会自动格式化为代码块）/ Console errors, `npm run tail` output, etc. (rendered as code)"
+      render: shell
+    validations:
+      required: false
