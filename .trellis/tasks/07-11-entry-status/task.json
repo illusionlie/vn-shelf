@@ -1,0 +1,29 @@
+{
+  "id": "entry-status",
+  "name": "entry-status",
+  "title": "条目游玩状态功能（含 D1 迁移前置）",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "illusionlie",
+  "assignee": "illusionlie",
+  "createdAt": "2026-07-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-11-d1-migration",
+    "07-11-entry-status-field"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
