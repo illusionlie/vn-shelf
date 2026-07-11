@@ -402,3 +402,37 @@ i18n.js 新增 applyI18nDom：data-i18n 方言（textContent+四属性）、<tem
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: B6c API 信封统一 + B6 批次父任务集成验收归档
+
+**Date**: 2026-07-11
+**Task**: B6c API 信封统一 + B6 批次父任务集成验收归档
+**Branch**: `master`
+
+### Summary
+
+B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（auth/status、vn 列表/单条、tier 列表、index/status、export）全收编为 {success,message?,data,...extras}；错误信封零改动（无 code，守住 friendlyErrorMessage 4xx 中文透传契约）；前端 6 回填点（loginPage×2/settingsPage×3/shared）统一 res.data 解构；导出文件格式不变+往返走查通过；新增 envelope.test.mjs 6 用例（真实 utils 副本防桩漂移），queue 加载器补 patch（research 漏判的依赖图问题），110/110 全绿。四项决策经用户逐项确认（全收编/顶层 extras/不加 code/保留 message）。spec：backend conventions 新增 7 段式信封契约 Scenario（含桩镜像纪律与 patch 加载器教训）。父任务 B6-finish 集成验收 AC1–AC4 全过并归档——B6 批次（b6d 响应式/b6a i18n 收尾/b6b HTML i18n/b6c 信封）全部闭环。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4501333` | (see git log) |
+| `9b7de43` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
