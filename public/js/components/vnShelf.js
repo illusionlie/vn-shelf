@@ -9,6 +9,9 @@ import { debounce, formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScro
 
 import { createDetailModal, createTagsView } from './shared.js';
 
+// 与 src/repository.js 的 VN_STATUS_VALUES 保持同步（后端另含预留的 wishlist，首期 UI 不暴露）
+const VN_STATUS_OPTIONS = ['playing', 'finished', 'stalled', 'dropped'];
+
 export function vnShelf() {
   return {
     ...createTagsView(),
@@ -18,6 +21,7 @@ export function vnShelf() {
     filteredList: [],
     searchQuery: '',
     sortBy: 'created_desc',
+    statusFilter: 'all',
     isLoading: true,
     showEdit: false,
     editForm: {},
@@ -38,7 +42,7 @@ export function vnShelf() {
       try {
         const res = await vnAPI.getList({ sort: this.sortBy });
         this.vnList = res.data || [];
-        this.filteredList = this.vnList;
+        this.filteredList = this.applyFilters(this.vnList);
       } catch (error) {
         this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadFailed')), 'error');
       } finally {
@@ -60,8 +64,34 @@ export function vnShelf() {
       );
     },
 
+    // 状态过滤：'all' 不过滤；'none' 匹配未设置（null）；四状态精确匹配
+    applyStatusFilter(list) {
+      if (this.statusFilter === 'none') {
+        return list.filter(vn => !vn.status);
+      }
+      if (VN_STATUS_OPTIONS.includes(this.statusFilter)) {
+        return list.filter(vn => vn.status === this.statusFilter);
+      }
+      return list;
+    },
+
+    // 搜索 ∧ 状态叠加过滤（所有过滤重放走这里，保证两个条件同时生效）
+    applyFilters(list) {
+      return this.applyStatusFilter(this.applySearchFilter(list));
+    },
+
     handleSearch() {
-      this.filteredList = this.applySearchFilter(this.vnList);
+      this.filteredList = this.applyFilters(this.vnList);
+    },
+
+    handleStatusFilterChange() {
+      this.filteredList = this.applyFilters(this.vnList);
+    },
+
+    // 卡片徽章仅渲染已配色的四状态；白名单外的值（如后端预留的 wishlist）
+    // 安全降级为不显示徽章，避免渲染无样式徽章或裸 i18n key
+    statusBadgeLabel(status) {
+      return VN_STATUS_OPTIONS.includes(status) ? t(`status.${status}`) : '';
     },
 
     // 本地排序（比较器语义与后端 handleGetVNList 一致），不再重新请求列表
@@ -85,8 +115,8 @@ export function vnShelf() {
         return order === 'desc' ? valB - valA : valA - valB;
       });
 
-      // 重放当前搜索过滤，保持 filteredList 与排序结果同步
-      this.filteredList = this.applySearchFilter(this.vnList);
+      // 重放当前搜索 + 状态过滤，保持 filteredList 与排序结果同步
+      this.filteredList = this.applyFilters(this.vnList);
     },
 
     openEdit(vn = null) {
@@ -110,6 +140,7 @@ export function vnShelf() {
           review: vn.user?.review || '',
           startDate: vn.user?.startDate || '',
           finishDate: vn.user?.finishDate || '',
+          status: vn.user?.status ?? '', // '' = 未设置（提交时转 null）
           tags: userTags.join(', '), // 逗号分隔的文本
           isNew: false
         };
@@ -123,6 +154,7 @@ export function vnShelf() {
           review: '',
           startDate: '',
           finishDate: '',
+          status: '',
           tags: '',
           isNew: true
         };
@@ -217,6 +249,7 @@ export function vnShelf() {
             review: this.editForm.review,
             startDate: this.editForm.startDate,
             finishDate: this.editForm.finishDate,
+            status: this.editForm.status || null, // '' → null（未设置）
             tags: tags
           });
           this.$store.app.addToast(t('toast.addOk'));
@@ -229,6 +262,7 @@ export function vnShelf() {
             review: this.editForm.review,
             startDate: this.editForm.startDate,
             finishDate: this.editForm.finishDate,
+            status: this.editForm.status || null, // '' → null（清除状态）
             tags: tags
           });
           this.$store.app.addToast(t('toast.updateOk'));

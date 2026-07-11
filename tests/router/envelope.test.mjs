@@ -138,6 +138,9 @@ export async function isInitialized() { return true; }
 const state = globalThis.__routerEnvelopeTestRegistry?.get('${testId}');
 const clone = value => JSON.parse(JSON.stringify(value));
 
+// router.js 顶层 import 依赖（status 白名单），与 src/repository.js 保持一致
+export const VN_STATUS_VALUES = ['playing', 'finished', 'stalled', 'dropped', 'wishlist'];
+
 export async function getVNList() { return clone(state.vnList); }
 export async function getVNEntry(_env, id) {
   return state.entries[id] ? clone(state.entries[id]) : null;

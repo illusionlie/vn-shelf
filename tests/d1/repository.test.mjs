@@ -13,9 +13,11 @@ function normalizeSql(sql) {
   return sql.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-// initDB 经 prepare+batch 执行的建表/建索引 DDL（真实 D1 中 batch 可执行 DDL）
+// initDB 经 prepare+batch 执行的建表/建索引/迁移 DDL（真实 D1 中 batch 可执行 DDL）
 function isSchemaDdlSql(normalizedSql) {
-  return normalizedSql.startsWith('create table if not exists') || normalizedSql.startsWith('create index if not exists');
+  return normalizedSql.startsWith('create table if not exists')
+    || normalizedSql.startsWith('create index if not exists')
+    || normalizedSql.startsWith('alter table');
 }
 
 function clone(value) {
@@ -220,7 +222,8 @@ class FakeD1Database {
         finish_date: bindings[22],
         user_tags: bindings[23],
         tier_id: bindings[24],
-        tier_sort: bindings[25]
+        tier_sort: bindings[25],
+        status: bindings[26]
       };
       state.vnEntries.set(row.id, row);
       return { success: true, meta: { changes: 1 } };
@@ -339,7 +342,7 @@ class FakeD1Database {
       return { results: Array.from(state.vnEntries.values()).map(row => ({ id: row.id })) };
     }
 
-    if (normalizedSql.startsWith('select id, title, title_ja, title_cn, title_cn_user, image, image_nsfw, rating, personal_rating, play_time_minutes, developers, all_age, tier_id, tier_sort, created_at from vn_entries order by created_at desc')) {
+    if (normalizedSql.startsWith('select id, title, title_ja, title_cn, title_cn_user, image, image_nsfw, rating, personal_rating, play_time_minutes, developers, all_age, tier_id, tier_sort, status, created_at from vn_entries order by created_at desc')) {
       const results = Array.from(state.vnEntries.values())
         .map(row => ({
           id: row.id,
@@ -356,6 +359,7 @@ class FakeD1Database {
           all_age: row.all_age,
           tier_id: row.tier_id,
           tier_sort: row.tier_sort,
+          status: row.status,
           created_at: row.created_at
         }))
         .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
@@ -1097,6 +1101,67 @@ test('exportData 导出所有条目和 tierList', async () => {
     assert.equal(data.entries[0].id, 'v1');
     assert.equal(data.tierList.tiers.length, 1);
     assert.equal(data.tierList.tiers[0].id, 'tier-s');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('status 字段：保存合法状态往返一致，完整条目与列表项均携带', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+    await repository.saveVNEntry(env, createEntry('v1', { user: { status: 'playing' } }));
+
+    const fetched = await repository.getVNEntry(env, 'v1');
+    assert.equal(fetched.user.status, 'playing');
+
+    const list = await repository.getVNList(env);
+    assert.equal(list.items.length, 1);
+    assert.equal(list.items[0].status, 'playing');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('status 字段：非法值与缺失一律归一为 null', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+
+    await repository.saveVNEntry(env, createEntry('v1', { user: { status: 'weird' } }));
+    const invalid = await repository.getVNEntry(env, 'v1');
+    assert.equal(invalid.user.status, null);
+
+    await repository.saveVNEntry(env, createEntry('v2'));
+    const missing = await repository.getVNEntry(env, 'v2');
+    assert.equal(missing.user.status, null);
+
+    const list = await repository.getVNList(env);
+    assert.ok(list.items.every(item => item.status === null));
+  } finally {
+    await cleanup();
+  }
+});
+
+test('importData：旧备份无 status 与含非法 status 均落 null，不拒包（宽松导入）', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+
+    await repository.importData(env, {
+      entries: [
+        createEntry('v1'), // 旧备份形态：无 status 字段
+        createEntry('v2', { user: { status: 'weird' } }), // 非法值
+        createEntry('v3', { user: { status: 'finished' } }) // 合法值
+      ]
+    }, 'merge');
+
+    assert.equal((await repository.getVNEntry(env, 'v1')).user.status, null);
+    assert.equal((await repository.getVNEntry(env, 'v2')).user.status, null);
+    assert.equal((await repository.getVNEntry(env, 'v3')).user.status, 'finished');
   } finally {
     await cleanup();
   }

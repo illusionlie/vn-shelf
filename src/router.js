@@ -27,12 +27,20 @@ import {
   batchUpdateVNTiers,
   clearTierAssignments,
   tryAcquireIndexStartLock,
-  releaseIndexStartLock
+  releaseIndexStartLock,
+  VN_STATUS_VALUES
 } from './repository.js';
 import { errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
+
+const INVALID_STATUS_MESSAGE = '状态值无效，仅支持 playing/finished/stalled/dropped/wishlist';
+
+// 游玩状态输入校验：undefined（未提供）与 null（清除）合法，其余必须命中白名单
+function isValidStatusInput(status) {
+  return status === undefined || status === null || VN_STATUS_VALUES.includes(status);
+}
 
 // 公开只读端点（提供真实 CORS：GET 响应附加 Allow-Origin，OPTIONS 预检返回 204）
 const PUBLIC_CORS_PATH_PATTERNS = [
@@ -561,11 +569,16 @@ async function handleCreateVN(request, env, auth) {
     review,
     startDate,
     finishDate,
-    tags
+    tags,
+    status
   } = body;
 
   if (!vndbId || !isValidVNDBId(vndbId)) {
     return errorResponse('无效的VNDB ID', 400);
+  }
+
+  if (!isValidStatusInput(status)) {
+    return errorResponse(INVALID_STATUS_MESSAGE, 400);
   }
 
   // 验证个人评分
@@ -612,6 +625,7 @@ async function handleCreateVN(request, env, auth) {
       review: review || '',
       startDate: startDate || null,
       finishDate: finishDate || null,
+      status: status ?? null, // 缺省/null 均落 null（未设置）
       tags: Array.isArray(tags) ? tags : [], // 用户手动 tags
       tierId: null
     }
@@ -655,8 +669,13 @@ async function handleUpdateVN(request, env, id, auth) {
     startDate,
     finishDate,
     tags,
+    status,
     refreshVNDB
   } = body;
+
+  if (!isValidStatusInput(status)) {
+    return errorResponse(INVALID_STATUS_MESSAGE, 400);
+  }
 
   // 是否刷新VNDB数据
   if (refreshVNDB) {
@@ -711,6 +730,8 @@ async function handleUpdateVN(request, env, id, auth) {
     review: review !== undefined ? review : entry.user.review,
     startDate: startDate !== undefined ? startDate : entry.user.startDate,
     finishDate: finishDate !== undefined ? finishDate : entry.user.finishDate,
+    // 三态语义：字段未出现 = 保持；null = 清除；白名单值 = 设置（非法值已在上方 400）
+    status: status !== undefined ? status : (entry.user.status ?? null),
     tags: tags !== undefined ? (Array.isArray(tags) ? tags : []) : (entry.user.tags || [])
   };
 

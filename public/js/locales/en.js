@@ -51,7 +51,13 @@ export default {
     completed: 'Completed',
     failed: 'Failed',
     partial: 'Partially completed',
-    startFailed: 'Start failed'
+    startFailed: 'Start failed',
+    playing: 'Playing',
+    finished: 'Finished',
+    stalled: 'Stalled',
+    dropped: 'Dropped',
+    wishlist: 'Wishlist', // Reserved backend value (future ulist import); display-only, no UI entry point
+    none: 'Not set'
   },
   toast: {
     vndbTokenSaved: 'VNDB API token saved',
@@ -158,6 +164,9 @@ export default {
     sortRatingAsc: 'VNDB rating ↑',
     sortPersonalDesc: 'Personal rating ↓',
     sortPersonalAsc: 'Personal rating ↑',
+    filterStatusAriaLabel: 'Filter by play status',
+    filterStatusAll: 'All statuses',
+    statusLabel: 'Play status',
     addButton: '+ Add',
     emptyTitle: 'No entries yet',
     emptyHintAdmin: 'Click the "Add" button in the top right to add your first visual novel',

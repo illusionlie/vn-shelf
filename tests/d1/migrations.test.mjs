@@ -124,18 +124,20 @@ const DEMO_MIGRATIONS = [
 
 // ============ Tests ============
 
-test('机制交付态：MIGRATIONS 为空数组，LATEST_SCHEMA_VERSION 为 0', async () => {
+test('真实 MIGRATIONS：v1 为 vn_entries 加 status 列，LATEST_SCHEMA_VERSION 为 1', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
-    assert.deepEqual(db.MIGRATIONS, []);
-    assert.equal(db.LATEST_SCHEMA_VERSION, 0);
+    assert.deepEqual(db.MIGRATIONS, [
+      { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] }
+    ]);
+    assert.equal(db.LATEST_SCHEMA_VERSION, 1);
   } finally {
     await cleanup();
   }
 });
 
-test('全新库：initDB 建全部基线表，schema_version 读为 0 且不执行任何迁移语句', async () => {
+test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 1', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
@@ -150,34 +152,60 @@ test('全新库：initDB 建全部基线表，schema_version 读为 0 且不执�
     assert.ok(createStatements.some(sql => sql.includes('index_tasks')));
     assert.ok(createStatements.some(sql => sql.includes('index_task_items')));
 
-    assert.deepEqual(fake.migrationSqlLog(), [], 'MIGRATIONS 为空时不产生任何迁移语句');
-    assert.equal(await db.readSchemaVersion(fake), 0, '缺失版本键视为 0，即最新版本号');
-    assert.equal(fake.settings.has(db.SCHEMA_VERSION_KEY), false, '无迁移时不写版本键');
+    const alters = fake.executedSql.filter(sql => sql.startsWith('alter table'));
+    assert.deepEqual(alters, ['alter table vn_entries add column status text'], '全新库同样走全量迁移回放（基线冻结语义）');
+    assert.equal(await db.readSchemaVersion(fake), 1, '版本号推进到最新');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '1', '版本号以字符串落库');
   } finally {
     await cleanup();
   }
 });
 
-test('全新库：基线之上注入迁移全部按序应用，版本号落库且每迁移单批原子', async () => {
+test('真实迁移 v1：存量 v0 库（含业务数据、无 schema_version 键）initDB 后正确应用', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
     const fake = new FakeMigrationD1();
-    await db.initDB(fake);
-    const baselineBatchCount = fake.batchLog.length;
+    // 模拟存量部署：settings 已有业务键，但没有 schema_version（= v0）
+    fake.settings.set('config:settings', '{"tagsMode":"vndb"}');
 
-    const finalVersion = await db.applyPendingMigrations(fake, DEMO_MIGRATIONS, await db.readSchemaVersion(fake));
+    await db.initDB(fake);
+
+    const alters = fake.executedSql.filter(sql => sql.startsWith('alter table'));
+    assert.deepEqual(alters, ['alter table vn_entries add column status text'], '存量库补齐 status 列');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '1', '版本号推进到 1');
+    assert.equal(fake.settings.get('config:settings'), '{"tagsMode":"vndb"}', '业务设置键不受迁移影响');
+
+    // 幂等：已最新的库重入不再执行迁移语句
+    db.resetDBInitFlag();
+    await db.initDB(fake);
+    assert.equal(
+      fake.executedSql.filter(sql => sql.startsWith('alter table')).length,
+      1,
+      '重入不重复应用迁移'
+    );
+  } finally {
+    await cleanup();
+  }
+});
+
+test('注入迁移表：从 v0 全部按序应用，版本号落库且每迁移单批原子', async () => {
+  const { db, cleanup } = await loadDbModule();
+
+  try {
+    const fake = new FakeMigrationD1();
+
+    const finalVersion = await db.applyPendingMigrations(fake, DEMO_MIGRATIONS, 0);
 
     assert.equal(finalVersion, 2);
     assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号以字符串落库');
 
-    const migrationBatches = fake.batchLog.slice(baselineBatchCount);
-    assert.equal(migrationBatches.length, 2, '每个迁移一个 batch');
-    assert.deepEqual(migrationBatches[0], [
+    assert.equal(fake.batchLog.length, 2, '每个迁移一个 batch');
+    assert.deepEqual(fake.batchLog[0], [
       'alter table vn_entries add column demo_a text',
       UPSERT_SETTINGS_SQL
     ], 'v1：迁移语句与版本号 upsert 同批');
-    assert.deepEqual(migrationBatches[1], [
+    assert.deepEqual(fake.batchLog[1], [
       'alter table vn_entries add column demo_b text',
       'alter table tiers add column demo_c text',
       UPSERT_SETTINGS_SQL

@@ -36,8 +36,11 @@ const SCHEMA_SQL = [
 export const SCHEMA_VERSION_KEY = 'schema_version';
 
 // 版本化迁移表：version 从 1 起连续递增，statements 为单行 SQL 字符串数组
-// 示例条目：{ version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] }
-export const MIGRATIONS = [];
+export const MIGRATIONS = [
+  // v1（07-11-entry-status-field）：条目游玩状态列。可空、无默认值，NULL = 未设置；
+  // 合法值白名单见 src/repository.js VN_STATUS_VALUES。列表全量加载后前端筛选，不建索引。
+  { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] }
+];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);
 

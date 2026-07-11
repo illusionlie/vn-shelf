@@ -6,6 +6,16 @@ import { initDB } from './db.js';
 
 const TIER_COLOR_HEX_REGEX = /^#[0-9a-fA-F]{6}$/;
 const VNDB_ID_REGEX = /^v\d+$/;
+
+// 条目游玩状态白名单。wishlist 为未来 VNDB ulist 导入预留，首期 UI 不暴露。
+// 前端 public/js/components/vnShelf.js 的 VN_STATUS_OPTIONS 与此保持同步（不含 wishlist）。
+export const VN_STATUS_VALUES = ['playing', 'finished', 'stalled', 'dropped', 'wishlist'];
+
+// 状态归一化唯一入口：合法值原样返回，非法/缺失一律 null（导入宽松策略依赖此处，不拒包）
+export function normalizeStatus(value) {
+  return VN_STATUS_VALUES.includes(value) ? value : null;
+}
+
 const INDEX_START_LOCK_DO_NAME = 'global';
 const INDEX_START_LOCK_TTL_SECONDS = 60;
 const INDEX_START_LOCK_TTL_MS = INDEX_START_LOCK_TTL_SECONDS * 1000;
@@ -138,6 +148,7 @@ function rowToEntry(row) {
       review: row.review || '',
       startDate: row.start_date,
       finishDate: row.finish_date,
+      status: normalizeStatus(row.status),
       tags: safeJSONParse(row.user_tags, []),
       tierId: row.tier_id || null,
       tierSort: toNonNegativeNumber(row.tier_sort)
@@ -177,7 +188,8 @@ function entryToRow(entry, { preserveUpdatedAt = false, now = new Date().toISOSt
     finish_date: entry.user?.finishDate || null,
     user_tags: JSON.stringify(entry.user?.tags || []),
     tier_id: entry.user?.tierId || null,
-    tier_sort: toNonNegativeNumber(entry.user?.tierSort)
+    tier_sort: toNonNegativeNumber(entry.user?.tierSort),
+    status: normalizeStatus(entry.user?.status)
   };
 }
 
@@ -193,15 +205,15 @@ export function buildSaveVNEntryStatement(db, entry, options = {}) {
         length_text, length_minutes, developers, tags, all_age,
         title_cn_user, personal_rating, play_time, play_time_hours,
         play_time_part_minutes, play_time_minutes, review,
-        start_date, finish_date, user_tags, tier_id, tier_sort
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        start_date, finish_date, user_tags, tier_id, tier_sort, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       row.id, row.created_at, row.updated_at,
       row.title, row.title_ja, row.title_cn, row.image, row.image_nsfw, row.rating,
       row.length_text, row.length_minutes, row.developers, row.tags, row.all_age,
       row.title_cn_user, row.personal_rating, row.play_time, row.play_time_hours,
       row.play_time_part_minutes, row.play_time_minutes, row.review,
-      row.start_date, row.finish_date, row.user_tags, row.tier_id, row.tier_sort
+      row.start_date, row.finish_date, row.user_tags, row.tier_id, row.tier_sort, row.status
     )
   };
 }
@@ -258,6 +270,7 @@ function rowToListItem(row) {
     allAge: Boolean(row.all_age),
     tierId: row.tier_id || null,
     tierSort: toNonNegativeNumber(row.tier_sort),
+    status: normalizeStatus(row.status),
     createdAt: row.created_at
   };
 }
@@ -302,7 +315,7 @@ export async function getVNList(env) {
 
   const [entryResults, statsResults] = await Promise.all([
     env.DB.prepare(
-      'SELECT id, title, title_ja, title_cn, title_cn_user, image, image_nsfw, rating, personal_rating, play_time_minutes, developers, all_age, tier_id, tier_sort, created_at FROM vn_entries ORDER BY created_at DESC'
+      'SELECT id, title, title_ja, title_cn, title_cn_user, image, image_nsfw, rating, personal_rating, play_time_minutes, developers, all_age, tier_id, tier_sort, status, created_at FROM vn_entries ORDER BY created_at DESC'
     ).all(),
     env.DB.prepare(
       'SELECT COUNT(*) as total, COALESCE(SUM(play_time_minutes), 0) as totalPlayTimeMinutes, COALESCE(AVG(CASE WHEN rating > 0 THEN rating END), 0) as avgRating, COALESCE(AVG(CASE WHEN personal_rating > 0 THEN personal_rating END), 0) as avgPersonalRating, MAX(updated_at) as maxUpdatedAt FROM vn_entries'

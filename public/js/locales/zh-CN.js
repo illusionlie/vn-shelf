@@ -4,7 +4,7 @@
  * 结构约定：两级嵌套对象，key 形如 `<域>.<语义名>`：
  * - common.*     通用词（未知/保存/取消/关闭等，跨页复用）
  * - error.*      friendlyErrorMessage 的 code→文案映射
- * - status.*     索引任务状态（settingsPage.formatStatus）
+ * - status.*     索引任务状态（settingsPage.formatStatus）+ 条目游玩状态（playing/finished/stalled/dropped/none）
  * - toast.*      成功/提示类 toast
  * - prefix.*     错误 toast 的业务前缀（friendlyErrorMessage prefix）
  * - validation.* 表单校验提示
@@ -67,7 +67,13 @@ export default {
     completed: '已完成',
     failed: '失败',
     partial: '部分完成',
-    startFailed: '启动失败'
+    startFailed: '启动失败',
+    playing: '在玩',
+    finished: '已完成',
+    stalled: '搁置',
+    dropped: '抛弃',
+    wishlist: '愿望单', // 后端预留值（未来 ulist 导入），UI 不提供设置入口，仅防御性展示
+    none: '未设置'
   },
   toast: {
     vndbTokenSaved: 'VNDB API Token已保存',
@@ -174,6 +180,9 @@ export default {
     sortRatingAsc: 'VNDB评分 ↑',
     sortPersonalDesc: '个人评分 ↓',
     sortPersonalAsc: '个人评分 ↑',
+    filterStatusAriaLabel: '按游玩状态筛选',
+    filterStatusAll: '全部状态',
+    statusLabel: '游玩状态',
     addButton: '+ 添加',
     emptyTitle: '暂无条目',
     emptyHintAdmin: '点击右上角"添加"按钮添加第一个视觉小说',

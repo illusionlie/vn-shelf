@@ -222,6 +222,7 @@ tests/
     review: "评价内容",
     startDate: "2024-01-01",
     finishDate: "2024-02-01",
+    status: "playing", // 游玩状态：playing/finished/stalled/dropped/wishlist，null = 未设置
     tags: ["自定义标签"],
     tierId: "tier-a",
     tierSort: 0
@@ -246,6 +247,7 @@ tests/
   allAge: false,
   tierId: "tier-a",
   tierSort: 0,
+  status: "playing", // 游玩状态，同完整条目 user.status，null = 未设置
   createdAt: "2024-01-01T00:00:00.000Z"
 }
 ```

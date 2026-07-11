@@ -105,6 +105,9 @@ const state = globalThis.__routerIndexStartTestRegistry?.get('${testId}');
 const kv = state.sharedKvState;
 const clone = value => JSON.parse(JSON.stringify(value));
 
+// router.js 顶层 import 依赖（status 白名单），与 src/repository.js 保持一致
+export const VN_STATUS_VALUES = ['playing', 'finished', 'stalled', 'dropped', 'wishlist'];
+
 export async function listIndexableVNIds() {
   kv.getVNListCalls += 1;
   const rawIds = Array.isArray(kv.vnList?.items)
