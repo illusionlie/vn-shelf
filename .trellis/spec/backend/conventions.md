@@ -126,6 +126,74 @@ const settings = auth.settings;
 
 ---
 
+## Scenario: API 响应信封（B6c/A3 统一后契约）
+
+### 1. Scope / Trigger
+
+- Trigger：任何新增/修改 API 路由的返回体，或改动 `src/utils.js` 响应辅助函数的变更。
+- 2026-07（B6c）起全部 25 条公开路由统一信封；此前 6 条裸出端点已收编，**新路由不得再走裸 `jsonResponse`**。
+
+### 2. Signatures
+
+```js
+// src/utils.js
+successResponse(data = null, message = '操作成功', extra = {})
+// → jsonResponse({ success: true, message, data, ...extra })，恒 200
+errorResponse(message, status = 400)
+// → { success: false, error: message }，无 code、无 data
+jsonResponse(data, status, headers)   // 底层序列化通道，公开路由不得直接用它裸出业务数据
+```
+
+### 3. Contracts
+
+- 成功：`{ success: true, message?: string, data: <payload>, ...extras }`。`success`+`data` 必备；`message` 可选且**前端零消费**（纯信息性）；`extras` 仅列表端点顶层散字段（`GET /api/vn` 带 `total`；`GET /api/tier` 带 `total`+`updatedAt`）。
+- 错误：`{ success: false, error: string }` —— **无 `code`**。前端 `friendlyErrorMessage` 的 4xx 分支依赖"无 code + 中文 message 透传"；`createApiError` 硬依赖字段名 `error`。加 code = 把 4xx 文案来源切到前端 locale 映射，是方向性变更，必须独立任务显式决策。
+- 前端消费规则：组件层统一 `res.data` 解构；**禁止 `res.data || res` 类形态兜底**（B5a 已清零，B6c 后无存在理由）。
+- 导出特例语义：`GET /api/export` 的 data 层即导出文件内容（`{version,exportedAt,entries,tierList,appearance}`）——前端存 `res.data`，文件格式与 import 端及历史备份兼容。
+- 豁免：`IndexStartLockDurableObject` 内部端点（`{acquired}/{released}/{lock}`，Worker↔DO 通信，前端不消费）。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 新公开路由成功返回 | 必走 `successResponse`（列表散字段用第三参 `extra`） |
+| 业务错误 | `errorResponse(中文友好文案, 4xx)` —— message 原样出前端 toast |
+| 未捕获异常（index.js 顶层） | `errorResponse('Internal Server Error', 500)`（勿手写复刻） |
+| 路由未命中 | `errorResponse('Not Found', 404)` |
+
+### 5. Good/Base/Bad Cases
+
+- Good：列表端点 `successResponse(items, undefined, { total: items.length })`——data 恒为数组，散字段顶层。
+- Base：普通端点 `successResponse(entry)` / `successResponse(null, '删除成功')`。
+- Bad（禁止）：`jsonResponse({ data: items, total })` 裸出（无 success，B6c 前的历史形态）；`jsonResponse(entry)` 裸对象；错误响应塞 `code` 字段。
+
+### 6. Tests Required
+
+- `tests/router/envelope.test.mjs`：6 个原偏离端点的信封形态断言（含 export 的 data 五键精确 `deepEqual`、404 错误信封无 code）。新增公开路由应在此补形态用例。
+- **测试桩镜像纪律**：`config.update.test.mjs` 与 `index.start.test.mjs` 内的 utils 桩必须与真实 `successResponse/errorResponse` 逐行为等价——改 utils 签名/形态时同步两桩，否则假绿。更稳的形态断言（如 envelope 测试）直接复制真实 `src/utils.js` 进 tempDir，不打桩。
+- **源码 patch 型加载器的依赖图陷阱**（B6c 教训）：`tests/queue/index.queue.test.mjs` 以 patch 相对导入方式加载 `src/index.js`——给被加载源文件**新增 import 时必须同步 patch 列表**，否则 `ERR_MODULE_NOT_FOUND`。评估测试影响面时不能只看断言，要看依赖图。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：裸出 + 散字段与 data 平铺（B6c 前历史形态，禁止回潮）
+return jsonResponse({ data: items, total: items.length });
+
+// Correct：信封统一，散字段走第三参
+return successResponse(items, undefined, { total: items.length });
+```
+
+```js
+// Wrong：错误响应加 code（破坏 friendlyErrorMessage 的中文透传契约）
+return jsonResponse({ success: false, error: '未授权', code: 'UNAUTHORIZED' }, 401);
+
+// Correct
+return errorResponse('未授权', 401);
+```
+
+
+---
+
 ## Convention: wrangler 配置双轨（toml 被 gitignore）
 
 **What**：`wrangler.toml` 含真实 D1 id 等敏感信息，被 `.gitignore` 排除；仓库内被跟踪的模板是 `wrangler.toml.example`。**任何绑定/变量/队列等配置变更必须同时改两份文件**，否则克隆者或 CI 拿到的模板与实际运行配置漂移。
