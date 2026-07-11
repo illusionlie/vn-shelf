@@ -262,6 +262,18 @@ const MIGRATIONS = [
 
 ---
 
+## Convention: 条目游玩状态枚举（status）
+
+**What**：`vn_entries.status` 为字符串枚举，白名单 `VN_STATUS_VALUES = ['playing','finished','stalled','dropped','wishlist']`（src/repository.js 导出），NULL = 未设置。`wishlist` 为**预留值**：后端全链路接受，前端编辑/筛选/徽章首期不暴露（展示层安全降级：无配色徽章不渲染，详情有防御性 locale key）。前端在 `vnShelf.js` 持有四值 UI 常量，与后端白名单注释互指同步。
+
+**归一与校验分层**：`normalizeStatus()`（非法 → null）是持久化边界唯一归一点（`rowToEntry`/`entryToRow`/`rowToListItem` 三处生效）——导入走宽松归一不拒包；API（create/update）走严格白名单校验，非法 400 中文文案无 code。update 三态：字段缺省 = 保持、`null` = 清除、合法值 = 设置。
+
+**Why**：为未来 VNDB ulist 导入预置落点。映射规则已在任务 `07-11-entry-status`（父任务 prd.md 决策记录）固化：label `1→playing, 2→finished, 3→stalled, 4→dropped, 5→wishlist`；多标签单值化取终态优先 `2 > 4 > 3 > 1`；纯 Wishlist 条目跳过。映射常量**不预置进代码**（避免死代码），届时落 `src/vndb.js`。
+
+**Related**：`tests/router/vn.status.test.mjs`（校验矩阵）、`tests/d1/repository.test.mjs`（归一/宽松导入）、状态与 `finishDate` 无联动（显式决策，勿"顺手"加自动填充）。
+
+---
+
 ## Convention: wrangler 配置双轨（toml 被 gitignore）
 
 **What**：`wrangler.toml` 含真实 D1 id 等敏感信息，被 `.gitignore` 排除；仓库内被跟踪的模板是 `wrangler.toml.example`。**任何绑定/变量/队列等配置变更必须同时改两份文件**，否则克隆者或 CI 拿到的模板与实际运行配置漂移。
