@@ -1,1 +1,2 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "核对信封形态、迁移契约遵循（MIGRATIONS 追加而非改基线）、测试桩镜像纪律与依赖图陷阱（B6c 教训）"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "核对 i18n 缺 key、CSS 放置、a11y 与禁用模式"}

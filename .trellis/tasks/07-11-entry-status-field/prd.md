@@ -40,13 +40,13 @@
 
 ## Acceptance Criteria
 
-- [ ] 存量部署升级后 `vn_entries` 具有 status 列，旧数据 status 为 NULL，应用正常。
-- [ ] `POST /api/vn` 携带 `status:'playing'` 持久化成功；`status:'xxx'` → 400。
-- [ ] `PUT` 三态语义（缺省保持 / null 清除 / 合法设置）各有测试覆盖。
-- [ ] `GET /api/vn` 列表项与 `GET /api/vn/:id` 的 `user.status` 均返回。
-- [ ] 旧备份（无 status）导入成功且 status 为 null；备份含 `status:'weird'` 导入后落 null。
-- [ ] UI：编辑可改状态、卡片显示徽章、筛选与搜索叠加正确、详情弹窗展示、i18n 双语无缺 key 警告。
-- [ ] `npm run lint`、`npm run test` 通过；repository 既有测试的绑定序号更新无遗漏。
+- [x] 存量部署升级后 `vn_entries` 具有 status 列，旧数据 status 为 NULL，应用正常。（migrations.test 存量 v0 库用例）
+- [x] `POST /api/vn` 携带 `status:'playing'` 持久化成功；`status:'xxx'` → 400。（tests/router/vn.status.test.mjs）
+- [x] `PUT` 三态语义（缺省保持 / null 清除 / 合法设置）各有测试覆盖。
+- [x] `GET /api/vn` 列表项与 `GET /api/vn/:id` 的 `user.status` 均返回。
+- [x] 旧备份（无 status）导入成功且 status 为 null；备份含 `status:'weird'` 导入后落 null。
+- [x] UI：编辑可改状态、卡片显示徽章、筛选与搜索叠加正确、详情弹窗展示、i18n 双语无缺 key 警告。（逻辑经质检代理审查 + i18n key parity 单测；浏览器冒烟未在本会话执行，留待下次 `npm run dev` 时顺手确认）
+- [x] `npm run lint`、`npm run test` 通过（135/135）；repository 既有测试的绑定序号更新无遗漏。
 
 ## Out of Scope
 

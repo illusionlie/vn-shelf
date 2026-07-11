@@ -1,1 +1,4 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "API 响应信封契约（错误无 code、中文 message）、D1 迁移契约（加列必须追加 MIGRATIONS，禁改 SCHEMA_SQL 基线）、settings 复用契约"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "i18n t() 契约与 data-i18n 方言、CSS 模块归属与 link 顺序契约、卡片网格密度/封面比例契约、禁用模式清单"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine 组件与 shared.js mixin 组合模式、a11y 要求（新增筛选下拉与徽章需遵循）"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "表单归一化与防御性读取模式（editForm.status 的 '' ↔ null 转换）"}
