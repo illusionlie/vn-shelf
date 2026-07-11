@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "settings 表复用契约（schema_version 作为新增独立键需遵循既有 settings 键空间用法）与 wrangler 双轨配置说明"}
