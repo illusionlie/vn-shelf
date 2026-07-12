@@ -470,3 +470,37 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: VNDB ulist 用户列表导入
+
+**Date**: 2026-07-12
+**Task**: VNDB ulist 用户列表导入
+**Branch**: `master`
+
+### Summary
+
+实现 ulist 导入端到端：vndb.js request 支持 GET、抽 mapVnObjectToVndbData 共享映射（getVN 对拍回归）、新增 getAuthInfo/fetchUList/mapUListItemToEntry（终态优先 2>4>3>1、纯 wishlist 跳过、vote/10、日期映射）；新建 ulist-import.js waitUntil 分页管线（预载已存在 id 集合省 subrequest、跳过已存在、partial 断点续传）；MIGRATIONS v2 给 index_tasks 加 type/skipped 列；POST /api/ulist/import + 设置页按钮与进度（按 type 区分文案）。质检 12 项全 PASS，lint 通过、159/159 测试。待真实 token 冒烟。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `891a8d1` | (see git log) |
+| `742ae2f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
