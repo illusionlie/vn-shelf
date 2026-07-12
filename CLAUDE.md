@@ -20,6 +20,7 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 src/
 ├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject
 ├── index-task.js   # 索引任务逻辑（启动、状态查询）
+├── ulist-import.js # VNDB ulist 用户列表导入管线
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
 ├── repository.js   # D1 数据访问层
@@ -49,6 +50,9 @@ tests/
 │   └── markdown.security.test.mjs
 ├── queue/
 │   └── index.queue.test.mjs
+├── vndb/
+│   ├── ulist-mapping.test.mjs
+│   └── ulist-import.test.mjs
 └── router/
     ├── index.start.test.mjs
     └── config.update.test.mjs

@@ -21,6 +21,7 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 src/
 ├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject
 ├── index-task.js   # 索引任务逻辑（启动、状态查询）
+├── ulist-import.js # VNDB ulist 用户列表导入管线
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
 ├── repository.js   # D1 数据访问层
@@ -128,7 +129,8 @@ tests/
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
 | POST | `/api/index/start` | 启动批量索引 | 需认证 |
-| GET | `/api/index/status` | 获取索引状态 | 需认证 |
+| GET | `/api/index/status` | 获取索引/导入状态（返回体含 `type`/`skipped`） | 需认证 |
+| POST | `/api/ulist/import` | 启动 VNDB ulist 用户列表导入 | 需认证 |
 
 ### 配置接口
 
@@ -185,10 +187,20 @@ tests/
 ## VNDB API 集成
 
 - API 基址：`https://api.vndb.org/kana`
-- 客户端类：[`VNDBClient`](src/vndb.js:14)
-- 主要方法：[`getVN()`](src/vndb.js:49)、[`searchVN()`](src/vndb.js:133)
-- 统一入口：[`fetchVNDB()`](src/vndb.js:195)，默认 3 次重试 + 指数退避
+- 客户端类：`VNDBClient`（`src/vndb.js`）
+- 主要方法：`getVN()`、`searchVN()`、`getAuthInfo()`（GET `/authinfo`，校验 `listread` 权限）、`fetchUList()`（POST `/ulist` 分页拉取用户列表）
+- 请求方法：`request(endpoint, body, method='POST')`，GET 不带 body（`/authinfo` 用 GET；`/vn`、`/ulist` 默认 POST）
+- 共享映射：`mapVnObjectToVndbData(vn)` 将 VNDB vn 对象转本地格式，`getVN` 与 ulist 导入共用（回归保护）
+- 统一入口：`fetchVNDB()`，默认 3 次重试 + 指数退避
 - 配置来源：`config:settings/vndbApiToken`
+
+## VNDB ulist 用户列表导入
+
+- 管线：`src/ulist-import.js` 的 `startUListImport(env, ctx)` → `getAuthInfo` 取 uid → 建 `type='ulist_import'` 任务 → `ctx.waitUntil` 分页拉取 + 映射 + `saveVNEntry`
+- 执行模型：waitUntil 分页循环（每页 ≤100，`vn.*` 一次拉全）；开始时一次性预载已存在 id 集合到内存，逐条命中判断走内存避免 N 次 subrequest
+- 状态映射（07-11 固化）：label `1→playing, 2→finished, 3→stalled, 4→dropped, 5→wishlist`；多 label 终态优先 `2>4>3>1` 单值化；纯 wishlist（仅 label5、无 1-4）跳过；无 1-4 标签 → status null；`vote/10→personalRating`（vote 空→0）；`started→startDate`、`finished→finishDate`。映射常量与 `mapUListItemToEntry()` 落 `src/vndb.js`
+- 进度语义：total（拉取到条目数）、processed、skipped（已存在 + 纯 wishlist）、failed（写库失败）；终态 `completed`/`partial`
+- 任务状态复用 `index_tasks` 表（`type` 列区分 index/ulist_import，`skipped` 列记录跳过数）；启动端点 `POST /api/ulist/import` 复用 `INDEX_START_LOCK` Durable Object 与索引任务互斥；进度查询复用 `GET /api/index/status`（返回体含 `type`/`skipped`，前端按 `type` 区分文案）
 
 ## 数据结构
 

@@ -268,9 +268,48 @@ const MIGRATIONS = [
 
 **归一与校验分层**：`normalizeStatus()`（非法 → null）是持久化边界唯一归一点（`rowToEntry`/`entryToRow`/`rowToListItem` 三处生效）——导入走宽松归一不拒包；API（create/update）走严格白名单校验，非法 400 中文文案无 code。update 三态：字段缺省 = 保持、`null` = 清除、合法值 = 设置。
 
-**Why**：为未来 VNDB ulist 导入预置落点。映射规则已在任务 `07-11-entry-status`（父任务 prd.md 决策记录）固化：label `1→playing, 2→finished, 3→stalled, 4→dropped, 5→wishlist`；多标签单值化取终态优先 `2 > 4 > 3 > 1`；纯 Wishlist 条目跳过。映射常量**不预置进代码**（避免死代码），届时落 `src/vndb.js`。
+**Why**：为 VNDB ulist 导入预置落点（已于 07-12 兑现）。映射规则在任务 `07-11-entry-status` 固化：label `1→playing, 2→finished, 3→stalled, 4→dropped, 5→wishlist`；多标签单值化取终态优先 `2 > 4 > 3 > 1`；纯 Wishlist 条目跳过。映射常量已落 `src/vndb.js`（`ULIST_LABEL_TO_STATUS`/`STATUS_PRIORITY`），详见下方「VNDB ulist 导入管线」Scenario。
 
 **Related**：`tests/router/vn.status.test.mjs`（校验矩阵）、`tests/d1/repository.test.mjs`（归一/宽松导入）、状态与 `finishDate` 无联动（显式决策，勿"顺手"加自动填充）。
+
+---
+
+## Scenario: VNDB ulist 导入管线（07-12 兑现）
+
+### 1. Scope / Trigger
+
+- Trigger：改动 `src/ulist-import.js`、`src/vndb.js` 的 ulist/authinfo 方法、或 `index_tasks` 表复用逻辑的变更。
+- 07-11 预留的 status 枚举与映射规则在此兑现；映射常量已落 `src/vndb.js`（不再是"不预置"状态）。
+
+### 2. Signatures
+
+```js
+// src/vndb.js
+mapVnObjectToVndbData(vn)              // getVN 与 ulist 共享的 VN 元数据映射（回归保护）
+mapUListItemToEntry(item)             // ulist 单条 → entry | { skip: true }
+VNDBClient.request(endpoint, body, method='POST')  // GET 不带 body
+VNDBClient.getAuthInfo()              // GET /authinfo，校验 listread
+VNDBClient.fetchUList(userId, { page, results })   // POST /ulist，返回 { results, more }
+// src/ulist-import.js
+startUListImport(env, ctx)            // 鉴权 + 建任务，waitUntil 后台拉取
+```
+
+### 3. Contracts
+
+- **映射规则唯一落点**：`ULIST_LABEL_TO_STATUS` + `STATUS_PRIORITY`（终态优先 `2>4>3>1`）常量在 `src/vndb.js`。纯 wishlist（仅 label5、无 1-4）→ `{ skip: true }`；无 1-4 但有其他标签 → status `null` 仍导入；`vote/10→personalRating`（vote 空→0，四舍五入一位小数）；`started/finished→startDate/finishDate`。
+- **getVN 回归不变量**：`getVN` 必须委托 `mapVnObjectToVndbData`，输出逐字段与重构前一致（`tests/vndb/ulist-mapping.test.mjs` 对拍）。
+- **request 方法参数**：默认 POST 保持 `/vn`、`/ulist` 行为；仅 `/authinfo` 传 `'GET'`，GET 不序列化 body。
+- **任务表复用**：`index_tasks` 加 `type`（默认 `'index'`）与 `skipped` 列（迁移 v2）；`saveIndexStatus`/`getIndexStatus` 读写两列。导入任务 `type='ulist_import'`；进度查询复用 `GET /api/index/status`。
+- **冲突策略**：已存在同 ID 条目跳过（计入 skipped），本地数据零改动；开始时预载已存在 id 集合到内存，逐条判断不查库。
+- **启动互斥**：`POST /api/ulist/import` 复用 `INDEX_START_LOCK` Durable Object，与索引任务互斥（两者都写 vn_entries）；持锁仅覆盖鉴权 + 建任务同步窗口，后台拉取靠任务活跃态阻止重复启动。
+- **执行模型**：`ctx.waitUntil` 分页循环 + 分批写入；单次墙钟/网络中断 → 记录已导入进度置 `partial`（已存在跳过 = 天然断点续传，重跑收敛）。
+
+### 4. Tests Required
+
+- `tests/vndb/ulist-mapping.test.mjs`：`mapUListItemToEntry` 全边界 + getVN 回归 + getAuthInfo/fetchUList 方法/body/错误分支 + request GET/POST。
+- `tests/vndb/ulist-import.test.mjs`：跳过已存在 + skipped 计数 + 鉴权失败信封 + 分页汇总 + 写库失败 partial。
+- `tests/d1/migrations.test.mjs`：v2 在存量 v1 库加 `type`/`skipped` 列。
+- 路由 patch 型加载器（`config.update`/`envelope`/`vn.status`/`index.start`）新增 `./ulist-import.js` import 时必须同步 patch 列表与 stub，否则 `ERR_MODULE_NOT_FOUND`。
 
 ---
 
