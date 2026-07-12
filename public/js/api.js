@@ -382,6 +382,19 @@ export const indexAPI = {
   }
 };
 
+// ============ ulist 导入API ============
+
+export const ulistAPI = {
+  /**
+   * 启动 VNDB ulist 导入任务
+   */
+  async import() {
+    return apiRequest('/ulist/import', {
+      method: 'POST'
+    });
+  }
+};
+
 // ============ 配置API ============
 
 export const configAPI = {

@@ -37,6 +37,7 @@ async function loadRouterModule({ initialSettings = {}, authenticated = true } =
   const indexTaskStubPath = path.join(tempDir, 'index-task.stub.mjs');
   const utilsStubPath = path.join(tempDir, 'utils.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
+  const ulistImportStubPath = path.join(tempDir, 'ulist-import.stub.mjs');
   const testId = `${Date.now()}_${Math.random()}`;
 
   globalThis.__routerConfigTestRegistry = globalThis.__routerConfigTestRegistry || new Map();
@@ -206,12 +207,14 @@ export async function getIndexTaskStatus() {
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.stub.mjs';")
+    .replace(/from '\.\/ulist-import\.js';/, "from './ulist-import.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
   await fs.writeFile(indexTaskStubPath, indexTaskStubCode, 'utf8');
+  await fs.writeFile(ulistImportStubPath, 'export async function startUListImport() { return { ok: true, taskId: "ulist_stub" }; }\n', 'utf8');
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(routerPath, patchedSource, 'utf8');

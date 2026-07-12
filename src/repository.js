@@ -535,8 +535,10 @@ export async function getIndexStatus(env) {
     return {
       status: 'idle',
       taskId: null,
+      type: 'index',
       total: 0,
       processed: 0,
+      skipped: 0,
       failed: [],
       startedAt: null,
       completedAt: null,
@@ -548,8 +550,10 @@ export async function getIndexStatus(env) {
   return {
     status: row.status || 'idle',
     taskId: row.id,
+    type: row.type || 'index',
     total: row.total || 0,
     processed: row.processed || 0,
+    skipped: row.skipped || 0,
     failed: safeJSONParse(row.failed_ids, []),
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -564,15 +568,18 @@ export async function saveIndexStatus(env, status) {
   const failed = Array.isArray(status.failed) ? status.failed : [];
   const taskId = status.taskId || status.id;
   const statusValue = status.status || 'idle';
+  const typeValue = status.type || 'index';
 
   await env.DB.prepare(`
-    INSERT OR REPLACE INTO index_tasks (id, status, total, processed, started_at, completed_at, error, failed_ids, last_reconciled_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO index_tasks (id, status, type, total, processed, skipped, started_at, completed_at, error, failed_ids, last_reconciled_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     taskId,
     statusValue,
+    typeValue,
     status.total || 0,
     status.processed || 0,
+    status.skipped || 0,
     status.startedAt || null,
     status.completedAt || null,
     status.error || null,

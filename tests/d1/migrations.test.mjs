@@ -124,20 +124,24 @@ const DEMO_MIGRATIONS = [
 
 // ============ Tests ============
 
-test('真实 MIGRATIONS：v1 为 vn_entries 加 status 列，LATEST_SCHEMA_VERSION 为 1', async () => {
+test('真实 MIGRATIONS：v1 加 status 列、v2 加 index_tasks type/skipped 列，LATEST_SCHEMA_VERSION 为 2', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
     assert.deepEqual(db.MIGRATIONS, [
-      { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] }
+      { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] },
+      { version: 2, statements: [
+        "ALTER TABLE index_tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'index'",
+        'ALTER TABLE index_tasks ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0'
+      ] }
     ]);
-    assert.equal(db.LATEST_SCHEMA_VERSION, 1);
+    assert.equal(db.LATEST_SCHEMA_VERSION, 2);
   } finally {
     await cleanup();
   }
 });
 
-test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 1', async () => {
+test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 2', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
@@ -153,9 +157,34 @@ test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 
     assert.ok(createStatements.some(sql => sql.includes('index_task_items')));
 
     const alters = fake.executedSql.filter(sql => sql.startsWith('alter table'));
-    assert.deepEqual(alters, ['alter table vn_entries add column status text'], '全新库同样走全量迁移回放（基线冻结语义）');
-    assert.equal(await db.readSchemaVersion(fake), 1, '版本号推进到最新');
-    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '1', '版本号以字符串落库');
+    assert.deepEqual(alters, [
+      'alter table vn_entries add column status text',
+      "alter table index_tasks add column type text not null default 'index'",
+      'alter table index_tasks add column skipped integer not null default 0'
+    ], '全新库同样走全量迁移回放（基线冻结语义）');
+    assert.equal(await db.readSchemaVersion(fake), 2, '版本号推进到最新');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号以字符串落库');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('真实迁移 v2：存量 v1 库（已有 status 列）initDB 后加 index_tasks type/skipped 列', async () => {
+  const { db, cleanup } = await loadDbModule();
+
+  try {
+    const fake = new FakeMigrationD1();
+    // 模拟已应用 v1 的存量库
+    fake.settings.set('schema_version', '1');
+
+    await db.initDB(fake);
+
+    const alters = fake.executedSql.filter(sql => sql.startsWith('alter table'));
+    assert.deepEqual(alters, [
+      "alter table index_tasks add column type text not null default 'index'",
+      'alter table index_tasks add column skipped integer not null default 0'
+    ], '仅应用 v2 迁移，不重复 v1');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号推进到 2');
   } finally {
     await cleanup();
   }
@@ -172,8 +201,12 @@ test('真实迁移 v1：存量 v0 库（含业务数据、无 schema_version 键
     await db.initDB(fake);
 
     const alters = fake.executedSql.filter(sql => sql.startsWith('alter table'));
-    assert.deepEqual(alters, ['alter table vn_entries add column status text'], '存量库补齐 status 列');
-    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '1', '版本号推进到 1');
+    assert.deepEqual(alters, [
+      'alter table vn_entries add column status text',
+      "alter table index_tasks add column type text not null default 'index'",
+      'alter table index_tasks add column skipped integer not null default 0'
+    ], '存量 v0 库补齐 status 列及 index_tasks type/skipped 列');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号推进到 2');
     assert.equal(fake.settings.get('config:settings'), '{"tagsMode":"vndb"}', '业务设置键不受迁移影响');
 
     // 幂等：已最新的库重入不再执行迁移语句
@@ -181,7 +214,7 @@ test('真实迁移 v1：存量 v0 库（含业务数据、无 schema_version 键
     await db.initDB(fake);
     assert.equal(
       fake.executedSql.filter(sql => sql.startsWith('alter table')).length,
-      1,
+      3,
       '重入不重复应用迁移'
     );
   } finally {

@@ -12,8 +12,10 @@ function createBaseIndexTaskStatus(overrides = {}) {
   return {
     status: 'idle',
     taskId: null,
+    type: 'index',
     total: 0,
     processed: 0,
+    skipped: 0,
     failed: [],
     startedAt: null,
     completedAt: null,

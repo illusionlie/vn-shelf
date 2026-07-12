@@ -30,6 +30,7 @@ import {
   releaseIndexStartLock,
   VN_STATUS_VALUES
 } from './repository.js';
+import { startUListImport } from './ulist-import.js';
 import { errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB } from './vndb.js';
 
@@ -85,7 +86,7 @@ async function parseJsonBodyOr400(request) {
 /**
  * 路由处理器
  */
-export async function handleRequest(request, env) {
+export async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
@@ -104,7 +105,7 @@ export async function handleRequest(request, env) {
 
   // API路由
   if (path.startsWith('/api/')) {
-    const response = await handleAPI(request, env, path, method);
+    const response = await handleAPI(request, env, path, method, ctx);
 
     // 仅公开只读端点的 GET 响应附加 CORS 头，认证/写操作端点一律不加
     if (method === 'GET' && isPublicCorsPath(path)) {
@@ -121,7 +122,7 @@ export async function handleRequest(request, env) {
 /**
  * API路由处理
  */
-async function handleAPI(request, env, path, method) {
+async function handleAPI(request, env, path, method, ctx) {
   // 认证相关接口
   if (path === '/api/auth/status' && method === 'GET') {
     return handleAuthStatus(request, env);
@@ -197,6 +198,10 @@ async function handleAPI(request, env, path, method) {
 
   if (path === '/api/index/status' && method === 'GET') {
     return handleGetIndexStatus(request, env, auth);
+  }
+
+  if (path === '/api/ulist/import' && method === 'POST') {
+    return handleStartUListImport(request, env, auth, ctx);
   }
 
   if (path === '/api/config' && method === 'GET') {
@@ -1137,6 +1142,45 @@ async function handleGetIndexStatus(request, env, auth) {
 
   const status = await getIndexTaskStatus(env);
   return successResponse(status);
+}
+
+// ============ ulist 导入接口 ============
+
+async function handleStartUListImport(request, env, auth, ctx) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const startLockHolder = `ulist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  return runWithStartIndexLock(async () => {
+    // 与索引任务互斥：复用 INDEX_START_LOCK Durable Object（两者都写 vn_entries）
+    const acquired = await tryAcquireIndexStartLock(env, startLockHolder);
+    if (!acquired) {
+      return errorResponse('已有索引或导入任务正在运行', 409);
+    }
+
+    // 导入任务经 ctx.waitUntil 后台执行，持锁期仅覆盖鉴权 + 建任务这一同步窗口；
+    // 后台拉取写入不在锁内，靠 index_tasks 活跃态阻止重复启动。
+    try {
+      const result = await startUListImport(env, ctx);
+
+      if (!result.ok) {
+        return errorResponse(result.message, result.status);
+      }
+
+      return successResponse({ taskId: result.taskId }, 'ulist 导入任务已启动');
+    } finally {
+      try {
+        await releaseIndexStartLock(env, startLockHolder);
+      } catch (releaseError) {
+        console.error('[ulist][start] release lock failed', {
+          holder: startLockHolder,
+          error: releaseError instanceof Error ? releaseError.message : String(releaseError)
+        });
+      }
+    }
+  });
 }
 
 // ============ 配置接口 ============

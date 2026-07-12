@@ -39,7 +39,14 @@ export const SCHEMA_VERSION_KEY = 'schema_version';
 export const MIGRATIONS = [
   // v1（07-11-entry-status-field）：条目游玩状态列。可空、无默认值，NULL = 未设置；
   // 合法值白名单见 src/repository.js VN_STATUS_VALUES。列表全量加载后前端筛选，不建索引。
-  { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] }
+  { version: 1, statements: ['ALTER TABLE vn_entries ADD COLUMN status TEXT'] },
+  // v2（07-12-vndb-ulist-import）：泛化 index_tasks 表以复用于 ulist 导入任务。
+  // type 区分 index / ulist_import（默认 'index'，存量索引任务不受影响）；
+  // skipped 记录导入跳过数（已存在 + 纯 wishlist），语义独立于 processed/failed。
+  { version: 2, statements: [
+    "ALTER TABLE index_tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'index'",
+    'ALTER TABLE index_tasks ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0'
+  ] }
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

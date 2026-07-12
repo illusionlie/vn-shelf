@@ -2,7 +2,7 @@
  * VN Shelf 设置页组件
  */
 
-import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI } from '../api.js';
+import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI, ulistAPI } from '../api.js';
 import { getLocale, getStoredLocale, setLocale, t } from '../i18n.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
@@ -166,6 +166,19 @@ export function settingsPage() {
       }
     },
 
+    async startUListImport() {
+      this.isLoading = true;
+      try {
+        await ulistAPI.import();
+        this.$store.app.addToast(t('toast.ulistImportStarted'));
+        await this.loadIndexStatus();
+      } catch (error) {
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.ulistImportFailed')), 'error');
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
     async exportData() {
       try {
         // 解包信封 data 层后落盘：导出文件内容保持
@@ -259,6 +272,11 @@ export function settingsPage() {
         start_failed: t('status.startFailed')
       };
       return map[status] || status;
+    },
+
+    // 任务类型文案：index=索引 / ulist_import=ulist 导入（进度区按 type 区分显示）
+    formatTaskType(type) {
+      return type === 'ulist_import' ? t('settings.taskTypeUlistImport') : t('settings.taskTypeIndex');
     },
 
     formatDateTime(dateStr) {

@@ -158,12 +158,14 @@ export async function fetchVNDB(id) {
     .replace(/from '\.\/auth\.js';/, "from './auth.stub.mjs';")
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.stub.mjs';")
+    .replace(/from '\.\/ulist-import\.js';/, "from './ulist-import.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.real.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
   await fs.writeFile(indexTaskStubPath, indexTaskStubCode, 'utf8');
+  await fs.writeFile(path.join(tempDir, 'ulist-import.stub.mjs'), 'export async function startUListImport() { return { ok: true, taskId: "ulist_stub" }; }\n', 'utf8');
   await fs.writeFile(utilsRealPath, utilsSourceCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(routerPath, patchedSource, 'utf8');

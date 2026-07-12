@@ -233,13 +233,15 @@ class FakeD1Database {
       state.indexTasks.set(bindings[0], {
         id: bindings[0],
         status: bindings[1],
-        total: bindings[2],
-        processed: bindings[3],
-        started_at: bindings[4],
-        completed_at: bindings[5],
-        error: bindings[6],
-        failed_ids: bindings[7],
-        last_reconciled_at: bindings[8]
+        type: bindings[2],
+        total: bindings[3],
+        processed: bindings[4],
+        skipped: bindings[5],
+        started_at: bindings[6],
+        completed_at: bindings[7],
+        error: bindings[8],
+        failed_ids: bindings[9],
+        last_reconciled_at: bindings[10]
       });
       return { success: true, meta: { changes: 1 } };
     }
@@ -1009,6 +1011,9 @@ test('saveIndexStatus 和 getIndexStatus 正确存取索引任务状态', async 
     assert.equal(status.total, 10);
     assert.equal(status.processed, 3);
     assert.deepEqual(status.failed, ['v99']);
+    // 默认 type='index'、skipped=0（未显式提供时）
+    assert.equal(status.type, 'index');
+    assert.equal(status.skipped, 0);
   } finally {
     await cleanup();
   }

@@ -96,6 +96,20 @@
           <span data-i18n="settings.tokenGetPrefix"></span> <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> <span data-i18n="settings.tokenGetSuffix"></span>
         </p>
       </div>
+
+      <div class="form-group">
+        <label class="form-label" data-i18n="settings.ulistImportLabel"></label>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button
+            class="btn btn-primary"
+            @click="startUListImport()"
+            :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
+            data-i18n="settings.ulistImportButton"
+          >
+          </button>
+        </div>
+        <p class="form-hint" data-i18n="settings.ulistImportHint"></p>
+      </div>
     </section>
 
     <!-- 密码设置 -->
@@ -134,10 +148,16 @@
       <template x-if="indexStatus">
         <div class="mb-4">
           <p class="text-muted">
+            <span data-i18n="settings.taskTypeLabel"></span> <strong x-text="formatTaskType(indexStatus.type)"></strong>
+          </p>
+          <p class="text-muted">
             <span data-i18n="settings.statusLabel"></span> <strong x-text="formatStatus(indexStatus.status)"></strong>
             <span x-show="isIndexTaskActive(indexStatus.status)">
               <span data-i18n="settings.progressLabel"></span> <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
             </span>
+          </p>
+          <p class="text-muted" x-show="indexStatus.skipped > 0">
+            <span data-i18n="settings.skippedLabel"></span> <span x-text="indexStatus.skipped"></span>
           </p>
           <p class="text-muted" x-show="indexStatus.startedAt">
             <span data-i18n="settings.startedAtLabel"></span> <span x-text="formatDateTime(indexStatus.startedAt)"></span>
