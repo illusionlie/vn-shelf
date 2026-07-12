@@ -116,17 +116,6 @@
   padding: 4px 10px;
 }
 
-/* 游玩状态徽章：与 all-age-badge 同容器、对侧角落（右上） */
-.vn-card-image-wrapper .status-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 10;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  font-size: 0.8rem;
-  padding: 4px 10px;
-}
-
 .vn-card-image {
   width: 100%;
   aspect-ratio: 7 / 10;
@@ -163,8 +152,8 @@
   display: inline-block;
   font-size: 0.65rem;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;
   white-space: nowrap;
@@ -173,20 +162,28 @@
 }
 
 /*
- * 游玩状态徽章基础样式（沿用 all-age-badge 模式：固定深色渐变 + 白字，
- * 与主题变量解耦，明暗主题下对比度一致可读）。
+ * 游玩状态章：彩色胶囊 + 内嵌单色 SVG 图标 + 状态文字（不再依赖 hover）。
+ * 固定深色渐变 + 白字，与主题变量解耦，明暗主题下对比度一致可读。
  * 状态值枚举与 src/repository.js VN_STATUS_VALUES 对应（UI 不含 wishlist）。
  */
 .status-badge {
-  display: inline-block;
-  font-size: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
   color: white;
   white-space: nowrap;
   flex-shrink: 0;
   vertical-align: middle;
+}
+
+.status-badge-icon {
+  width: 0.9em;
+  height: 0.9em;
+  flex-shrink: 0;
 }
 
 .status-badge.status-playing {
@@ -300,6 +297,11 @@
   padding: 3px 8px;
 }
 
+.detail-title .status-badge {
+  font-size: 0.8rem;
+  padding: 4px 12px;
+}
+
 .detail-title-link {
   color: inherit;
   text-decoration: none;
@@ -346,7 +348,7 @@
 
 .detail-meta {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
 
@@ -487,12 +489,18 @@
   }
 
   .controls-bar {
-    flex-direction: column;
-    align-items: stretch;
+    gap: 10px;
   }
 
+  /* 搜索框独占首行；排序与状态筛选平分第二行，避免各占一行浪费竖向空间 */
   .search-container {
+    flex: 1 1 100%;
     max-width: 100%;
+  }
+
+  .controls-bar .sort-select {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

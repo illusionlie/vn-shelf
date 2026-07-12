@@ -140,7 +140,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
             </div>
             <span class="all-age-badge" x-show="vn.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>
-            <span class="status-badge" :class="'status-' + vn.status" x-show="statusBadgeLabel(vn.status)" x-text="statusBadgeLabel(vn.status)"></span>
           </div>
           <div class="vn-card-content">
             <h3 class="vn-card-title">
@@ -151,13 +150,19 @@
             <hr class="card-divider">
             <div class="vn-card-meta">
               <div class="vn-card-rating">
-                <div class="stars-container">
-                  <template x-for="i in 10" :key="i">
-                    <span class="star" :class="{ empty: i > Math.round(vn.rating || 0) }">★</span>
-                  </template>
-                </div>
+                <span class="star">★</span>
                 <span class="rating-value" x-text="vn.rating?.toFixed(2) || 'N/A'"></span>
               </div>
+              <span
+                class="status-badge"
+                :class="'status-' + vn.status"
+                x-show="statusBadgeLabel(vn.status)"
+                :title="statusBadgeLabel(vn.status)"
+                :aria-label="statusBadgeLabel(vn.status)"
+              >
+                <span x-html="statusIcon(vn.status)"></span>
+                <span class="status-badge-label" x-text="statusBadgeLabel(vn.status)"></span>
+              </span>
             </div>
           </div>
         </div>
@@ -220,6 +225,16 @@
                     </svg>
                   </a>
                   <span class="all-age-badge" x-show="selectedVN.vndb?.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>
+                  <span
+                    class="status-badge"
+                    :class="'status-' + selectedVN.user?.status"
+                    x-show="statusBadgeLabel(selectedVN.user?.status)"
+                    :title="statusBadgeLabel(selectedVN.user?.status)"
+                    :aria-label="statusBadgeLabel(selectedVN.user?.status)"
+                  >
+                    <span x-html="statusIcon(selectedVN.user?.status)"></span>
+                    <span class="status-badge-label" x-text="statusBadgeLabel(selectedVN.user?.status)"></span>
+                  </span>
                 </h1>
                 <p class="detail-subtitle" x-text="(selectedVN.user?.titleCn || selectedVN.vndb?.titleCn) ? (selectedVN.vndb?.titleJa || selectedVN.vndb?.title) : ''" x-show="selectedVN.user?.titleCn || selectedVN.vndb?.titleCn"></p>
                 <p class="detail-company" x-text="selectedVN.vndb?.developers?.join(', ') || ''" x-show="selectedVN.vndb?.developers?.length"></p>
@@ -228,11 +243,7 @@
                 <div class="detail-stars-group" x-show="selectedVN.vndb?.rating">
                   <span class="detail-stars-label" data-i18n="common.vndbRating"></span>
                   <div class="detail-stars vndb-rating">
-                    <div class="stars-container">
-                      <template x-for="i in 10" :key="i">
-                        <span class="star" :class="{ empty: i > Math.round(selectedVN.vndb?.rating || 0) }">★</span>
-                      </template>
-                    </div>
+                    <span class="star">★</span>
                     <span class="detail-rating-score" x-text="selectedVN.vndb?.rating?.toFixed(1) || '-'"></span>
                   </div>
                 </div>
@@ -241,20 +252,12 @@
                 <div class="detail-stars-group" x-show="selectedVN.user?.personalRating">
                   <span class="detail-stars-label" data-i18n="common.personalRating"></span>
                   <div class="detail-stars personal-rating">
-                    <div class="stars-container">
-                      <template x-for="i in 10" :key="i">
-                        <span class="star" :class="{ empty: i > Math.round(selectedVN.user?.personalRating || 0) }">★</span>
-                      </template>
-                    </div>
+                    <span class="star">★</span>
                     <span class="detail-rating-score" x-text="selectedVN.user?.personalRating?.toFixed(1) || '-'"></span>
                   </div>
                 </div>
 
                 <div class="detail-meta">
-                  <div class="detail-meta-item">
-                    <span class="detail-meta-label" data-i18n="index.statusLabel"></span>
-                    <span class="detail-meta-value" x-text="selectedVN.user?.status ? $t('status.' + selectedVN.user.status) : $t('status.none')"></span>
-                  </div>
                   <div class="detail-meta-item">
                     <span class="detail-meta-label" data-i18n="common.gameLength"></span>
                     <span class="detail-meta-value" x-text="selectedVN.vndb?.length || $t('common.unknown')"></span>

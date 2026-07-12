@@ -94,6 +94,26 @@ export function vnShelf() {
       return VN_STATUS_OPTIONS.includes(status) ? t(`status.${status}`) : '';
     },
 
+    // 内嵌单色 SVG 图标（fill/stroke 均用 currentColor，随状态章白字渲染）。
+    // 用内嵌 SVG 而非 ▶✓⏸✕ Unicode，避免 Windows 下被 emoji 字体劫持成彩色。
+    // 白名单外（含 null / wishlist）返回空串，配合 statusBadgeLabel 整章不渲染。
+    statusIcon(status) {
+      const icons = {
+        // 在玩：播放三角
+        playing: '<path d="M8 5v14l11-7z"/>',
+        // 已完成：对勾
+        finished: '<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
+        // 搁置：暂停双竖
+        stalled: '<path d="M7 5h3v14H7zM14 5h3v14h-3z"/>',
+        // 抛弃：叉
+        dropped: '<path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>'
+      };
+      const inner = icons[status];
+      return inner
+        ? `<svg class="status-badge-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${inner}</svg>`
+        : '';
+    },
+
     // 本地排序（比较器语义与后端 handleGetVNList 一致），不再重新请求列表
     handleSortChange() {
       const [field, order] = this.sortBy.split('_');
