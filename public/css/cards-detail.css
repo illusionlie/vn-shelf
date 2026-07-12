@@ -232,6 +232,12 @@
   color: var(--accent-color);
 }
 
+/* 卡片展示个人评分时沿用详情弹窗 personal-rating 绿色约定；回退 VNDB 分保持金星默认色 */
+.vn-card-rating.personal-rating .star,
+.vn-card-rating.personal-rating .rating-value {
+  color: #6bff6b;
+}
+
 /* Star Rating Visualization */
 .stars-container {
   display: flex;

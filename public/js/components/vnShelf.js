@@ -114,6 +114,17 @@ export function vnShelf() {
         : '';
     },
 
+    // 卡片评分：个人评分优先，未评分（后端存 0 / 缺失）回退 VNDB 分
+    hasPersonalRating(vn) {
+      return (vn.personalRating || 0) > 0;
+    },
+
+    // 个人分沿用一位小数（与详情弹窗一致），VNDB 回退分保持原有两位小数
+    cardRatingText(vn) {
+      if (this.hasPersonalRating(vn)) return vn.personalRating.toFixed(1);
+      return vn.rating?.toFixed(2) || 'N/A';
+    },
+
     // 本地排序（比较器语义与后端 handleGetVNList 一致），不再重新请求列表
     handleSortChange() {
       const [field, order] = this.sortBy.split('_');

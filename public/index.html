@@ -149,9 +149,9 @@
             <p class="vn-card-company" x-text="vn.developers?.[0] || ''" x-show="vn.developers?.[0]"></p>
             <hr class="card-divider">
             <div class="vn-card-meta">
-              <div class="vn-card-rating">
+              <div class="vn-card-rating" :class="{ 'personal-rating': hasPersonalRating(vn) }">
                 <span class="star">★</span>
-                <span class="rating-value" x-text="vn.rating?.toFixed(2) || 'N/A'"></span>
+                <span class="rating-value" x-text="cardRatingText(vn)"></span>
               </div>
               <span
                 class="status-badge"
