@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-07-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~506 | Active |
+| `journal-1.md` | ~540 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-07-12 | 主页卡片评分个人分优先（回退 VNDB 分） | `d6f9564`, `a422ad4` | `master` |
 | 14 | 2026-07-12 | VNDB ulist 用户列表导入 | `891a8d1`, `742ae2f` | `master` |
 | 13 | 2026-07-12 | 条目游玩状态视觉重构 + 移动端工具栏 | `9d3cb37`, `77be1c7` | `master` |
 | 12 | 2026-07-11 | B6c API 信封统一 + B6 批次父任务集成验收归档 | `4501333`, `9b7de43` | `master` |

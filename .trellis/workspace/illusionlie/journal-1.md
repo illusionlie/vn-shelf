@@ -504,3 +504,37 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 主页卡片评分个人分优先（回退 VNDB 分）
+
+**Date**: 2026-07-12
+**Task**: 主页卡片评分个人分优先（回退 VNDB 分）
+**Branch**: `master`
+
+### Summary
+
+主页书架卡片评分从固定显示 VNDB 分改为 personalRating>0 优先（绿星绿字 toFixed(1)），未评分回退 VNDB 分（金星 toFixed(2)，视觉零变化）。复用详情弹窗 #6bff6b 配色约定，helper hasPersonalRating/cardRatingText 落 vnShelf.js，样式限定 .vn-card-rating.personal-rating。后端零改动（列表接口 rowToListItem 已扁平化 personalRating，未评分存 0）。顺带修复按个人评分排序时卡片显示 VNDB 分的视觉乱序。lint + 159 tests 全过；评分配色语义已入 frontend/quality-guidelines.md。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6f9564` | (see git log) |
+| `a422ad4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
