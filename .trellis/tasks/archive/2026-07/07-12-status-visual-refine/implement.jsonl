@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "CSS 模块归属与 link 顺序契约、i18n t()/data-i18n 方言与缺 key 守护、a11y（aria-label）、卡片网格密度契约、禁用模式清单"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine 组件与 shared.js mixin 模式、徽章/图标等展示元素的 a11y 与结构约定"}

@@ -1,0 +1,1 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "核对 CSS 放置、i18n 缺 key、a11y、禁用模式是否被本次视觉改动违反"}
