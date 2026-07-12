@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "核对信封形态、迁移契约（v2 加列）、状态枚举映射规则、测试桩镜像与 index.queue 依赖图陷阱是否被 ulist 导入破坏"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "核对 i18n 缺 key、CSS 放置、API 信封解构"}

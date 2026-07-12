@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "API 响应信封契约（无 code 中文文案）、D1 迁移契约（追加 MIGRATIONS 禁改基线）、settings 复用契约、条目状态枚举与 ulist 映射规则固化位置、测试桩镜像纪律与 index.queue 依赖图陷阱"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "i18n t()/data-i18n 方言与缺 key 守护、CSS 模块归属、移动端 toolbar flex-wrap、API 信封 res.data 解构、apiRequest 命名空间封装"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "apiRequest 统一入口、typed namespace 封装（indexAPI/新增 ulistAPI）、withLoading 加载态模式"}
