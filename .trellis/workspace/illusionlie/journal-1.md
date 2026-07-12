@@ -436,3 +436,37 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: 条目游玩状态视觉重构 + 移动端工具栏
+
+**Date**: 2026-07-12
+**Task**: 条目游玩状态视觉重构 + 移动端工具栏
+**Branch**: `master`
+
+### Summary
+
+在已有游玩状态字段基础上重构展示：卡片状态章从封面移入评分行（单星+数字左、彩色胶囊状态章右，内嵌单色SVG图标规避emoji劫持），封面仅留全年龄徽章；详情页状态升为标题旁头部章、两组评分改单星双色、时长块回到一行；全年龄徽章与状态章统一胶囊圆角；移动端(≤768px)工具栏由四行竖排压缩为两行（搜索独占首行，排序+状态筛选共享第二行）。Playwright真实渲染验证含/不含全年龄·四状态·明暗主题·390/360px移动双态。lint通过、135测试无回归。沉淀移动端toolbar flex-wrap规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9d3cb37` | (see git log) |
+| `77be1c7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

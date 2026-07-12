@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-07-11
+- **Total Sessions**: 13
+- **Last Active**: 2026-07-12
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~438 | Active |
+| `journal-1.md` | ~472 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-07-12 | 条目游玩状态视觉重构 + 移动端工具栏 | `9d3cb37`, `77be1c7` | `master` |
 | 12 | 2026-07-11 | B6c API 信封统一 + B6 批次父任务集成验收归档 | `4501333`, `9b7de43` | `master` |
 | 11 | 2026-07-10 | B6b HTML 静态文案 i18n 迁移 | `7da9452`, `5a9f895`, `e36942c` | `master` |
 | 10 | 2026-07-10 | B6a i18n 收尾：en 词典 + key-diff 单测 + 语言切换入口 | `2963f8a`, `9d53179` | `master` |
