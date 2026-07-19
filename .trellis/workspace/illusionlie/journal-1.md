@@ -572,3 +572,30 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - 下一个任务建议：07-19-rating-color-contrast（PRD 已就绪，`task.py start` 即可）。
+
+## Session 17: 个人评分绿 token 化（亮色对比度修复）
+
+**Date**: 2026-07-20
+**Task**: 07-19-rating-color-contrast (archived)
+
+个人评分绿从三处硬编码 `#6bff6b` 收口为主题 token `--personal-rating-color`：亮色档 `#166534`（对卡片玻璃 #f0f1f3 约 5.5:1，达 WCAG AA；PRD 候选 #15803d 实算 ~4.3:1 压线弃用），暗色档沿用 `#6bff6b`（暗色视觉零变化）。绿=个人 / 金=VNDB 语义不变，spec 契约改为 token 描述并写入对比度约束（浅色表面变色时需复验）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3395522` | fix(a11y): tokenize personal rating green, meet light-mode contrast |
+| `4cdbaaa` | docs(spec): rating green is a theme token with contrast contract |
+
+### Testing
+
+- [OK] `npm run lint` 通过；`npm run test` 159/159。
+- [OK] 对比度按 WCAG 相对亮度公式实算达标；grep 确认无残留硬编码。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 下一个：07-19-focus-visible-coverage。
