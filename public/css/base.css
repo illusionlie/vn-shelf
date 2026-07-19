@@ -12,6 +12,7 @@
   --border-radius-lg: 24px;
   --transition-fast: 0.2s ease-in-out;
   --transition-medium: 0.3s ease-in-out;
+  --focus-ring: 2px solid var(--accent-color);
 
   /* --- Light Mode (Default) - Frosted Silver --- */
   --primary-text-color: #1d1d1f;
@@ -171,6 +172,16 @@ a:hover {
   color: var(--secondary-text-color);
 }
 
+/* ===== Keyboard Focus =====
+ * 仅键盘触发（:focus-visible），鼠标点击不出现焦点环。
+ * outline 绘制在 border-box 之外，不受元素自身 overflow: hidden 裁切（如 .vn-card）。
+ * 表单类 .form-input:focus 用 accent 边框 + 光晕自成焦点指示，其 outline: none 属预期豁免。
+ */
+:is(a, button, [role="button"], select, input, textarea):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* ===== Images ===== */
 img { max-width: 100%; height: auto; display: block; }
 
@@ -242,11 +253,6 @@ img { max-width: 100%; height: auto; display: block; }
 .banner-github-link svg {
   width: 18px;
   height: 18px;
-}
-
-.banner-github-link:focus-visible {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
 }
 
 .banner-title:hover {
