@@ -36,8 +36,8 @@
   --success-color: #34c759;
   --error-color: #ff3b30;
   --warning-color: #ff9500;
-  /* 个人评分绿（亮色档）：需对浅色毛玻璃背景保持 >= 4.5:1 对比度 */
-  --personal-rating-color: #166534;
+  /* 个人评分绿（亮色档）：评分数字为大号粗体、星标为图形件，按 AA 大文本/图形标准需 >= 3:1（实测 ~3.4:1） */
+  --personal-rating-color: #0d9448;
 }
 
 body.dark-mode {
@@ -61,7 +61,7 @@ body.dark-mode {
   --shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.3);
   --shadow-glow: 0 0 30px rgba(0, 122, 255, 0.15);
   --star-empty-color: #48484a;
-  --personal-rating-color: #6bff6b;
+  --personal-rating-color: #4ade80;
 }
 
 /* ===== Reset & Base ===== */
