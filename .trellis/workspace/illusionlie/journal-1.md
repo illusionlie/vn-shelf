@@ -654,3 +654,32 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - 五任务批次仅剩 07-19-theme-fouc-color-scheme（含 html/body class 挂载点决策 + CSP 确认）。
+
+## Session 20: 主题防白闪 + 跟随系统偏好（五任务批次收官）
+
+**Date**: 2026-07-20
+**Task**: 07-19-theme-fouc-color-scheme (archived)
+
+主题 class 从 body 迁到 html（方案 a）：五个页面 head 在 CSS link 之前注入同一段同步内联脚本，首帧前判定主题——localStorage 显式选择优先，无存储值回退 prefers-color-scheme，暗色白闪消除。CSS 4 处选择器迁移，theme.js 5 处 body 读写迁 documentElement，initTheme 简化为仅同步按钮（class 写入单一事实在内联脚本）。CSP 核验无阻碍。加分项：color-scheme light/dark 让 UA 控件滚动条跟随主题。契约入 spec：新页面必须复制该脚本且位置在样式表之前，禁止重新引入 body.dark-mode。
+
+至此 07-19 前端质量批次五个任务全部完成归档（cover-lazy-loading / rating-color-contrast / focus-visible-coverage / reduced-motion / theme-fouc-color-scheme）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4155f68` | feat(theme): pre-paint theme class on <html> via head inline script |
+| `8a498fc` | docs(spec): theme mount point + inline-script FOUC contract |
+
+### Testing
+
+- [OK] `npm run lint` 通过；`npm run test` 159/159；grep 无 body.dark-mode 残留。
+- [PENDING] 真机验证：暗色刷新无白闪、清 localStorage 后跟随系统偏好、切换持久化。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 批次完成。评估报告中的候选改进（accent token 化、header 高度魔法数、NSFW 键盘可达、视觉方向升级）未立项，待需求。
