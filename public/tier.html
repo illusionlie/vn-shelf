@@ -128,6 +128,8 @@
                     <img
                       :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                       :alt="vn.titleCn || vn.titleJa || vn.title"
+                      loading="lazy"
+                      decoding="async"
                       :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
                       @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                     >
@@ -196,6 +198,8 @@
                     <img
                       :src="vn.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                       :alt="vn.titleCn || vn.titleJa || vn.title"
+                      loading="lazy"
+                      decoding="async"
                       :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
                       @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
                     >
@@ -235,6 +239,7 @@
                   :src="selectedVN.vndb?.image || ''"
                   :alt="selectedVN.vndb?.title"
                   class="detail-image"
+                  decoding="async"
                   :class="{ 'nsfw-blur': selectedVN.vndb?.imageNsfw && !showNsfw }"
                   @error="$event.target.style.display='none'"
                 >
