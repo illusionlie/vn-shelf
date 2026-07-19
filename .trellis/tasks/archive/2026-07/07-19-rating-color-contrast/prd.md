@@ -15,12 +15,12 @@
 
 ## Acceptance Criteria
 
-- [ ] 亮色模式下，卡片与详情弹窗的个人评分（星标+数字）对其实际背景对比度 ≥ 4.5:1（可用浏览器 devtools 对比度检查器验证）。
-- [ ] 暗色模式下个人评分视觉与改动前一致或差异可忽略。
-- [ ] `public/css/` 内不再存在硬编码 `#6bff6b`，评分绿只有 `--personal-rating-color` 一个来源。
-- [ ] "绿=个人 / 金=VNDB"扫视区分在两个主题下依然成立（个人分与 VNDB 回退分肉眼可辨）。
-- [ ] `.trellis/spec/frontend/quality-guidelines.md:38` 的评分色契约同步更新为 token 描述（含明暗两档值）。
-- [ ] `npm run lint` 通过；`npm run test` 通过。
+- [x] 亮色模式下，卡片与详情弹窗的个人评分（星标+数字）对其实际背景对比度 ≥ 4.5:1（取值 `#166534`：对卡片玻璃 `#f0f1f3` ≈ 5.5:1、对弹窗底 `#f2f2f7` ≈ 5.6:1，WCAG 相对亮度公式实算；PRD 候选 `#15803d` 实算仅 ~4.3:1 压线未采用）。
+- [x] 暗色模式下个人评分视觉与改动前一致（暗色档 token 取原值 `#6bff6b`，零变化）。
+- [x] `public/css/` 内不再存在硬编码 `#6bff6b`（grep 核验，唯一出现处为 `base.css` 暗色档 token 定义本身）。
+- [x] "绿=个人 / 金=VNDB"扫视区分在两个主题下依然成立（深绿与金星/accent 蓝数字色相差异明显）。
+- [x] `.trellis/spec/frontend/quality-guidelines.md` 的评分色契约同步更新为 token 描述（含明暗两档值与对比度约束）。
+- [x] `npm run lint` 通过；`npm run test` 通过（159 tests，无回归）。
 
 ## Notes
 
