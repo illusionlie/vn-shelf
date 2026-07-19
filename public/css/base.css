@@ -5,6 +5,7 @@
 /* ===== CSS Variables - Liquid Glass Theme ===== */
 :root {
   /* --- Base --- */
+  color-scheme: light;
   --font-family-base: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   --accent-color: #007AFF;
   --border-radius-sm: 8px;
@@ -41,8 +42,10 @@
   --personal-rating-color: #0d9448;
 }
 
-body.dark-mode {
+/* 主题 class 挂 <html>：由各页面 head 内联脚本在首帧前写入，避免暗色白闪（FOUC） */
+html.dark-mode {
   /* --- Dark Mode - Obsidian Glass --- */
+  color-scheme: dark;
   --primary-text-color: #E2E2E2;
   --secondary-text-color: #A0A0A0;
   --muted-text-color: #6e6e73;

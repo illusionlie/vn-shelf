@@ -52,7 +52,7 @@ function createThemeIcon(isDark) {
 }
 
 function updateThemeToggleButtons() {
-  const isDark = document.body.classList.contains('dark-mode');
+  const isDark = document.documentElement.classList.contains('dark-mode');
   const themeToggleButtons = document.querySelectorAll('.theme-toggle-btn');
 
   themeToggleButtons.forEach(button => {
@@ -68,17 +68,15 @@ function updateThemeToggleButtons() {
 }
 
 export function initTheme() {
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'dark') {
-    document.body.classList.add('dark-mode');
-  }
-
+  // 主题 class（html.dark-mode）已由各页面 head 内联脚本在首帧前写入：
+  // localStorage 显式选择优先，无存储值时回退 prefers-color-scheme。
+  // 这里只负责切换按钮的图标与 aria-label 同步。
   updateThemeToggleButtons();
 }
 
 export function toggleTheme() {
-  document.body.classList.toggle('dark-mode');
-  const isDark = document.body.classList.contains('dark-mode');
+  document.documentElement.classList.toggle('dark-mode');
+  const isDark = document.documentElement.classList.contains('dark-mode');
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
   updateThemeToggleButtons();
   applyBackgroundOverlay();
@@ -186,7 +184,7 @@ export function applyBackgroundOverlay() {
 
   const opacity = _backgroundConfig.backgroundOverlay ?? 0.5;
   const blur = _backgroundConfig.backgroundBlur ?? 4;
-  const isDark = document.body.classList.contains('dark-mode');
+  const isDark = document.documentElement.classList.contains('dark-mode');
 
   if (isDark) {
     overlay.style.backgroundColor = `rgba(18, 18, 18, ${opacity})`;

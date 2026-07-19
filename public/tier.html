@@ -3,6 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    // 首帧前应用主题 class（html.dark-mode），避免暗色用户白闪：
+    // localStorage 显式选择优先，无存储值时跟随系统 prefers-color-scheme。
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark-mode');
+        }
+      } catch (e) { /* localStorage 不可用时保持亮色默认 */ }
+    })();
+  </script>
   <title>Tier List - VN Shelf</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/forms.css">

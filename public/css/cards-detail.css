@@ -800,15 +800,15 @@
 }
 
 /* 深色模式下的特殊调整 */
-body.dark-mode .md-mark {
+html.dark-mode .md-mark {
   background: linear-gradient(120deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.15) 100%);
 }
 
-body.dark-mode .md-code-block {
+html.dark-mode .md-code-block {
   background: rgba(0, 0, 0, 0.2);
 }
 
-body.dark-mode .md-table {
+html.dark-mode .md-table {
   background: var(--tag-bg-color);
   border-radius: var(--border-radius-sm);
 
