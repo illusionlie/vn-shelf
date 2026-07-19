@@ -20,11 +20,17 @@
 
 ## Acceptance Criteria
 
-- [ ] DevTools 模拟 `prefers-reduced-motion: reduce` 后：卡片 hover 无位移/缩放/光扫，进度条无 shimmer，toast 直接出现或纯淡入，modal 无 scale 弹入，页内滚动无平滑动画。
-- [ ] 降级模式下所有交互功能与最终视觉状态不变（hover 仍有静态反馈，modal/toast 正常显示）。
-- [ ] 未开启偏好的用户视觉零变化。
-- [ ] loading spinner 在降级模式下仍提供可感知的加载反馈（保留旋转或等效静态提示，实现自选）。
-- [ ] `npm run lint` 通过；`npm run test` 通过。
+- [x] 降级覆盖逐项落地：卡片 hover 位移/封面缩放/光扫（cards-detail.css）、stat 卡位移（stats.css）、tier 卡缩放（tier.css）、进度条 shimmer、toast slideIn、modal scale、`scroll-behavior: auto`（base.css）；DevTools `prefers-reduced-motion: reduce` 模拟走查待人工复核。
+- [x] 降级模式下所有交互功能与最终视觉状态不变（仅中和 transform/animation；hover 的阴影/边框/背景色静态反馈、overlay 透明度淡入全部保留）。
+- [x] 未开启偏好的用户视觉零变化（全部规则包在 `@media (prefers-reduced-motion: reduce)` 内，改动为纯新增）。
+- [x] loading spinner 在降级模式下保留旋转（功能性反馈，未纳入降级清单）。
+- [x] `npm run lint` 通过；`npm run test` 通过（159 tests，无回归）。
+
+### 实现要点（偏离与补充）
+
+- 按"选择性关停"路线实现，规则按 spec 惯例落在各组件所属 CSS 文件的文件尾媒体块。
+- 范围小幅外扩：`.btn` 三变体与 GitHub 链接的 hover `translateY` 位移属同类装饰动效，PRD 未列举，一并纳入降级。
+- 关键发现：模态挂了 Alpine `x-transition`，过渡期间以**内联样式**写 transform（内联高于普通声明），故 `.modal { transform: none }` 必须 `!important` 才能压住缩放；opacity 淡入不受影响。已记录进 spec。
 
 ## Notes
 
