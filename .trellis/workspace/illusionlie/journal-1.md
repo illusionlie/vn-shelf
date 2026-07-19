@@ -627,3 +627,30 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - 剩余：07-19-theme-fouc-color-scheme、07-19-reduced-motion。
+
+## Session 19: prefers-reduced-motion 动画降级
+
+**Date**: 2026-07-20
+**Task**: 07-19-reduced-motion (archived)
+
+四个 CSS 文件各在文件尾加 `@media (prefers-reduced-motion: reduce)` 块（规则与组件同文件的惯例）：中和卡片 hover 位移/封面缩放/光扫、stat 卡与 tier 卡位移缩放、进度条 shimmer、toast slideIn、modal scale、smooth scroll，外扩纳入 .btn 三变体与 GitHub 链接的 hover 位移。颜色/阴影/透明度过渡与 loading spinner 保留（reduce 针对位移不针对反馈）。关键发现：Alpine x-transition 过渡期写内联 transform，内联 > 普通声明，`.modal` 降级必须 `!important`；此坑与"新增动效必须同文件带 reduce 对应规则"一起入 spec。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5d99e74` | feat(a11y): prefers-reduced-motion downgrades for decorative motion |
+| `e6158c1` | docs(spec): reduced-motion convention + x-transition gotcha |
+
+### Testing
+
+- [OK] `npm run lint` 通过；`npm run test` 159/159；未开启偏好用户零变化（纯新增媒体块）。
+- [PENDING] DevTools 模拟 reduce 走查待人工复核。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 五任务批次仅剩 07-19-theme-fouc-color-scheme（含 html/body class 挂载点决策 + CSP 确认）。
