@@ -538,3 +538,37 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+## Session 16: 前端设计评估 + 封面懒加载
+
+**Date**: 2026-07-19
+**Task**: 07-19-cover-lazy-loading (archived) + 4 个 a11y/主题任务立项
+
+按 frontend-design skill 对前端做了全面评估（视觉个性/token 纪律/可访问性/性能四层，报告见会话），按逐项确认立项 5 个轻量任务。首个任务落地：书架卡片、Tier 行、未分级区三处列表封面 img 加 `loading="lazy" decoding="async"`，两处详情弹窗大图仅加 `decoding="async"`（按需打开即在视口，lazy 无意义）。`@error` 回退、NSFW 模糊、aspect-ratio 防 CLS 占位零改动。约定入 frontend/quality-guidelines.md（列表封面必带懒加载属性，依赖 aspect-ratio 占位才不引入 CLS）。
+
+### Main Changes
+
+- `public/index.html` / `public/tier.html`：5 处 img 属性新增，共 8 行。
+- spec：quality-guidelines.md 新增列表封面懒加载约定一条。
+- 立项待做：rating-color-contrast / focus-visible-coverage / theme-fouc-color-scheme / reduced-motion（PRD 均已写好）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eea6b26` | perf(covers): lazy-load list cover images |
+| `04346e8` | docs(spec): list-cover img lazy-loading convention |
+| `eea98a6` | chore(task): plan 4 frontend a11y/theme quality tasks (PRDs) |
+
+### Testing
+
+- [OK] `npm run lint` 通过；`npm run test` 159/159。
+- [PENDING] 真实数据下 DevTools Network 复核懒加载触发时机（属性为浏览器原生行为，风险极低）。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 下一个任务建议：07-19-rating-color-contrast（PRD 已就绪，`task.py start` 即可）。
