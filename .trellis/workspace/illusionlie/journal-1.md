@@ -599,3 +599,31 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - 下一个：07-19-focus-visible-coverage。
+
+## Session 18: 全站键盘焦点环（focus-visible）
+
+**Date**: 2026-07-20
+**Task**: 07-19-focus-visible-coverage (archived)
+
+`base.css` 新增 `--focus-ring` token（2px accent outline）+ 一条全局规则 `:is(a, button, [role="button"], select, input, textarea):focus-visible`，offset 2px。仅键盘触发，鼠标点击无环。书架卡片走 `[role="button"]`；outline 画在 border-box 外不受 `.vn-card` 自身 overflow:hidden 裁切。`banner-github-link` 专属焦点规则删除并入全局；`.form-input:focus` 的 outline:none 属预期豁免（accent 边框+光晕即焦点指示）。约定入 spec：焦点样式单一来源，新交互元素必须是原生元素或带 role="button" 才有环——点击 div 无 role 即裸奔，加元素时以此自查。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9f5f261` | feat(a11y): global focus-visible ring via --focus-ring token |
+| `5dcc80f` | docs(spec): single-source keyboard focus ring convention |
+
+### Testing
+
+- [OK] `npm run lint` 通过；`npm run test` 159/159。
+- [OK] PRD 交互元素清单逐一核对选择器命中；outline:none 四处层叠优先级核验。
+- [PENDING] 真机 Tab 走查（明暗两主题）待人工复核。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 剩余：07-19-theme-fouc-color-scheme、07-19-reduced-motion。
