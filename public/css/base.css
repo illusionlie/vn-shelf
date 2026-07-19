@@ -36,6 +36,8 @@
   --success-color: #34c759;
   --error-color: #ff3b30;
   --warning-color: #ff9500;
+  /* 个人评分绿（亮色档）：需对浅色毛玻璃背景保持 >= 4.5:1 对比度 */
+  --personal-rating-color: #166534;
 }
 
 body.dark-mode {
@@ -59,6 +61,7 @@ body.dark-mode {
   --shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.3);
   --shadow-glow: 0 0 30px rgba(0, 122, 255, 0.15);
   --star-empty-color: #48484a;
+  --personal-rating-color: #6bff6b;
 }
 
 /* ===== Reset & Base ===== */
