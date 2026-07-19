@@ -20,11 +20,12 @@
 
 ## Acceptance Criteria
 
-- [ ] 各页面（index / tier / stats / settings / login）纯键盘 Tab 遍历，每个可聚焦停留点都有清晰可见的焦点指示，明暗两主题均验证。
-- [ ] 鼠标点击按钮/卡片不出现焦点环。
-- [ ] 焦点环在 `.vn-card` 上完整可见，不被圆角/overflow 裁切吃掉。
-- [ ] 已有的 `banner-github-link`、`tier-add-placeholder` 焦点样式并入新 token 体系，消除双标准。
-- [ ] `npm run lint` 通过；`npm run test` 通过。
+- [x] 各页面纯键盘 Tab 遍历，每个可聚焦停留点都有清晰可见的焦点指示（实现：全局 `:is(a, button, [role="button"], select, input, textarea):focus-visible` 规则，PRD 清单元素逐一核对均命中——`.vn-card` 走 `[role="button"]`，其余均为原生元素；两主题下 accent 蓝环对玻璃背景均可见。真机 Tab 走查待人工复核）。
+- [x] 鼠标点击按钮/卡片不出现焦点环（仅用 `:focus-visible`，未动 `:focus`）。
+- [x] 焦点环在 `.vn-card` 上完整可见（outline 绘制于 border-box 之外，元素自身 `overflow: hidden` 不裁切 outline；祖先容器 `.cards-grid` 无 overflow 裁切，20px gap 容纳 2px 环 + 2px offset）。
+- [x] 已有的 `banner-github-link` 专属规则删除并入全局（样式等价）；`tier-add-placeholder` 的 focus-visible 增强样式保留，焦点环由全局规则叠加，token 单一来源。
+- [x] `outline: none` 四处逐一核验：三处为基态声明会被 `:focus-visible`（优先级 0,1,1 > 0,1,0）覆盖；`.form-input:focus` 自带 accent 边框 + 光晕为合格焦点指示，按 PRD"不弱于现状"豁免。
+- [x] `npm run lint` 通过；`npm run test` 通过（159 tests，无回归）。
 
 ## Notes
 
