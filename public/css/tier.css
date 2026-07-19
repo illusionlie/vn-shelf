@@ -262,3 +262,10 @@
     height: 72px;
   }
 }
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .tier-vn-card:hover {
+    transform: none;
+  }
+}

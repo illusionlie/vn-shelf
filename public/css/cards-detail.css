@@ -837,3 +837,19 @@ body.dark-mode .md-table {
     gap: 24px;
   }
 }
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .vn-card:hover {
+    transform: none;
+  }
+
+  /* 光扫冻结在静止位（保留 hover 阴影/边框等静态反馈） */
+  .vn-card:hover::before {
+    background-position: 0% 0%;
+  }
+
+  .vn-card:hover .vn-card-image {
+    transform: none;
+  }
+}

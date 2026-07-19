@@ -748,3 +748,34 @@ body.has-bg-image {
     max-width: 1600px;
   }
 }
+
+/* ===== Reduced Motion =====
+ * 装饰性动效降级：位移/缩放/光效动画停用；颜色、阴影、透明度过渡与
+ * loading spinner（功能性反馈）保留。进度条保留宽度变化，仅去 shimmer。
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .progress-fill::after {
+    animation: none;
+  }
+
+  .toast {
+    animation: none;
+  }
+
+  /* 弹入缩放取消：!important 用于压过 Alpine x-transition 过渡期写入的内联
+   * transform（内联样式高于普通声明），opacity 淡入不受影响 */
+  .modal {
+    transform: none !important;
+  }
+
+  .banner-github-link:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-danger:hover {
+    transform: none;
+  }
+}
