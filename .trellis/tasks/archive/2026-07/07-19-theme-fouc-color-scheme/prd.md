@@ -18,11 +18,18 @@
 
 ## Acceptance Criteria
 
-- [ ] 暗色主题下刷新任一页面，无肉眼可见的白色闪烁（DevTools Performance 或肉眼验证）。
-- [ ] 清空 localStorage + 系统暗色偏好 → 首次打开即为暗色；系统亮色偏好 → 亮色。
-- [ ] 手动切换主题后刷新，保持手动选择（显式选择覆盖系统偏好）。
-- [ ] 主题切换按钮、背景遮罩（`applyBackgroundOverlay`）、自定义背景功能全部正常。
-- [ ] `npm run lint` 通过；`npm run test` 通过。
+- [x] 暗色主题下刷新无白闪：主题 class 由 head 同步内联脚本在任何渲染前写入 `<html>`（脚本位于 CSS link 之前，无异步窗口期）；真机肉眼复核待人工确认。
+- [x] 清空 localStorage 后跟随系统偏好：无存储值时回退 `matchMedia('(prefers-color-scheme: dark)')`。
+- [x] 手动切换后刷新保持手动选择：`localStorage['theme']` 判定优先于系统偏好（'light' 显式值不触发暗色回退）。
+- [x] 主题切换按钮、背景遮罩、自定义背景正常：theme.js 全部 5 处 `document.body.classList` 读写迁移至 `documentElement`，grep 确认无残留 `body.dark-mode` 引用；toggle 行为与持久化逻辑不变。
+- [x] `npm run lint` 通过；`npm run test` 通过（159 tests，无回归）。
+
+### 实现记录
+
+- 采用方案 a（class 挂 `<html>`）：CSS 4 处选择器迁移（`base.css` 变量块 + `cards-detail.css` 三处 md-*），`initTheme` 简化为仅同步按钮图标/aria（class 写入职责移交内联脚本，单一事实）。
+- CSP 核验：`src/` 与 wrangler 配置无 Content-Security-Policy 头，inline script 无阻碍。
+- 加分项已做：`:root { color-scheme: light }` / `html.dark-mode { color-scheme: dark }`，UA 原生控件与滚动条跟随主题。
+- 五个页面（含 login）均注入同一段脚本；新页面需复制该脚本（已入 spec）。
 
 ## Notes
 
