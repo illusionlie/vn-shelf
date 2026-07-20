@@ -28,6 +28,7 @@
 - [x] 13. `npm run lint` 全绿
 - [x] 14. `npm test` 全绿（174 pass / 0 fail）
 - [ ] 15. 人工验收（用户侧）：明暗主题、空库、480 宽度、en locale
+- [x] 16. 验收迭代：概览区多卡片网格 → 单条摘要条（stats-overview，5 项横排，已完成+完成率合并；移除 stat-card/stats-grid 样式与 finishedRate 词条）
 
 ## 回滚点
 

@@ -276,7 +276,6 @@ export default {
     avgVndbRating: 'Average VNDB rating',
     avgPersonalRating: 'Average personal rating',
     finishedEntries: 'Finished',
-    finishedRate: 'Completion rate',
     statusTitle: 'Play status',
     ratingTitle: 'Rating analysis',
     personalHistogram: 'Personal rating distribution',

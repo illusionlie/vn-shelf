@@ -49,7 +49,7 @@ statsPage.js（Alpine）──派生视图状态──▶ stats.html 纯 CSS 图
 
 ## 前端布局（stats.html 六区块）
 
-1. 概览 6 卡：既有 4 卡 + 已完成数 + 完成率（由 statusCounts 前端派生，finished/total）
+1. 概览摘要条（07-20 验收迭代：多卡片网格视觉突兀，改为单容器横排）：总条目 / 总时长 / VNDB 均分 / 个人均分 / 已完成 (完成率%)，五项 flex wrap，已完成与完成率合并一项（由 statusCounts 前端派生）
 2. 状态堆叠条 + 图例（计数与百分比）；wishlist 仅 >0 展示；none=灰
 3. 评分区：双直方图（绿=个人 / 金=VNDB，循 07-12 配色语义）+ 平均分差说明 + 分歧双榜
    - 榜内标题 `titleCn||titleJa||title`，外链 `https://vndb.org/<id>`（同详情弹窗 index.viewOnVndb 惯例）

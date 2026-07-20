@@ -292,7 +292,6 @@ export default {
     avgVndbRating: '平均VNDB评分',
     avgPersonalRating: '平均个人评分',
     finishedEntries: '已完成',
-    finishedRate: '完成率',
     statusTitle: '游玩状态',
     ratingTitle: '评分分析',
     personalHistogram: '个人评分分布',

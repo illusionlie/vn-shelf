@@ -98,36 +98,33 @@
     <!-- 统计内容 -->
     <template x-if="!isLoading && stats && stats.total > 0">
       <div>
-        <!-- 概览卡片 -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-value" x-text="stats.total || 0"></div>
-            <div class="stat-label" data-i18n="stats.totalEntries"></div>
+        <!-- 概览摘要条：单容器横排全部指标（已完成与完成率合并为一项） -->
+        <div class="stats-overview">
+          <div class="stats-overview-item">
+            <div class="stats-overview-value" x-text="stats.total || 0"></div>
+            <div class="stats-overview-label" data-i18n="stats.totalEntries"></div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-value" x-text="formatMinutes(stats.totalPlayTimeMinutes)"></div>
-            <div class="stat-label" data-i18n="stats.totalPlayTime"></div>
+          <div class="stats-overview-item">
+            <div class="stats-overview-value" x-text="formatMinutes(stats.totalPlayTimeMinutes)"></div>
+            <div class="stats-overview-label" data-i18n="stats.totalPlayTime"></div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-value" x-text="formatRating(stats.avgRating)"></div>
-            <div class="stat-label" data-i18n="stats.avgVndbRating"></div>
+          <div class="stats-overview-item">
+            <div class="stats-overview-value" x-text="formatRating(stats.avgRating)"></div>
+            <div class="stats-overview-label" data-i18n="stats.avgVndbRating"></div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-value" x-text="formatRating(stats.avgPersonalRating)"></div>
-            <div class="stat-label" data-i18n="stats.avgPersonalRating"></div>
+          <div class="stats-overview-item">
+            <div class="stats-overview-value" x-text="formatRating(stats.avgPersonalRating)"></div>
+            <div class="stats-overview-label" data-i18n="stats.avgPersonalRating"></div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-value" x-text="finishedCount"></div>
-            <div class="stat-label" data-i18n="stats.finishedEntries"></div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-value" x-text="finishedRatePercent + '%'"></div>
-            <div class="stat-label" data-i18n="stats.finishedRate"></div>
+          <div class="stats-overview-item">
+            <div class="stats-overview-value">
+              <span x-text="finishedCount"></span><span class="stats-overview-rate" x-text="`(${finishedRatePercent}%)`"></span>
+            </div>
+            <div class="stats-overview-label" data-i18n="stats.finishedEntries"></div>
           </div>
         </div>
 
