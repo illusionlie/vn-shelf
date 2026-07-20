@@ -4,6 +4,7 @@
 .stats-overview {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 16px 48px;
   background: var(--card-bg-color);
   border: 1px solid var(--border-color);
