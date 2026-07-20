@@ -6,7 +6,7 @@
 import { getSettings } from './repository.js';
 
 const VNDB_API_URL = 'https://api.vndb.org/kana';
-const UserAgent = 'vn-shelf/1.2.0 (+https://github.com/illusionlie/vn-shelf)';
+const UserAgent = 'vn-shelf/2.0.0 (+https://github.com/illusionlie/vn-shelf)';
 
 // VN 元数据字段选择：getVN 与 ulist 的 vn.* 嵌套共用，保证两条路径拉取字段一致
 const VN_FIELDS = 'title, titles.lang, titles.title, titles.main, titles.official, image.url, image.sexual, image.violence, rating, length_minutes, developers.name, tags.id, tags.name, tags.rating, tags.category, tags.spoiler';
