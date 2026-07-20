@@ -3,6 +3,7 @@
  */
 
 import { initDB } from './db.js';
+import { computeStats } from './stats.js';
 
 const TIER_COLOR_HEX_REGEX = /^#[0-9a-fA-F]{6}$/;
 const VNDB_ID_REGEX = /^v\d+$/;
@@ -313,28 +314,29 @@ export async function saveSettings(env, settings) {
 export async function getVNList(env) {
   await initDB(env.DB);
 
-  const [entryResults, statsResults] = await Promise.all([
-    env.DB.prepare(
-      'SELECT id, title, title_ja, title_cn, title_cn_user, image, image_nsfw, rating, personal_rating, play_time_minutes, developers, all_age, tier_id, tier_sort, status, created_at FROM vn_entries ORDER BY created_at DESC'
-    ).all(),
-    env.DB.prepare(
-      'SELECT COUNT(*) as total, COALESCE(SUM(play_time_minutes), 0) as totalPlayTimeMinutes, COALESCE(AVG(CASE WHEN rating > 0 THEN rating END), 0) as avgRating, COALESCE(AVG(CASE WHEN personal_rating > 0 THEN personal_rating END), 0) as avgPersonalRating, MAX(updated_at) as maxUpdatedAt FROM vn_entries'
-    ).first()
-  ]);
-
-  const items = (entryResults.results || []).map(rowToListItem);
-  const statsRow = statsResults;
+  const entryResults = await env.DB.prepare(
+    'SELECT id, title, title_ja, title_cn, title_cn_user, image, image_nsfw, rating, personal_rating, play_time_minutes, developers, all_age, tier_id, tier_sort, status, created_at FROM vn_entries ORDER BY created_at DESC'
+  ).all();
 
   return {
-    items,
-    stats: {
-      total: statsRow?.total || 0,
-      totalPlayTimeMinutes: toNonNegativeNumber(statsRow?.totalPlayTimeMinutes),
-      avgRating: toNonNegativeNumber(statsRow?.avgRating),
-      avgPersonalRating: toNonNegativeNumber(statsRow?.avgPersonalRating)
-    },
-    updatedAt: statsRow?.maxUpdatedAt || null
+    items: (entryResults.results || []).map(rowToListItem)
   };
+}
+
+// ============ Stats ============
+
+/**
+ * 统计聚合：单条宽 SELECT 取原始行，聚合口径全部在 src/stats.js 纯函数内。
+ * /api/stats 为公开端点，此处只出聚合值与标题级信息，review 等明细不出库。
+ */
+export async function getStats(env) {
+  await initDB(env.DB);
+
+  const { results } = await env.DB.prepare(
+    'SELECT id, title, title_ja, title_cn, title_cn_user, rating, personal_rating, play_time_minutes, developers, tags, user_tags, status, start_date, finish_date FROM vn_entries'
+  ).all();
+
+  return computeStats(results || []);
 }
 
 // ============ VN Entry ============

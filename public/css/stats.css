@@ -46,6 +46,448 @@
   margin-top: 8px;
 }
 
+/* ===== 区块小标题（直方图 / 分歧榜共用） ===== */
+.stats-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--secondary-text-color);
+  margin-bottom: 10px;
+}
+
+/* 配色语义与站内一致：绿 = 个人评分、金 = VNDB 评分（quality-guidelines 07-12） */
+.stats-subtitle-personal::before,
+.stats-subtitle-vndb::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.stats-subtitle-personal::before {
+  background: var(--personal-rating-color);
+}
+
+.stats-subtitle-vndb::before {
+  background: #FFD700;
+}
+
+/* ===== ① 游玩状态：横向堆叠条 + 图例 ===== */
+/* 段配色与 status-badge（cards-detail.css）同源；none 用主题中性色 */
+.status-stack {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--tag-bg-color);
+}
+
+.status-stack-segment {
+  min-width: 2px;
+}
+
+.status-seg-playing {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.status-seg-finished {
+  background: linear-gradient(135deg, #22c55e, #15803d);
+}
+
+.status-seg-stalled {
+  background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.status-seg-dropped {
+  background: linear-gradient(135deg, #9f5f5f, #7f4646);
+}
+
+/* wishlist 为后端预留状态，仅 >0 时防御性展示 */
+.status-seg-wishlist {
+  background: linear-gradient(135deg, #a855f7, #7e22ce);
+}
+
+.status-seg-none {
+  background: var(--star-empty-color);
+}
+
+.status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--secondary-text-color);
+}
+
+.status-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-legend-count {
+  color: var(--muted-text-color);
+}
+
+/* ===== ② 评分直方图 ===== */
+.histogram-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.histogram-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 150px;
+}
+
+.histogram-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.histogram-count {
+  font-size: 0.7rem;
+  line-height: 1;
+  min-height: 0.7rem;
+  color: var(--muted-text-color);
+}
+
+.histogram-bar-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.histogram-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+}
+
+.histogram-bar:not(.is-zero) {
+  min-height: 3px;
+}
+
+.histogram-bar-personal {
+  background: var(--personal-rating-color);
+}
+
+.histogram-bar-vndb {
+  background: #FFD700;
+}
+
+.histogram-score {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--muted-text-color);
+}
+
+/* ===== ② 分歧榜 ===== */
+.diff-block {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.diff-summary {
+  font-size: 0.9rem;
+  color: var(--secondary-text-color);
+  margin-bottom: 16px;
+}
+
+.diff-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.diff-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.diff-item-title {
+  color: var(--primary-text-color);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-item-title:hover {
+  color: var(--accent-color);
+  text-decoration: underline;
+}
+
+.diff-item-scores {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-score-personal {
+  color: var(--personal-rating-color);
+  font-weight: 600;
+}
+
+.diff-score-vndb {
+  color: var(--secondary-text-color);
+}
+
+.diff-vs {
+  color: var(--muted-text-color);
+}
+
+.diff-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.diff-badge-positive {
+  color: var(--success-color);
+  background: rgba(52, 199, 89, 0.12);
+}
+
+.diff-badge-negative {
+  color: var(--error-color);
+  background: rgba(255, 59, 48, 0.12);
+}
+
+/* ===== ③ 完成时间线 ===== */
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.year-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.year-tab {
+  border: 1px solid var(--border-color);
+  background: var(--tag-bg-color);
+  color: var(--secondary-text-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.year-tab:hover {
+  border-color: var(--border-glow);
+  color: var(--primary-text-color);
+}
+
+.year-tab.active {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #fff;
+}
+
+.timeline-year-total {
+  font-size: 0.85rem;
+}
+
+.month-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 150px;
+}
+
+.month-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.month-count {
+  font-size: 0.7rem;
+  line-height: 1;
+  min-height: 0.7rem;
+  color: var(--muted-text-color);
+}
+
+.month-bar-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.month-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #5856d6, var(--accent-color));
+}
+
+.month-bar:not(.month-bar-empty) {
+  min-height: 3px;
+}
+
+.month-bar-empty {
+  background: transparent;
+}
+
+.month-label {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--muted-text-color);
+}
+
+.timeline-span {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+/* ===== ④ 偏好画像 ===== */
+.pref-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.pref-row .pref-section {
+  margin-bottom: 20px;
+}
+
+.dev-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dev-item {
+  min-width: 0;
+}
+
+.dev-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  font-size: 0.88rem;
+}
+
+.dev-name {
+  color: var(--primary-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dev-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--muted-text-color);
+  font-size: 0.8rem;
+}
+
+.dev-avg {
+  color: var(--personal-rating-color);
+  background: rgba(52, 199, 89, 0.12);
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tag-bg-color);
+  overflow: hidden;
+}
+
+.dev-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-color), #5856d6);
+  min-width: 3px;
+}
+
+.stats-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stats-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--tag-bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--primary-text-color);
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.stats-tag-count {
+  color: var(--accent-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Responsive - 768（平板/窄桌面：图表区并列改单列） ===== */
+@media screen and (max-width: 768px) {
+  .histogram-row,
+  .diff-lists,
+  .pref-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ===== Responsive - 480 (紧凑手机) ===== */
 @media screen and (max-width: 480px) {
   .stats-grid {
@@ -55,6 +497,17 @@
 
   .stat-value {
     font-size: 2rem;
+  }
+
+  .histogram-bars,
+  .month-bars {
+    gap: 3px;
+    height: 120px;
+  }
+
+  .histogram-count,
+  .month-count {
+    display: none;
   }
 }
 

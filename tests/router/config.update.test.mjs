@@ -101,15 +101,15 @@ export async function saveSettings(env, settings) {
 }
 
 export async function getVNList() {
+  return { items: [] };
+}
+
+export async function getStats() {
   return {
-    items: [],
-    stats: {
-      total: 0,
-      totalPlayTimeMinutes: 0,
-      avgRating: 0,
-      avgPersonalRating: 0
-    },
-    updatedAt: null
+    total: 0,
+    totalPlayTimeMinutes: 0,
+    avgRating: 0,
+    avgPersonalRating: 0
   };
 }
 

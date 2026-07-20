@@ -25,6 +25,7 @@ src/
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
 ├── repository.js   # D1 数据访问层
+├── stats.js        # 统计聚合纯函数（computeStats，/api/stats 数据源）
 ├── auth.js         # JWT + 密码哈希认证
 ├── vndb.js         # VNDB API 客户端
 └── utils.js        # 通用工具函数
@@ -57,14 +58,26 @@ public/
 
 tests/
 ├── d1/
+│   ├── migrations.test.mjs
 │   └── repository.test.mjs
 ├── public/
-│   └── markdown.security.test.mjs
+│   ├── i18n.keys.test.mjs
+│   ├── i18n.test.mjs
+│   ├── markdown.security.test.mjs
+│   ├── markdown.syntax.test.mjs
+│   └── tier-diff.test.mjs
 ├── queue/
 │   └── index.queue.test.mjs
-└── router/
-    ├── index.start.test.mjs
-    └── config.update.test.mjs
+├── router/
+│   ├── config.update.test.mjs
+│   ├── envelope.test.mjs
+│   ├── index.start.test.mjs
+│   └── vn.status.test.mjs
+├── stats/
+│   └── compute.test.mjs
+└── vndb/
+    ├── ulist-import.test.mjs
+    └── ulist-mapping.test.mjs
 
 .github/workflows/
 ├── ci.yml
@@ -122,7 +135,9 @@ tests/
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/api/stats` | 获取统计数据 | 公开 |
+| GET | `/api/stats` | 获取统计聚合（概览四项 / 状态计数 / 评分直方图与分歧榜 / 完成时间线 / 开发商与标签 Top） | 公开 |
+
+> data 层字段：既有四项（`total`/`totalPlayTimeMinutes`/`avgRating`/`avgPersonalRating`，语义不变）+ `statusCounts`、`ratingHistograms`（round 取整 1-10 分桶）、`ratingDiff`（个人 vs VNDB 双评分分歧榜）、`timeline`（按 `finish_date` 的月度聚合与通关跨度）、`topDevelopers`、`topTags`（vndb/user 双列表）。聚合口径与 shape 见 [`src/stats.js`](src/stats.js) 头注。
 
 ### 索引接口
 
@@ -310,6 +325,7 @@ tests/
 - Queue 行为测试：[`tests/queue/index.queue.test.mjs`](tests/queue/index.queue.test.mjs)
    - 覆盖重试补发、ack/retry 分支、失败结果写入异常分支
 - D1 数据访问层测试：[`tests/d1/repository.test.mjs`](tests/d1/repository.test.mjs)
+- 统计聚合纯函数测试：[`tests/stats/compute.test.mjs`](tests/stats/compute.test.mjs)
 - Markdown 安全测试：[`tests/public/markdown.security.test.mjs`](tests/public/markdown.security.test.mjs)
 - 索引启动路由测试：[`tests/router/index.start.test.mjs`](tests/router/index.start.test.mjs)
 - 配置更新路由测试：[`tests/router/config.update.test.mjs`](tests/router/config.update.test.mjs)

@@ -49,14 +49,27 @@ function createSharedState() {
   return {
     authenticated: true,
     vnList: {
-      items: [createEntry('v17'), createEntry('v19')],
-      stats: {
-        total: 2,
-        totalPlayTimeMinutes: 0,
-        avgRating: 80,
-        avgPersonalRating: 9
+      items: [createEntry('v17'), createEntry('v19')]
+    },
+    stats: {
+      total: 2,
+      totalPlayTimeMinutes: 630,
+      avgRating: 8,
+      avgPersonalRating: 9,
+      statusCounts: { playing: 1, finished: 1, stalled: 0, dropped: 0, wishlist: 0, none: 0 },
+      ratingHistograms: {
+        vndb: [0, 0, 0, 0, 0, 0, 0, 2, 0, 0],
+        personal: [0, 0, 0, 0, 0, 0, 0, 0, 2, 0]
       },
-      updatedAt: '2026-01-02T00:00:00.000Z'
+      ratingDiff: { avg: 1, count: 2, overrated: [], underrated: [] },
+      timeline: {
+        months: [{ month: '2026-01', finished: 1, playTimeMinutes: 630 }],
+        datedFinished: 1,
+        avgSpanDays: 3,
+        spanCount: 1
+      },
+      topDevelopers: [{ name: 'Key', count: 2, avgPersonalRating: 9 }],
+      topTags: { vndb: [{ name: 'Drama', count: 2 }], user: [] }
     },
     entries: {
       v17: createEntry('v17')
@@ -142,6 +155,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 export const VN_STATUS_VALUES = ['playing', 'finished', 'stalled', 'dropped', 'wishlist'];
 
 export async function getVNList() { return clone(state.vnList); }
+export async function getStats() { return clone(state.stats); }
 export async function getVNEntry(_env, id) {
   return state.entries[id] ? clone(state.entries[id]) : null;
 }
@@ -341,6 +355,39 @@ test('GET /api/export 信封 data 层保持导出文件格式（version/exported
       ['appearance', 'entries', 'exportedAt', 'tierList', 'version'],
       '导出文件级键必须齐全且无信封字段混入'
     );
+  } finally {
+    await cleanup();
+  }
+});
+
+test('GET /api/stats 返回成功信封，data 为聚合对象且区块键齐全', async () => {
+  const { routerModule, cleanup } = await loadRouterModule();
+
+  try {
+    const { response, payload } = await sendGetRequest(routerModule, '/api/stats');
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.success, true);
+    // statsPage 整包解构（stats = res.data）依赖的全部区块键在 data 层
+    assert.deepEqual(
+      Object.keys(payload.data).sort(),
+      [
+        'avgPersonalRating',
+        'avgRating',
+        'ratingDiff',
+        'ratingHistograms',
+        'statusCounts',
+        'timeline',
+        'topDevelopers',
+        'topTags',
+        'total',
+        'totalPlayTimeMinutes'
+      ],
+      '统计聚合区块键必须齐全且无信封字段混入'
+    );
+    assert.equal(payload.data.total, 2);
+    assert.ok(Array.isArray(payload.data.timeline.months), 'timeline.months 必须是数组');
+    assert.ok(Array.isArray(payload.data.ratingHistograms.vndb), '直方图必须是数组');
   } finally {
     await cleanup();
   }

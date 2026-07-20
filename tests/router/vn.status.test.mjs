@@ -112,7 +112,8 @@ export async function saveVNEntry(_env, entry) {
   state.entries[entry.id] = saved;
   return clone(saved);
 }
-export async function getVNList() { return { items: [], stats: {}, updatedAt: null }; }
+export async function getVNList() { return { items: [] }; }
+export async function getStats() { return { total: 0 }; }
 export async function deleteVNEntry() {}
 export async function getSettings() { return {}; }
 export async function saveSettings() {}

@@ -24,6 +24,7 @@ src/
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
 ├── repository.js   # D1 数据访问层
+├── stats.js        # 统计聚合纯函数（computeStats，/api/stats 数据源）
 ├── auth.js         # JWT + 密码哈希认证
 ├── vndb.js         # VNDB API 客户端
 └── utils.js        # 通用工具函数
@@ -45,17 +46,26 @@ public/js/
 
 tests/
 ├── d1/
+│   ├── migrations.test.mjs
 │   └── repository.test.mjs
 ├── public/
-│   └── markdown.security.test.mjs
+│   ├── i18n.keys.test.mjs
+│   ├── i18n.test.mjs
+│   ├── markdown.security.test.mjs
+│   ├── markdown.syntax.test.mjs
+│   └── tier-diff.test.mjs
 ├── queue/
 │   └── index.queue.test.mjs
+├── stats/
+│   └── compute.test.mjs
 ├── vndb/
 │   ├── ulist-mapping.test.mjs
 │   └── ulist-import.test.mjs
 └── router/
+    ├── config.update.test.mjs
+    ├── envelope.test.mjs
     ├── index.start.test.mjs
-    └── config.update.test.mjs
+    └── vn.status.test.mjs
 ```
 
 ## 前端模块关系

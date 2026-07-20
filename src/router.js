@@ -15,6 +15,7 @@ import { getIndexTaskStatus, startIndexTask } from './index-task.js';
 import {
   getVNList,
   getVNEntry,
+  getStats,
   saveVNEntry,
   deleteVNEntry,
   getSettings,
@@ -1094,8 +1095,8 @@ async function handleUpdateVNTier(request, env, id, auth) {
 // ============ 统计接口 ============
 
 async function handleGetStats(request, env) {
-  const list = await getVNList(env);
-  return successResponse(list.stats);
+  const stats = await getStats(env);
+  return successResponse(stats);
 }
 
 // ============ 索引接口 ============

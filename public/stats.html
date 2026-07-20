@@ -95,9 +95,10 @@
       </div>
     </template>
 
-    <!-- 统计卡片 -->
-    <template x-if="!isLoading && stats">
+    <!-- 统计内容 -->
+    <template x-if="!isLoading && stats && stats.total > 0">
       <div>
+        <!-- 概览卡片 -->
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-value" x-text="stats.total || 0"></div>
@@ -118,8 +119,221 @@
             <div class="stat-value" x-text="formatRating(stats.avgPersonalRating)"></div>
             <div class="stat-label" data-i18n="stats.avgPersonalRating"></div>
           </div>
+
+          <div class="stat-card">
+            <div class="stat-value" x-text="finishedCount"></div>
+            <div class="stat-label" data-i18n="stats.finishedEntries"></div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-value" x-text="finishedRatePercent + '%'"></div>
+            <div class="stat-label" data-i18n="stats.finishedRate"></div>
+          </div>
         </div>
 
+        <!-- ① 游玩状态 -->
+        <section class="settings-section">
+          <h2 class="settings-section-title" data-i18n="stats.statusTitle"></h2>
+          <div class="status-stack" role="img" :aria-label="statusAriaLabel">
+            <template x-for="segment in statusSegments" :key="segment.key">
+              <div class="status-stack-segment" :class="'status-seg-' + segment.key" :style="`width: ${segment.percent}%`"></div>
+            </template>
+          </div>
+          <div class="status-legend">
+            <template x-for="segment in statusSegments" :key="segment.key">
+              <span class="status-legend-item">
+                <span class="status-legend-dot" :class="'status-seg-' + segment.key" aria-hidden="true"></span>
+                <span x-text="statusLabel(segment.key)"></span>
+                <span class="status-legend-count" x-text="`${segment.count} (${segment.percent.toFixed(0)}%)`"></span>
+              </span>
+            </template>
+          </div>
+        </section>
+
+        <!-- ② 评分分析 -->
+        <section class="settings-section">
+          <h2 class="settings-section-title" data-i18n="stats.ratingTitle"></h2>
+
+          <template x-if="hasRatingSamples">
+            <div class="histogram-row">
+              <div class="histogram-block" role="img" :aria-label="histogramAriaLabel('personal')">
+                <h3 class="stats-subtitle stats-subtitle-personal" data-i18n="stats.personalHistogram"></h3>
+                <div class="histogram-bars" aria-hidden="true">
+                  <template x-for="bar in histogramBars('personal')" :key="bar.score">
+                    <div class="histogram-col">
+                      <span class="histogram-count" x-text="bar.count || ''"></span>
+                      <div class="histogram-bar-track">
+                        <div class="histogram-bar histogram-bar-personal" :class="{ 'is-zero': !bar.count }" :style="`height: ${bar.heightPercent}%`"></div>
+                      </div>
+                      <span class="histogram-score" x-text="bar.score"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <div class="histogram-block" role="img" :aria-label="histogramAriaLabel('vndb')">
+                <h3 class="stats-subtitle stats-subtitle-vndb" data-i18n="stats.vndbHistogram"></h3>
+                <div class="histogram-bars" aria-hidden="true">
+                  <template x-for="bar in histogramBars('vndb')" :key="bar.score">
+                    <div class="histogram-col">
+                      <span class="histogram-count" x-text="bar.count || ''"></span>
+                      <div class="histogram-bar-track">
+                        <div class="histogram-bar histogram-bar-vndb" :class="{ 'is-zero': !bar.count }" :style="`height: ${bar.heightPercent}%`"></div>
+                      </div>
+                      <span class="histogram-score" x-text="bar.score"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template x-if="!hasRatingSamples">
+            <p class="text-muted" data-i18n="stats.noRatingSamples"></p>
+          </template>
+
+          <template x-if="stats.ratingDiff.count > 0">
+            <div class="diff-block">
+              <p class="diff-summary" x-text="diffSummaryText"></p>
+              <div class="diff-lists">
+                <div class="diff-list">
+                  <h3 class="stats-subtitle" data-i18n="stats.overratedTitle"></h3>
+                  <template x-if="stats.ratingDiff.overrated.length > 0">
+                    <ol class="diff-items">
+                      <template x-for="item in stats.ratingDiff.overrated" :key="item.id">
+                        <li class="diff-item">
+                          <a class="diff-item-title" :href="vndbUrl(item.id)" target="_blank" rel="noopener noreferrer" x-text="displayTitle(item)"></a>
+                          <span class="diff-item-scores">
+                            <span class="diff-score diff-score-personal" x-text="item.personal.toFixed(1)"></span>
+                            <span class="diff-vs" aria-hidden="true">/</span>
+                            <span class="diff-score diff-score-vndb" x-text="item.vndb.toFixed(1)"></span>
+                            <span class="diff-badge diff-badge-positive" x-text="formatDiff(item.diff)"></span>
+                          </span>
+                        </li>
+                      </template>
+                    </ol>
+                  </template>
+                  <template x-if="stats.ratingDiff.overrated.length === 0">
+                    <p class="text-muted" data-i18n="stats.noDiffItems"></p>
+                  </template>
+                </div>
+
+                <div class="diff-list">
+                  <h3 class="stats-subtitle" data-i18n="stats.underratedTitle"></h3>
+                  <template x-if="stats.ratingDiff.underrated.length > 0">
+                    <ol class="diff-items">
+                      <template x-for="item in stats.ratingDiff.underrated" :key="item.id">
+                        <li class="diff-item">
+                          <a class="diff-item-title" :href="vndbUrl(item.id)" target="_blank" rel="noopener noreferrer" x-text="displayTitle(item)"></a>
+                          <span class="diff-item-scores">
+                            <span class="diff-score diff-score-personal" x-text="item.personal.toFixed(1)"></span>
+                            <span class="diff-vs" aria-hidden="true">/</span>
+                            <span class="diff-score diff-score-vndb" x-text="item.vndb.toFixed(1)"></span>
+                            <span class="diff-badge diff-badge-negative" x-text="formatDiff(item.diff)"></span>
+                          </span>
+                        </li>
+                      </template>
+                    </ol>
+                  </template>
+                  <template x-if="stats.ratingDiff.underrated.length === 0">
+                    <p class="text-muted" data-i18n="stats.noDiffItems"></p>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template x-if="stats.ratingDiff.count === 0">
+            <p class="text-muted" data-i18n="stats.noDiffSamples"></p>
+          </template>
+        </section>
+
+        <!-- ③ 完成时间线 -->
+        <section class="settings-section">
+          <h2 class="settings-section-title" data-i18n="stats.timelineTitle"></h2>
+          <template x-if="timelineYears.length > 0">
+            <div>
+              <div class="timeline-header">
+                <div class="year-tabs" role="tablist" :aria-label="$t('stats.timelineTitle')">
+                  <template x-for="year in timelineYears" :key="year">
+                    <button
+                      type="button"
+                      class="year-tab"
+                      :class="{ 'active': selectedYear === year }"
+                      role="tab"
+                      :aria-selected="selectedYear === year ? 'true' : 'false'"
+                      @click="selectedYear = year"
+                      x-text="year"
+                    ></button>
+                  </template>
+                </div>
+                <span class="timeline-year-total text-muted" x-text="yearTotalText"></span>
+              </div>
+              <div class="month-bars" role="img" :aria-label="timelineAriaLabel">
+                <template x-for="item in yearMonths" :key="item.monthIndex">
+                  <div class="month-col" :title="monthTooltip(item)">
+                    <span class="month-count" x-text="item.finished || ''"></span>
+                    <div class="month-bar-track" aria-hidden="true">
+                      <div class="month-bar" :class="{ 'month-bar-empty': !item.finished }" :style="`height: ${item.heightPercent}%`"></div>
+                    </div>
+                    <span class="month-label" x-text="item.monthIndex"></span>
+                  </div>
+                </template>
+              </div>
+              <p class="text-muted timeline-span" x-text="spanText"></p>
+            </div>
+          </template>
+          <template x-if="timelineYears.length === 0">
+            <p class="text-muted" data-i18n="stats.noTimelineSamples"></p>
+          </template>
+        </section>
+
+        <!-- ④ 偏好画像 -->
+        <div class="pref-row">
+          <section class="settings-section pref-section">
+            <h2 class="settings-section-title" data-i18n="stats.developersTitle"></h2>
+            <template x-if="developerBars.length > 0">
+              <ol class="dev-items">
+                <template x-for="dev in developerBars" :key="dev.name">
+                  <li class="dev-item">
+                    <div class="dev-item-head">
+                      <span class="dev-name" x-text="dev.name"></span>
+                      <span class="dev-meta">
+                        <span x-text="devCountText(dev)"></span>
+                        <template x-if="dev.avgPersonalRating !== null">
+                          <span class="dev-avg" :title="$t('stats.devAvgTitle')" x-text="dev.avgPersonalRating.toFixed(1)"></span>
+                        </template>
+                      </span>
+                    </div>
+                    <div class="dev-bar-track" aria-hidden="true">
+                      <div class="dev-bar" :style="`width: ${dev.widthPercent}%`"></div>
+                    </div>
+                  </li>
+                </template>
+              </ol>
+            </template>
+            <template x-if="developerBars.length === 0">
+              <p class="text-muted" data-i18n="stats.noDeveloperSamples"></p>
+            </template>
+          </section>
+
+          <section class="settings-section pref-section">
+            <h2 class="settings-section-title" data-i18n="stats.tagsTitle"></h2>
+            <template x-if="displayTopTags.length > 0">
+              <div class="stats-tag-cloud">
+                <template x-for="tag in displayTopTags" :key="tag.key">
+                  <span class="stats-tag">
+                    <span x-text="tag.name"></span>
+                    <span class="stats-tag-count" x-text="tag.count"></span>
+                  </span>
+                </template>
+              </div>
+            </template>
+            <template x-if="displayTopTags.length === 0">
+              <p class="text-muted" data-i18n="stats.noTagSamples"></p>
+            </template>
+          </section>
+        </div>
+
+        <!-- 关于统计 -->
         <div class="settings-section">
           <h2 class="settings-section-title" data-i18n="stats.aboutTitle"></h2>
           <p class="text-muted" data-i18n="stats.aboutText"></p>
@@ -128,7 +342,7 @@
     </template>
 
     <!-- 空状态 -->
-    <template x-if="!isLoading && !stats">
+    <template x-if="!isLoading && (!stats || !stats.total)">
       <div class="empty-state">
         <div class="empty-state-icon">📊</div>
         <div class="empty-state-title" data-i18n="stats.emptyTitle"></div>

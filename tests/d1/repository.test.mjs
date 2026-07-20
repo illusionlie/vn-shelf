@@ -368,21 +368,24 @@ class FakeD1Database {
       return { results };
     }
 
-    if (normalizedSql.startsWith('select count(*) as total,')) {
-      const entries = Array.from(state.vnEntries.values());
-      const totalPlayTime = entries.reduce((sum, r) => sum + (Number(r.play_time_minutes) || 0), 0);
-      const ratedEntries = entries.filter(r => Number(r.rating) > 0);
-      const personalRatedEntries = entries.filter(r => Number(r.personal_rating) > 0);
-      const avgRating = ratedEntries.length > 0 ? ratedEntries.reduce((s, r) => s + Number(r.rating), 0) / ratedEntries.length : 0;
-      const avgPersonalRating = personalRatedEntries.length > 0 ? personalRatedEntries.reduce((s, r) => s + Number(r.personal_rating), 0) / personalRatedEntries.length : 0;
-      const maxUpdatedAt = entries.length > 0 ? entries.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), entries[0].updated_at) : null;
-      return {
-        total: entries.length,
-        totalPlayTimeMinutes: totalPlayTime,
-        avgRating,
-        avgPersonalRating,
-        maxUpdatedAt
-      };
+    if (normalizedSql === 'select id, title, title_ja, title_cn, title_cn_user, rating, personal_rating, play_time_minutes, developers, tags, user_tags, status, start_date, finish_date from vn_entries') {
+      const results = Array.from(state.vnEntries.values()).map(row => ({
+        id: row.id,
+        title: row.title,
+        title_ja: row.title_ja,
+        title_cn: row.title_cn,
+        title_cn_user: row.title_cn_user,
+        rating: row.rating,
+        personal_rating: row.personal_rating,
+        play_time_minutes: row.play_time_minutes,
+        developers: row.developers,
+        tags: row.tags,
+        user_tags: row.user_tags,
+        status: row.status,
+        start_date: row.start_date,
+        finish_date: row.finish_date
+      }));
+      return { results };
     }
 
     if (normalizedSql === 'select * from vn_entries order by created_at asc') {
@@ -439,9 +442,12 @@ async function loadModules() {
   const sourceDir = path.join(repoRoot, 'src');
 
   await fs.writeFile(path.join(tempDir, 'db.mjs'), await fs.readFile(path.join(sourceDir, 'db.js'), 'utf8'));
+  await fs.writeFile(path.join(tempDir, 'stats.mjs'), await fs.readFile(path.join(sourceDir, 'stats.js'), 'utf8'));
   await fs.writeFile(
     path.join(tempDir, 'repository.mjs'),
-    await fs.readFile(path.join(sourceDir, 'repository.js'), 'utf8').then(text => text.replace("'./db.js'", "'./db.mjs'"))
+    await fs.readFile(path.join(sourceDir, 'repository.js'), 'utf8').then(
+      text => text.replace("'./db.js'", "'./db.mjs'").replace("'./stats.js'", "'./stats.mjs'")
+    )
   );
 
   const cacheBust = `test=${encodeURIComponent(`${Date.now()}_${Math.random()}`)}`;
@@ -1145,6 +1151,80 @@ test('status 字段：非法值与缺失一律归一为 null', async () => {
 
     const list = await repository.getVNList(env);
     assert.ok(list.items.every(item => item.status === null));
+  } finally {
+    await cleanup();
+  }
+});
+
+test('getStats：宽查询装配 computeStats，聚合结果与种子数据一致', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+
+    await repository.saveVNEntry(env, createEntry('v1', {
+      vndb: { rating: 8, developers: ['Key'], tags: ['Drama', 'Romance'] },
+      user: {
+        personalRating: 9.5,
+        playTimeMinutes: 600,
+        status: 'finished',
+        startDate: '2026-01-01',
+        finishDate: '2026-01-11',
+        tags: ['神作']
+      }
+    }));
+    await repository.saveVNEntry(env, createEntry('v2', {
+      vndb: { rating: 7, developers: ['Key', 'Alice Soft'], tags: ['Drama'] },
+      user: { playTimeMinutes: 300, status: 'playing' }
+    }));
+    await repository.saveVNEntry(env, createEntry('v3', {
+      vndb: { rating: 0 },
+      user: { personalRating: 6, finishDate: '2026-02-05' }
+    }));
+
+    const stats = await repository.getStats(env);
+
+    // 既有 4 项语义不变：均分仅计 >0 样本
+    assert.equal(stats.total, 3);
+    assert.equal(stats.totalPlayTimeMinutes, 900);
+    assert.equal(stats.avgRating, 7.5);
+    assert.equal(stats.avgPersonalRating, 7.75);
+
+    // 状态计数：v3 无 status 归入 none
+    assert.deepEqual(stats.statusCounts, { playing: 1, finished: 1, stalled: 0, dropped: 0, wishlist: 0, none: 1 });
+
+    // 直方图：vndb 8/7 各一桶；personal round(9.5)=10 桶与 6 桶各一
+    assert.equal(stats.ratingHistograms.vndb[7], 1);
+    assert.equal(stats.ratingHistograms.vndb[6], 1);
+    assert.equal(stats.ratingHistograms.personal[9], 1);
+    assert.equal(stats.ratingHistograms.personal[5], 1);
+
+    // 分歧：仅 v1 双评分（9.5 − 8 = 1.5）
+    assert.equal(stats.ratingDiff.count, 1);
+    assert.equal(stats.ratingDiff.avg, 1.5);
+    assert.equal(stats.ratingDiff.overrated[0].id, 'v1');
+    assert.equal(stats.ratingDiff.overrated[0].diff, 1.5);
+    assert.deepEqual(stats.ratingDiff.underrated, []);
+
+    // 时间线：时长记入完成月；跨度仅 v1 双日期（10 天）
+    assert.deepEqual(stats.timeline.months, [
+      { month: '2026-01', finished: 1, playTimeMinutes: 600 },
+      { month: '2026-02', finished: 1, playTimeMinutes: 0 }
+    ]);
+    assert.equal(stats.timeline.datedFinished, 2);
+    assert.equal(stats.timeline.avgSpanDays, 10);
+    assert.equal(stats.timeline.spanCount, 1);
+
+    // 偏好：一条多社各计一次；平均个人分仅计已评分条目，无样本为 null
+    assert.deepEqual(stats.topDevelopers, [
+      { name: 'Key', count: 2, avgPersonalRating: 9.5 },
+      { name: 'Alice Soft', count: 1, avgPersonalRating: null }
+    ]);
+    assert.deepEqual(stats.topTags.vndb, [
+      { name: 'Drama', count: 2 },
+      { name: 'Romance', count: 1 }
+    ]);
+    assert.deepEqual(stats.topTags.user, [{ name: '神作', count: 1 }]);
   } finally {
     await cleanup();
   }

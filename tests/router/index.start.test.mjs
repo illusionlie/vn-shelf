@@ -183,6 +183,7 @@ export async function deleteVNEntry() {}
 export async function addEntryToList() {}
 export async function removeEntryFromList() {}
 export async function getVNList() { return clone(kv.vnList); }
+export async function getStats() { return { total: 0 }; }
 export async function getSettings() {
   return {
     vndbApiToken: '',

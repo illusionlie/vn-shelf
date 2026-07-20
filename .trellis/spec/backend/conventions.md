@@ -334,3 +334,22 @@ ENVIRONMENT = "production"
 ```
 
 **Related**：`.dev.vars`、`src/router.js` 的 `setAuthCookie` 调用点。
+
+---
+
+## Convention: 统计聚合（/api/stats，07-20 起）
+
+**What**：统计口径唯一落点是 `src/stats.js` 的 `computeStats(rows)` 纯函数（vn_entries 原始行 → 聚合对象，shape 与口径见模块头注）；`repository.getStats(env)` 只做宽 SELECT 取数装配。`getVNList` 已瘦身为仅返回 `{ items }`——stats 不再挂车列表查询，两端点各查各的。
+
+**Why**：纯函数不依赖 D1 桩即可全边界测试（`tests/stats/compute.test.mjs`）；`/api/stats` 是公开 CORS 端点，聚合只出统计值与标题级信息，review 等明细不出库。
+
+**扩展纪律**（新增统计字段时）：
+
+1. `computeStats` 保持纯函数 + 单遍历累积；禁止在 repository/router 层散落聚合逻辑。
+2. 宽 SELECT 加列必须同步 `tests/d1/repository.test.mjs` FakeD1 的对应 SQL 分支（mock 对未知 SQL 抛错，漏改会红）。
+3. router 4 桩（envelope/config.update/vn.status/index.start）已含 `getStats` 导出；给 router.js 再新增 repository 导入时同样要四桩齐改（patch 型加载器依赖图陷阱）。
+4. 口径变更同步三处文案：AGENTS.md 统计接口说明、`src/stats.js` 头注、前端 locales 的 `stats.aboutText`（zh-CN/en 双侧，key diff 测试强制）。
+
+**既有口径决策**（勿"顺手"更改）：时间线按 `finish_date` 计数不看 status（沿用「状态与 finishDate 无联动」决策）；直方图 round 取整 clamp 1..10 仅计 >0；分歧榜样本 = 双评分均 >0、按 1 位小数舍入后过滤；条目时长整体记入完成月（近似口径）；日期脏数据跳过不抛错。
+
+**Related**：`tests/stats/compute.test.mjs`、`tests/d1/repository.test.mjs`（getStats 装配）、`tests/router/envelope.test.mjs`（/api/stats 信封形态）、任务 `07-20-stats-page-expansion`。
