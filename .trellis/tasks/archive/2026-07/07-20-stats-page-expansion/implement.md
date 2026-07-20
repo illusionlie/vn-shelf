@@ -27,7 +27,7 @@
 - [x] 12. `AGENTS.md`：/api/stats 行说明 + 结构树补 src/stats.js、tests/stats/（测试树同步拉平到现状）；`CLAUDE.md` 结构树同步
 - [x] 13. `npm run lint` 全绿
 - [x] 14. `npm test` 全绿（174 pass / 0 fail）
-- [ ] 15. 人工验收（用户侧）：明暗主题、空库、480 宽度、en locale
+- [x] 15. 人工验收（用户侧）：浏览器实测通过，并驱动概览区两轮迭代（摘要条 + 居中）
 - [x] 16. 验收迭代：概览区多卡片网格 → 单条摘要条（stats-overview，5 项横排，已完成+完成率合并；移除 stat-card/stats-grid 样式与 finishedRate 词条）
 
 ## 回滚点

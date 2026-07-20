@@ -31,7 +31,7 @@
 - [x] `GET /api/stats` 返回 design.md 定义的完整 shape，信封仍为 `successResponse(data)`，CORS 行为不变。
 - [x] `computeStats` 纯函数测试覆盖：空库、无日期、round 边界、跨年、多开发商、JSON 容错、负跨度、Top 截断与稳定排序、wishlist/none。
 - [x] 4 个 router 测试的 repository stub 补 `getStats` 导出，envelope 含 `/api/stats` 形态用例。
-- [ ] 统计页六区块（概览 6 卡/状态条/评分区/时间线/厂商/标签）在明暗主题、480 宽度、空样本下均正常，各区块样本不足显示提示而非隐藏。（代码已实现，待人工浏览器验收）
+- [x] 统计页六区块（概览摘要条/状态条/评分区/时间线/厂商/标签）在明暗主题、480 宽度、空样本下均正常，各区块样本不足显示提示而非隐藏。（用户浏览器验收通过，概览区经两轮迭代定稿）
 - [x] zh-CN 与 en 词条同步（i18n key 双向 diff 测试通过）。
 - [x] AGENTS.md 与 CLAUDE.md 的结构树、API 说明同步。
 - [x] `npm run lint` 与 `npm test` 全绿（174 pass / 0 fail）。
