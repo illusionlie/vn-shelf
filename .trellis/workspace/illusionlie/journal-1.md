@@ -683,3 +683,39 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - 批次完成。评估报告中的候选改进（accent token 化、header 高度魔法数、NSFW 键盘可达、视觉方向升级）未立项，待需求。
+
+
+## Session 16: 统计页四维扩展与概览区迭代
+
+**Date**: 2026-07-20
+**Task**: 统计页四维扩展与概览区迭代
+**Branch**: `master`
+
+### Summary
+
+统计页从 4 个聚合值扩展为四维画像：/api/stats 后端聚合（src/stats.js 纯函数 computeStats，宽 SELECT 装配），前端六区块纯 CSS 图表（状态堆叠条、双评分直方图+分歧榜、年份切换月度时间线、厂商/标签 Top）。getVNList 瘦身为仅返回 items。测试 174 全绿（新增 tests/stats/compute.test.mjs 全边界 + FakeD1 宽 SELECT 分支 + 4 个 router 桩 getStats 导出 + envelope /api/stats 信封用例）。验收迭代两轮：概览多卡片网格改单条摘要条（已完成+完成率合并），组内与整条居中。统计聚合扩展纪律已沉淀至 backend spec。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74a9975` | (see git log) |
+| `d310944` | (see git log) |
+| `aee5b56` | (see git log) |
+| `b3cb61d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
