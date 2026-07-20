@@ -15,6 +15,7 @@
 
 .stats-overview-item {
   min-width: 0;
+  text-align: center;
 }
 
 .stats-overview-value {
