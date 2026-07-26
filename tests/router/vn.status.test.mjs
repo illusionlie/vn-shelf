@@ -153,6 +153,11 @@ export async function fetchVNDB(id) {
     allAge: false
   };
 }
+
+// router.js 顶层 import 依赖（/api/vndb/search），本套件不触达该路由
+export class VNDBClient {
+  async searchVN() { return []; }
+}
 `;
 
   const patchedSource = sourceCode

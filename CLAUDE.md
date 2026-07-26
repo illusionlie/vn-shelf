@@ -59,13 +59,15 @@ tests/
 ├── stats/
 │   └── compute.test.mjs
 ├── vndb/
+│   ├── search.test.mjs
 │   ├── ulist-mapping.test.mjs
 │   └── ulist-import.test.mjs
 └── router/
     ├── config.update.test.mjs
     ├── envelope.test.mjs
     ├── index.start.test.mjs
-    └── vn.status.test.mjs
+    ├── vn.status.test.mjs
+    └── vndb.search.test.mjs
 ```
 
 ## 前端模块关系

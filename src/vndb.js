@@ -244,15 +244,16 @@ export class VNDBClient {
   }
 
   /**
-   * 搜索视觉小说
-   * @param {string} query - 搜索关键词
+   * 搜索视觉小说（GET /api/vndb/search 数据源，添加条目弹窗模糊搜索）
+   * @param {string} query - 搜索关键词（search filter 跨标题/别名/发行版名匹配）
    * @param {number} limit - 结果数量限制
    * @returns {Promise<Object[]>}
    */
   async searchVN(query, limit = 10) {
     const result = await this.request('/vn', {
       filters: ['search', '=', query],
-      fields: 'id, title, alttitle, image.url, rating, developers.name',
+      sort: 'searchrank', // 按相关度排序（缺省为按 id 排序）
+      fields: 'id, title, alttitle, released, image.url, image.sexual, image.violence, rating, developers.name',
       results: limit
     });
 
@@ -260,7 +261,10 @@ export class VNDBClient {
       id: vn.id,
       title: vn.title,
       original: vn.alttitle || '',
+      released: vn.released || '',
       image: vn.image?.url || '',
+      // 与 mapVnObjectToVndbData 同口径：sexual/violence 任一 >1 视为 NSFW
+      imageNsfw: (vn.image?.sexual > 1 || vn.image?.violence > 1),
       rating: (vn.rating || 0) / 10, // VNDB API 返回 0-100 范围，转换为 0-10
       developers: (vn.developers || []).map(d => d.name)
     }));

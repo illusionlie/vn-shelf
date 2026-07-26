@@ -320,15 +320,98 @@
         <form @submit.prevent="saveEdit()">
           <template x-if="editForm.isNew">
             <div class="form-group">
-              <label class="form-label">VNDB ID *</label>
-              <input
-                type="text"
-                class="form-input"
-                x-model="editForm.vndbId"
-                data-i18n-placeholder="index.vndbIdPlaceholder"
-                required
-              >
-              <p class="form-hint" data-i18n="index.vndbIdHint"></p>
+              <label class="form-label" for="vndbSearchInput" data-i18n="index.vndbSearchLabel"></label>
+
+              <!-- 已选卡片：点选候选后替换输入框区域 -->
+              <template x-if="vndbSearchSelected">
+                <div class="vndb-search-selected">
+                  <div class="vndb-search-thumb">
+                    <img
+                      :src="vndbSearchSelected.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                      alt=""
+                      decoding="async"
+                      :class="{ 'nsfw-blur': vndbSearchSelected.imageNsfw }"
+                      @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                    >
+                  </div>
+                  <div class="vndb-search-selected-info">
+                    <span class="vndb-search-option-title" x-text="vndbSearchSelected.title"></span>
+                    <span class="vndb-search-option-original" x-show="vndbSearchSelected.original" x-text="vndbSearchSelected.original"></span>
+                    <span class="vndb-search-selected-id" x-text="vndbSearchSelected.id"></span>
+                  </div>
+                  <button type="button" class="btn btn-secondary vndb-search-reselect" @click="clearVndbSelection()" data-i18n="index.vndbSearchReselect"></button>
+                </div>
+              </template>
+
+              <!-- 未选中：双模式搜索框（v<id> 直连 / 名称模糊搜索） -->
+              <template x-if="!vndbSearchSelected">
+                <div class="vndb-search" @click.outside="closeVndbSearchDropdown()">
+                  <div class="vndb-search-box">
+                    <input
+                      id="vndbSearchInput"
+                      type="text"
+                      class="form-input"
+                      x-ref="vndbSearchInput"
+                      x-model="vndbSearchText"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      :aria-expanded="vndbSearchOpen ? 'true' : 'false'"
+                      aria-controls="vndbSearchListbox"
+                      :aria-activedescendant="vndbSearchActiveIndex >= 0 ? ('vndbSearchOption' + vndbSearchActiveIndex) : null"
+                      autocomplete="off"
+                      data-i18n-placeholder="index.vndbIdPlaceholder"
+                      @input="onVndbSearchInput()"
+                      @keydown="onVndbSearchKeydown($event)"
+                      @compositionstart="_vndbComposing = true"
+                      @compositionend="_vndbComposing = false; onVndbSearchInput()"
+                    >
+                    <div
+                      id="vndbSearchListbox"
+                      class="vndb-search-dropdown"
+                      role="listbox"
+                      data-i18n-aria-label="index.vndbSearchListLabel"
+                      x-show="vndbSearchOpen"
+                    >
+                      <div class="vndb-search-state" x-show="vndbSearchStatus === 'searching'" data-i18n="index.vndbSearchSearching"></div>
+                      <div class="vndb-search-state vndb-search-error" x-show="vndbSearchStatus === 'error'" x-text="vndbSearchError"></div>
+                      <div class="vndb-search-state" x-show="vndbSearchStatus === 'done' && vndbSearchResults.length === 0" data-i18n="index.vndbSearchNoResults"></div>
+                      <template x-for="(result, index) in vndbSearchResults" :key="result.id">
+                        <div
+                          class="vndb-search-option"
+                          role="option"
+                          :id="'vndbSearchOption' + index"
+                          :class="{ active: vndbSearchActiveIndex === index }"
+                          :aria-selected="vndbSearchActiveIndex === index ? 'true' : 'false'"
+                          @mousedown.prevent="selectVndbResult(result)"
+                          @mouseenter="vndbSearchActiveIndex = index"
+                        >
+                          <div class="vndb-search-thumb">
+                            <img
+                              :src="result.image || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              :class="{ 'nsfw-blur': result.imageNsfw }"
+                              @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
+                            >
+                          </div>
+                          <div class="vndb-search-option-info">
+                            <span class="vndb-search-option-title" x-text="result.title"></span>
+                            <span class="vndb-search-option-original" x-show="result.original" x-text="result.original"></span>
+                            <span class="vndb-search-option-meta" x-show="vndbResultMetaText(result)" x-text="vndbResultMetaText(result)"></span>
+                          </div>
+                          <div class="vndb-search-option-rating" x-show="result.rating > 0">
+                            <span class="star">★</span>
+                            <span x-text="result.rating?.toFixed(2)"></span>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <p class="form-hint" x-show="isVndbDirectInput()" data-i18n="index.vndbSearchDirectHint"></p>
+                  <p class="form-hint" x-show="!isVndbDirectInput()" data-i18n="index.vndbIdHint"></p>
+                </div>
+              </template>
             </div>
           </template>
 

@@ -117,7 +117,8 @@ export default {
     saveTierFailed: '保存 Tier 失败',
     deleteTierFailed: '删除 Tier 失败',
     updateOrderFailed: '更新排序失败',
-    dragUpdateFailed: '拖拽更新失败'
+    dragUpdateFailed: '拖拽更新失败',
+    searchFailed: '搜索失败'
   },
   validation: {
     passwordRequired: '请输入密码',
@@ -193,8 +194,15 @@ export default {
     goToVndb: '跳转到 VNDB 条目',
     addEntry: '添加条目',
     editEntry: '编辑条目',
-    vndbIdPlaceholder: '例如: v17',
-    vndbIdHint: '在VNDB网站上找到视觉小说的ID，格式为v+数字',
+    vndbIdPlaceholder: '输入作品名称或 v 开头的 VNDB ID',
+    vndbIdHint: '支持任意语言名称模糊搜索，也可直接输入 v+数字 格式的 VNDB ID',
+    vndbSearchLabel: 'VNDB 条目 *',
+    vndbSearchSearching: '搜索中...',
+    vndbSearchNoResults: '未找到匹配的作品',
+    vndbSearchDirectHint: '将直接使用该 VNDB ID',
+    vndbSearchReselect: '重新选择',
+    vndbSearchSelectRequired: '请先搜索并选择作品，或直接输入 VNDB ID',
+    vndbSearchListLabel: 'VNDB 搜索候选列表',
     titleCnLabel: '中文标题',
     titleCnPlaceholder: '游戏的中文译名',
     ratingPlaceholder: '0-10分',

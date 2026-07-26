@@ -122,3 +122,162 @@
   color: var(--primary-text-color);
   font-size: 0.95rem;
 }
+
+/* ===== VNDB Search Combobox (add-entry modal) ===== */
+/* .vndb-search-box 只包输入框，下拉以其为锚点贴输入框下沿（hint 段落在盒外不参与定位） */
+.vndb-search-box {
+  position: relative;
+}
+
+.vndb-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--modal-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--shadow-medium);
+  /* 盖过模态内后续表单控件（同层静态兄弟 z-index 均为 auto） */
+  z-index: 30;
+}
+
+.vndb-search-state {
+  padding: 14px 12px;
+  font-size: 0.85rem;
+  color: var(--muted-text-color);
+  text-align: center;
+}
+
+.vndb-search-error {
+  color: var(--error-color);
+}
+
+.vndb-search-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.vndb-search-option:hover,
+.vndb-search-option.active {
+  background: var(--input-focus-bg-color);
+}
+
+/* 缩略图容器：overflow hidden 同时收住 nsfw-blur 的模糊外溢 */
+.vndb-search-thumb {
+  flex-shrink: 0;
+  width: 40px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--tag-bg-color);
+}
+
+.vndb-search-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vndb-search-option-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vndb-search-option-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--primary-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vndb-search-option-original {
+  font-size: 0.8rem;
+  color: var(--secondary-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vndb-search-option-meta {
+  font-size: 0.75rem;
+  color: var(--muted-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 金色语义 = VNDB 评分（星 #FFD700 + accent 数字，循 07-12 色板约定） */
+.vndb-search-option-rating {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.vndb-search-option-rating .star {
+  color: #FFD700;
+  font-size: 0.9rem;
+}
+
+/* 已选卡片（方案 A）：封面小图 + 标题 + 原名 + vID + 重新选择 */
+.vndb-search-selected {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--tag-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+}
+
+.vndb-search-selected-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vndb-search-selected-id {
+  font-size: 0.75rem;
+  color: var(--muted-text-color);
+}
+
+.vndb-search-reselect {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 480px) {
+  .vndb-search-dropdown {
+    max-height: 260px;
+  }
+
+  .vndb-search-option,
+  .vndb-search-selected {
+    gap: 10px;
+    padding: 8px 10px;
+  }
+
+  .vndb-search-thumb {
+    width: 34px;
+    height: 48px;
+  }
+}

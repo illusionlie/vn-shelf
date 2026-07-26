@@ -33,7 +33,7 @@ import {
 } from './repository.js';
 import { startUListImport } from './ulist-import.js';
 import { errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
-import { fetchVNDB } from './vndb.js';
+import { fetchVNDB, VNDBClient } from './vndb.js';
 
 const MAX_BATCH_TIER_UPDATES = 200;
 
@@ -203,6 +203,10 @@ async function handleAPI(request, env, path, method, ctx) {
 
   if (path === '/api/ulist/import' && method === 'POST') {
     return handleStartUListImport(request, env, auth, ctx);
+  }
+
+  if (path === '/api/vndb/search' && method === 'GET') {
+    return handleVndbSearch(request, env, auth);
   }
 
   if (path === '/api/config' && method === 'GET') {
@@ -1182,6 +1186,44 @@ async function handleStartUListImport(request, env, auth, ctx) {
       }
     }
   });
+}
+
+// ============ VNDB 搜索接口 ============
+
+/**
+ * VNDB 模糊搜索（认证端点，添加条目弹窗的候选来源）。
+ * 认证端点不入 PUBLIC_CORS_PATH_PATTERNS、不加 CORS 头。
+ * type-ahead 场景单次调用不重试（下一次击键即自然重试），与 fetchVNDB 的退避重试有意不同。
+ */
+async function handleVndbSearch(request, env, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  const url = new URL(request.url);
+  const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
+  if (!q) {
+    return errorResponse('搜索关键词不能为空', 400);
+  }
+
+  const parsedLimit = Number.parseInt(url.searchParams.get('limit'), 10);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.max(1, Math.min(20, parsedLimit))
+    : 10;
+
+  // settings 单请求复用契约：直接使用 auth.settings 构造 client，
+  // 禁止 createVNDBClient(env)（内部会二次 getSettings）
+  const token = auth.settings.vndbApiToken;
+  if (!token) {
+    return errorResponse('VNDB API Token未配置，请先在设置页配置', 400);
+  }
+
+  try {
+    const results = await new VNDBClient(token).searchVN(q, limit);
+    return successResponse(results);
+  } catch (error) {
+    return errorResponse(`VNDB API错误: ${error.message}`, 500);
+  }
 }
 
 // ============ 配置接口 ============

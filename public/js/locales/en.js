@@ -101,7 +101,8 @@ export default {
     saveTierFailed: 'Failed to save tier',
     deleteTierFailed: 'Failed to delete tier',
     updateOrderFailed: 'Failed to update order',
-    dragUpdateFailed: 'Drag update failed'
+    dragUpdateFailed: 'Drag update failed',
+    searchFailed: 'Search failed'
   },
   validation: {
     passwordRequired: 'Please enter a password',
@@ -177,8 +178,15 @@ export default {
     goToVndb: 'Open the VNDB entry',
     addEntry: 'Add entry',
     editEntry: 'Edit entry',
-    vndbIdPlaceholder: 'e.g. v17',
-    vndbIdHint: 'Find the visual novel ID on the VNDB website; the format is v + digits',
+    vndbIdPlaceholder: 'Enter a title or a VNDB ID starting with v',
+    vndbIdHint: 'Fuzzy-search titles in any language, or enter a VNDB ID in the v+digits format directly',
+    vndbSearchLabel: 'VNDB entry *',
+    vndbSearchSearching: 'Searching...',
+    vndbSearchNoResults: 'No matching titles found',
+    vndbSearchDirectHint: 'This VNDB ID will be used directly',
+    vndbSearchReselect: 'Change',
+    vndbSearchSelectRequired: 'Search and pick a title first, or enter a VNDB ID directly',
+    vndbSearchListLabel: 'VNDB search suggestions',
     titleCnLabel: 'Chinese title',
     titleCnPlaceholder: 'Chinese translated title of the game',
     ratingPlaceholder: '0-10',

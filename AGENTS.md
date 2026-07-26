@@ -72,10 +72,12 @@ tests/
 │   ├── config.update.test.mjs
 │   ├── envelope.test.mjs
 │   ├── index.start.test.mjs
-│   └── vn.status.test.mjs
+│   ├── vn.status.test.mjs
+│   └── vndb.search.test.mjs
 ├── stats/
 │   └── compute.test.mjs
 └── vndb/
+    ├── search.test.mjs
     ├── ulist-import.test.mjs
     └── ulist-mapping.test.mjs
 
@@ -147,6 +149,12 @@ tests/
 | GET | `/api/index/status` | 获取索引/导入状态（返回体含 `type`/`skipped`） | 需认证 |
 | POST | `/api/ulist/import` | 启动 VNDB ulist 用户列表导入 | 需认证 |
 
+### VNDB 搜索接口
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/vndb/search` | VNDB 模糊搜索（`q` 关键词，trim 后必填、超 100 字符截断；`limit` clamp 1..20 默认 10；添加条目弹窗候选来源） | 需认证 |
+
 ### 配置接口
 
 | 方法 | 路径 | 说明 | 权限 |
@@ -203,7 +211,7 @@ tests/
 
 - API 基址：`https://api.vndb.org/kana`
 - 客户端类：`VNDBClient`（`src/vndb.js`）
-- 主要方法：`getVN()`、`searchVN()`、`getAuthInfo()`（GET `/authinfo`，校验 `listread` 权限）、`fetchUList()`（POST `/ulist` 分页拉取用户列表）
+- 主要方法：`getVN()`、`searchVN()`（search filter + `sort: 'searchrank'`，`GET /api/vndb/search` 数据源）、`getAuthInfo()`（GET `/authinfo`，校验 `listread` 权限）、`fetchUList()`（POST `/ulist` 分页拉取用户列表）
 - 请求方法：`request(endpoint, body, method='POST')`，GET 不带 body（`/authinfo` 用 GET；`/vn`、`/ulist` 默认 POST）
 - 共享映射：`mapVnObjectToVndbData(vn)` 将 VNDB vn 对象转本地格式，`getVN` 与 ulist 导入共用（回归保护）
 - 统一入口：`fetchVNDB()`，默认 3 次重试 + 指数退避

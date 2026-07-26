@@ -362,6 +362,20 @@ export const statsAPI = {
   }
 };
 
+// ============ VNDB 搜索API ============
+
+export const vndbAPI = {
+  /**
+   * VNDB 模糊搜索（认证接口，添加条目弹窗的候选来源）
+   * @param {string} q - 搜索关键词
+   * @param {number} limit - 结果数量（后端 clamp 1..20，默认 10）
+   */
+  async search(q, limit = 10) {
+    const query = new URLSearchParams({ q, limit: String(limit) });
+    return apiRequest(`/vndb/search?${query.toString()}`);
+  }
+};
+
 // ============ 索引API ============
 
 export const indexAPI = {
