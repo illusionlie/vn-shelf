@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "check 信封形态、settings 复用、CORS 不扩散、四桩镜像纪律是否被遵守"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "check i18n 双侧同步、friendlyError 分层、a11y/Esc 行为、评分色语义"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "check 搜索结果的防御性读取（image/released/developers 缺省）与表单归一"}

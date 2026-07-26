@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "API 响应信封（B6c）、settings 单请求复用契约、CORS 白名单纪律、patch 型加载器依赖图陷阱——新端点与四桩同步全部依赖本文件"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "i18n t() 契约与 key 双向 diff、friendlyErrorMessage 分层、modal a11y/Esc 惯例、金=VNDB 评分色语义——combobox 与词条改动的约束来源"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine 组件/mixin 组织与 a11y 模式——vnShelf 内新增 vndbSearch 状态组遵循的组件写法"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "css 模块归属（forms.css）与 locales 文件布局——新样式与词条的落点依据"}
