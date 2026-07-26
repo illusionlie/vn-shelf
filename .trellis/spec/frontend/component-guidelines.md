@@ -62,6 +62,35 @@ export function myPage() {
 
 ---
 
+## Scenario: 远程 type-ahead combobox（07-26 固化，样板：添加弹窗 VNDB 搜索）
+
+**What**：任何「输入 → 防抖请求后端 → 下拉候选 → 点选回填」组件必须同时具备**四层守卫**，缺一即实证 bug（07-26 check 阶段抓到 ③④ 缺失）：
+
+```js
+// 参考实现：vnShelf.js 的 vndbSearch* 状态组（350ms debounce，≥2 字符触发）
+_seq: 0,            // ① 竞态序号：请求前 ++ 并快照，success 与 error 两分支都只在 seq 最新时写状态
+_composing: false,  // ② IME 守卫 A：@compositionstart/@compositionend 维护；组字中 input 事件不分流，end 后补一次
+// ③ IME 守卫 B：keydown 处理器入口 if (event.isComposing) return;
+//    否则 ↑↓ 抢输入法候选导航、组字确认的 Enter 误选高亮候选
+// ④ 关闭作废：closeDropdown() 内 _seq += 1，且防抖回调入口 if (!open) return;
+//    否则防抖窗口内 Esc/外点/选中后，延迟回调重开"幽灵下拉"、in-flight 响应回写旧结果
+```
+
+**模态内层级契约**：
+
+- Esc：下拉开 → 关下拉 + `stopPropagation()`（模态的 `@keydown.escape.window` 挂冒泡末端，可被内层阻断）；下拉关 → 不拦截，Esc 照常关弹窗。
+- Enter：下拉开 → `preventDefault()` 选中高亮项（防触发外层 `<form>` 提交）；下拉关 → 不拦截。
+- 候选行用 `@mousedown.prevent` 选中（保持输入框焦点，避开 blur 时序）；外点关闭用 `@click.outside`。
+- 提交守卫写在组件方法内而非 HTML `required`——modal footer 按钮在 `<form>` 外，原生校验从不生效。
+
+**a11y 与状态呈现**：`role=combobox`（`aria-expanded/controls/activedescendant`）+ `role=listbox/option`（`aria-selected`）；searching/error/empty/results 四态**内联**展示于下拉区，不走 toast（逐击键刷屏）。
+
+**Why**：四层守卫各对应一个真实失效模式——过期响应覆盖新结果（①）、半截拼音打到后端（②）、组字 Enter 误选（③）、关闭后幽灵重开（④）。中文输入是本项目主用例，②③ 不是边缘场景。
+
+**Related**：backend/conventions.md「VNDB 搜索代理端点（07-26）」（服务端契约）；quality-guidelines.md（modal Esc/a11y 总则）。
+
+---
+
 ## Props Conventions
 
 This project has **no props** — Alpine.data components are factory functions returning plain objects, mounted via HTML `x-data="componentName()"`. Parent↔child data flow happens through:

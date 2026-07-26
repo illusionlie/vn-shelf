@@ -353,3 +353,64 @@ ENVIRONMENT = "production"
 **既有口径决策**（勿"顺手"更改）：时间线按 `finish_date` 计数不看 status（沿用「状态与 finishDate 无联动」决策）；直方图 round 取整 clamp 1..10 仅计 >0；分歧榜样本 = 双评分均 >0、按 1 位小数舍入后过滤；条目时长整体记入完成月（近似口径）；日期脏数据跳过不抛错。
 
 **Related**：`tests/stats/compute.test.mjs`、`tests/d1/repository.test.mjs`（getStats 装配）、`tests/router/envelope.test.mjs`（/api/stats 信封形态）、任务 `07-20-stats-page-expansion`。
+
+---
+
+## Scenario: VNDB 搜索代理端点（07-26）
+
+### 1. Scope / Trigger
+
+- Trigger：改动 `GET /api/vndb/search`、`VNDBClient.searchVN`，或新增任何「前端 type-ahead → Worker 代理上游 API」类端点时参照本契约。
+
+### 2. Signatures
+
+```js
+// src/router.js
+handleVndbSearch(request, env, auth)   // GET /api/vndb/search?q=<关键词>&limit=<1..20>
+// src/vndb.js
+VNDBClient.searchVN(query, limit = 10)
+// → [{ id, title, original, released, image, imageNsfw, rating, developers }]
+```
+
+### 3. Contracts
+
+- 认证端点：路由在 `authMiddleware` 之后；**不入** `PUBLIC_CORS_PATH_PATTERNS`，响应无 CORS 头。
+- token 直取 `auth.settings.vndbApiToken` 后 `new VNDBClient(token)`——**禁止** `createVNDBClient(env)`（内部二次 `getSettings`，违反 settings 复用契约）。
+- `q` trim 后必填，超 100 字符静默截断；`limit` 非法归 10、clamp 1..20（静默，不 400）。
+- **searchrank 坑**：kana API 的 search filter 结果默认按 id 排序，必须显式 `sort: 'searchrank'` 才按相关度——漏掉时功能"看起来能用"但候选顺序几乎不可用。
+- type-ahead 端点**不重试**（对比 `fetchVNDB` 的 3 次指数退避）：下一次击键即天然重试，重试只会放大延迟与 VNDB 配额消耗。
+- `imageNsfw` 口径与 `mapVnObjectToVndbData` 一致（`sexual>1 || violence>1`），供前端 `nsfw-blur` 复用。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 未认证 | `errorResponse('未授权', 401)` |
+| q trim 后空 | 400 中文文案 |
+| token 未配置 | **400**（非 500）——4xx 才走前端 friendlyErrorMessage 的中文透传分支，文案指引去设置页 |
+| VNDB 上游失败 | 500 `VNDB API错误: ...`（与 `handleCreateVN` 同形态） |
+| limit 非法/越界 | 静默归 10 / clamp 1..20 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：新增同类上游代理端点时复用「认证 + 无 CORS + settings 复用 + 输入静默 clamp + 上游错误 500」组合与本矩阵。
+- Base：`searchVN` 仅服务本端点；改字段集需同步 `tests/vndb/search.test.mjs` 的请求体 deepEqual。
+- Bad：handler 里 `createVNDBClient(env)`（双查 settings）；给 type-ahead 加重试；漏 `sort: 'searchrank'`。
+
+### 6. Tests Required
+
+- `tests/router/vndb.search.test.mjs`：401 信封 / q 空 400 / token 缺失 400 且不构造 client / 成功信封 + token 来源断言 + 无 CORS 头 / clamp（999→20、0→1、非法→10）/ trim+截断透传 / 上游失败 500。
+- `tests/vndb/search.test.mjs`：请求体（filters/sort/fields/results）deepEqual + 映射边界（imageNsfw 三态、rating 0-100→0-10、缺省兜底、空结果）。
+- router.js 新增 `VNDBClient` import → 四个 patch 桩（config.update/envelope/vn.status/index.start）必须同步 `export class VNDBClient`（依赖图陷阱，见 B6c 教训）。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：漏 searchrank（默认按 id 排序，相关度尽失）+ handler 内二次查 settings
+const client = await createVNDBClient(env);
+await client.request('/vn', { filters: ['search', '=', q], fields, results: limit });
+
+// Correct：settings 复用 + 显式相关度排序
+const client = new VNDBClient(auth.settings.vndbApiToken);
+await client.request('/vn', { filters: ['search', '=', q], fields, sort: 'searchrank', results: limit });
+```
