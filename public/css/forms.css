@@ -161,12 +161,18 @@
   gap: 12px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
 }
 
 .vndb-search-option:hover,
 .vndb-search-option.active {
   background: var(--input-focus-bg-color);
+}
+
+/* 搜索中保留上一轮候选：降透明度传达「正在刷新」；状态行不受影响，
+   旧候选保持可点击（勿加 pointer-events: none）——2026-07-27 验收迭代 */
+.vndb-search-dropdown.is-searching .vndb-search-option {
+  opacity: 0.55;
 }
 
 /* 缩略图容器：overflow hidden 同时收住 nsfw-blur 的模糊外溢 */

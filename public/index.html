@@ -371,6 +371,7 @@
                       role="listbox"
                       data-i18n-aria-label="index.vndbSearchListLabel"
                       x-show="vndbSearchOpen"
+                      :class="{ 'is-searching': vndbSearchStatus === 'searching' }"
                     >
                       <div class="vndb-search-state" x-show="vndbSearchStatus === 'searching'" data-i18n="index.vndbSearchSearching"></div>
                       <div class="vndb-search-state vndb-search-error" x-show="vndbSearchStatus === 'error'" x-text="vndbSearchError"></div>
