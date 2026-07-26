@@ -719,3 +719,38 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: 添加条目 VNDB 模糊搜索（07-26 任务全程）
+
+**Date**: 2026-07-27
+**Task**: 添加条目 VNDB 模糊搜索（07-26 任务全程）
+**Branch**: `master`
+
+### Summary
+
+完成 07-26-vndb-search-add-entry：添加条目弹窗升级为双模式搜索框——v<id> 直连保留，名称输入经 350ms 防抖走新增认证端点 GET /api/vndb/search（auth.settings 复用、信封契约、无 CORS、不重试），searchVN 补 sort:searchrank 与 released/imageNsfw 字段。前端 combobox 含四层守卫（竞态序号、IME 双守卫、关闭作废）、键盘导航与已选卡片（用户决策方案 A）；check 阶段实证修复幽灵下拉重开与组字 Enter 误选。新增 13 测试用例（187 全绿），四个 router patch 桩同步 VNDBClient。验收迭代：搜索中旧候选降透明度（.is-searching）。Spec 沉淀：backend VNDB 搜索代理端点七段式契约 + frontend 远程 type-ahead combobox 四层守卫。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `04335b3` | (see git log) |
+| `8ac43b6` | (see git log) |
+| `2864211` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
