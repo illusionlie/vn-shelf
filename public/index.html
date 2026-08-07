@@ -416,7 +416,8 @@
             </div>
           </template>
 
-          <div class="form-group">
+          <!-- 中文标题仅在编辑模式显示 -->
+          <div class="form-group" x-show="!editForm.isNew">
             <label class="form-label" data-i18n="index.titleCnLabel"></label>
             <input
               type="text"

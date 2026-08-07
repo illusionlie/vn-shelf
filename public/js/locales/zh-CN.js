@@ -203,7 +203,7 @@ export default {
     vndbSearchReselect: '重新选择',
     vndbSearchSelectRequired: '请先搜索并选择作品，或直接输入 VNDB ID',
     vndbSearchListLabel: 'VNDB 搜索候选列表',
-    titleCnLabel: '中文标题',
+    titleCnLabel: '中文标题 (覆盖)',
     titleCnPlaceholder: '游戏的中文译名',
     ratingPlaceholder: '0-10分',
     playTimeLabel: '游玩时长（小时 / 分钟）',
