@@ -49,14 +49,14 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1: 造 100+ 条测试数据（或临时调小窗高），首屏只渲染 30 张卡片（DOM 中 `.vn-card` 数量 = 30）；滚动到底自动追加至 90 后出现「加载更多」按钮；点击后再恢复自动追加。
-- [ ] AC2: 输入搜索词 / 切换状态过滤 / 切换排序后，窗口重置为前 30 条，按钮与预算状态复位。
-- [ ] AC3: 过滤结果 ≤30 条时无按钮、无计数异常；空结果时空状态文案正常。
-- [ ] AC4: 「已显示 X / Y」计数随滚动/点击/过滤实时正确。
-- [ ] AC5: `/`、`/tier`、`/stats`、`/settings` 四页底部出现一致 footer；`/login` 无 footer 且布局无变化。
-- [ ] AC6: footer 在亮/暗主题、480/768/1024 断点两侧均无样式异常；条目为 0 的首页 footer 贴底。
-- [ ] AC7: `npm run lint && npm run test` 退出码 0（含 i18n keys 双向 parity）。
-- [ ] AC8: DevTools 禁用 IntersectionObserver（或老内核模拟）时列表全量渲染不报错。
+- [x] AC1: 造 100+ 条测试数据（或临时调小窗高），首屏只渲染 30 张卡片（DOM 中 `.vn-card` 数量 = 30）；滚动到底自动追加至 90 后出现「加载更多」按钮；点击后再恢复自动追加。 — Playwright 实测（100 条桩数据）：30 → 滚动 60 → 90 → 按钮出现 → 点击 → 100 ✓
+- [x] AC2: 输入搜索词 / 切换状态过滤 / 切换排序后，窗口重置为前 30 条，按钮与预算状态复位。 — 实测：搜索收窄至 11 条、清空回 30、切换排序回 30 ✓
+- [x] AC3: 过滤结果 ≤30 条时无按钮、无计数异常；空结果时空状态文案正常。 — 实测 11 条时计数/按钮均隐藏 ✓
+- [x] AC4: 「已显示 X / Y」计数随滚动/点击/过滤实时正确。 — 实测 30/100 → 100/100 ✓
+- [x] AC5: `/`、`/tier`、`/stats`、`/settings` 四页底部出现一致 footer；`/login` 无 footer 且布局无变化。 — 实测四页 footer=1（settings 需认证，桩 auth 后验证）；/login footer=0 ✓
+- [x] AC6: footer 在亮/暗主题、480/768/1024 断点两侧均无样式异常；条目为 0 的首页 footer 贴底。 — 实测 1241px/390px 双视口 + 亮暗主题截图目检；空列表 footer 底边=视口底（1233=1233）✓（修复一处实证回归：column flex + auto margin → shrink-to-fit 网格坍缩，已加 width:100%）
+- [x] AC7: `npm run lint && npm run test` 退出码 0（含 i18n keys 双向 parity）。 — lint 0 错误，187 tests 全过 ✓
+- [x] AC8: DevTools 禁用 IntersectionObserver（或老内核模拟）时列表全量渲染不报错。 — 实测 delete window.IntersectionObserver 后 100 条全量渲染、零 pageerror ✓
 
 ## Notes
 
