@@ -14,6 +14,7 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 - `npm run lint` - ESLint 检查（`src/**/*.js` + `public/js/**/*.js`）
 - `npm run lint:fix` - 自动修复可修复的 lint 问题
 - `npm run test` - 运行 Node 内置测试（`node --test`）
+- `npm run fetch:vendor` - 按 package.json 锁定版本拉取自托管前端依赖（`public/js/vendor/`）
 
 ## 项目架构
 
@@ -40,21 +41,31 @@ public/
 ├── favicon.ico
 ├── robots.txt
 ├── css/
-│   └── style.css
+│   ├── base.css          # 设计变量/重置/壳层/页眉页脚/弹窗/Toast（全站共享，链接顺序最前）
+│   ├── forms.css         # 表单控件
+│   ├── cards-detail.css  # 首页卡片网格 + 详情 + 渲染窗口控制区
+│   └── login.css / settings.css / stats.css / tier.css  # 页面级样式
 └── js/
-    ├── app.js            # Alpine.js 入口：全局 Store + 组件注册
+    ├── app.js            # Alpine.js 入口：i18n 初始化 + 壳层/页脚注入 + 全局 Store + 组件注册
     ├── api.js            # API 封装
-    ├── utils.js          # 工具函数（formatUserPlayTime, lockPageScroll/unlockPageScroll, toggleMobileMenu, initProgressBar）
-    ├── theme.js          # 主题切换 + 自定义背景
+    ├── i18n.js           # i18n：t() 取词 + applyI18nDom() 静态文案应用 + setLocale()
+    ├── locales/          # 词典：zh-CN.js（默认）+ en.js（叶子 key 双向 parity 有测试卡住）
+    ├── layout.js         # injectShell() 公共壳层 + injectFooter() 站点页脚（登录页跳过）
+    ├── constants.js      # 前端共享常量（与后端同值约定，勿单方修改）
+    ├── utils.js          # 工具函数（debounce, trapFocus, formatUserPlayTime, lockPageScroll/unlockPageScroll, toggleMobileMenu, initProgressBar）
+    ├── theme.js          # 主题切换（html.dark-mode）+ 自定义背景
     ├── markdown.js       # Markdown 渲染
-    ├── translations.js   # Tags 翻译与缓存
+    ├── translations.js   # Tags 翻译与 IndexedDB 缓存
+    ├── tier-diff.js      # Tier 拖拽 diff 纯函数
+    ├── vendor/           # 自托管第三方依赖（alpine/marked/purify + fetch-vendor.cjs 拉取脚本）
     └── components/
-        ├── shared.js       # 跨页面共享 mixin（tags 视图 + 详情弹窗）
-        ├── vnShelf.js      # 主页书架组件
-        ├── tierlistPage.js # Tier List 页组件
-        ├── settingsPage.js # 设置页组件
-        ├── loginPage.js    # 登录页组件
-        └── statsPage.js    # 统计页组件
+        ├── shared.js        # 跨页面共享 mixin（tags 视图 + 详情弹窗）
+        ├── confirmDialog.js # 全局确认对话框（挂 $store.app.confirm() Promise 接口）
+        ├── vnShelf.js       # 主页书架组件（列表渲染窗口化：哨兵追加 + 加载更多）
+        ├── tierlistPage.js  # Tier List 页组件
+        ├── settingsPage.js  # 设置页组件
+        ├── loginPage.js     # 登录页组件
+        └── statsPage.js     # 统计页组件
 
 tests/
 ├── d1/
@@ -88,18 +99,18 @@ tests/
 
 ## Worker 执行模型
 
-- HTTP 入口：[`fetch()`](src/index.js:141)
+- HTTP 入口：[`fetch()`](src/index.js)
   - 非 `/api/*` 请求优先尝试 `env.ASSETS.fetch(request)` 获取静态资源。
-  - 失败后回退到路由处理 [`handleRequest()`](src/router.js:80)。
-- Queue 入口：[`queue()`](src/index.js:179)
+  - 失败后回退到路由处理 [`handleRequest()`](src/router.js)。
+- Queue 入口：[`queue()`](src/index.js)
   - 用于批量索引任务消费，带重试、幂等条目结果记录和状态汇总。
-- Durable Object：[`IndexStartLockDurableObject`](src/index.js:30)
+- Durable Object：[`IndexStartLockDurableObject`](src/index.js)
   - 全局单例，提供索引启动的分布式互斥锁（`/acquire`、`/release`、`/status`）。
   - 基于 Durable Object 存储，支持 TTL 自动过期。
 
 ## API 路由
 
-路由总入口：[`handleAPI()`](src/router.js:116)
+路由总入口：[`handleAPI()`](src/router.js)
 
 ### 认证接口
 
@@ -181,7 +192,7 @@ tests/
 | `/settings` | 设置页 |
 | `/stats` | 统计页 |
 | `/tier` | Tier List 页 |
-| `/css/style.css` | 样式 |
+| `/css/*.css` | 样式（base → forms → cards-detail → 页面文件，链接顺序固定） |
 | `/js/*.js` | 前端模块 |
 
 > `html_handling = "auto-trailing-slash"`，因此页面路由使用无 `.html` 形式也可访问。
@@ -189,23 +200,23 @@ tests/
 ## Queue 处理机制（批量索引）
 
 - Queue 绑定：`VN_INDEX_QUEUE`（配置见 [`wrangler.toml.example`](wrangler.toml.example)）
-- 消费逻辑：[`queue()`](src/index.js:179)
-- 索引启动：[`startIndexTask()`](src/index-task.js:42)，状态查询 [`getIndexTaskStatus()`](src/index-task.js:38)
-- 分布式锁：[`IndexStartLockDurableObject`](src/index.js:30) 提供启动互斥，绑定名 `INDEX_START_LOCK`
+- 消费逻辑：[`queue()`](src/index.js)
+- 索引启动：[`startIndexTask()`](src/index-task.js)，状态查询 [`getIndexTaskStatus()`](src/index-task.js)
+- 分布式锁：[`IndexStartLockDurableObject`](src/index.js) 提供启动互斥，绑定名 `INDEX_START_LOCK`
 - 重试策略：最多 3 次，重试延迟 60 秒（`retryCount` 累增）
 - 幂等结果：按 `taskId + vndbId` 写入 `index_task_items` 表，成功结果对失败回写具有"粘性"
-- 汇总机制：[`reconcileIndexStatusFromItems()`](src/repository.js:702) 基于 `index_task_items` 表汇总 `processed/failed`
+- 汇总机制：[`reconcileIndexStatusFromItems()`](src/repository.js) 基于 `index_task_items` 表汇总 `processed/failed`
 - 延迟汇总：高频批次下仅临近完成时即时汇总，其余走 `ctx.waitUntil` 延迟汇总降载（最多 6 次，间隔 5s）
 - 状态终态：`completed` 或 `partial`，D1 模式下聚合列表由 SQL 实时计算，无需手动重建
 - 终态清理：汇总转入终态时自动清理 `index_task_items` 表对应记录
 
 ## 认证系统
 
-- JWT 生成/校验：[`createJWT()`](src/auth.js:14)、[`verifyJWT()`](src/auth.js:44)
+- JWT 生成/校验：[`createJWT()`](src/auth.js)、[`verifyJWT()`](src/auth.js)
 - 签名算法：HMAC-SHA256（Web Crypto API）
 - Token 存储：`httpOnly` Cookie `auth_token`，有效期 24h
-- 密码哈希：PBKDF2 + SHA-256（见 [`hashPassword()`](src/auth.js:132)）
-- 初始化/校验：[`setAdminPassword()`](src/auth.js:251)、[`verifyAdminPassword()`](src/auth.js:268)
+- 密码哈希：PBKDF2 + SHA-256（见 [`hashPassword()`](src/auth.js)）
+- 初始化/校验：[`setAdminPassword()`](src/auth.js)、[`verifyAdminPassword()`](src/auth.js)
 
 ## VNDB API 集成
 
@@ -301,25 +312,33 @@ tests/
 
 ## 前端架构
 
-- 入口：[`public/js/app.js`](public/js/app.js) — Alpine.js 全局 Store 注册 + 组件注册（胶水层）
+- 入口：[`public/js/app.js`](public/js/app.js) — i18n 初始化 + 公共壳层/页脚注入 + Alpine 全局 Store 注册 + 组件注册（胶水层）
 - API 封装：[`public/js/api.js`](public/js/api.js)
-- 工具函数：[`public/js/utils.js`](public/js/utils.js) — `formatUserPlayTime`, `lockPageScroll`/`unlockPageScroll`, `toggleMobileMenu`, `initProgressBar`
-- 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换、自定义背景 overlay
-- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js:159)（带安全 URL 校验）
-- Tags 翻译：[`initTranslations()`](public/js/translations.js:240)
+- i18n：[`public/js/i18n.js`](public/js/i18n.js) + [`locales/`](public/js/locales/)（zh-CN 默认 + en）
+  - HTML 静态文案走 `data-i18n*` 标记，由 `applyI18nDom()` 应用（同步首遍 + 词典就绪后第二遍）
+  - JS 动态文案走 `t()`，Alpine 内联表达式走 `$t` magic
+  - 新增 key 必须双语词典同步（`tests/public/i18n.keys.test.mjs` 双向 parity 强制）
+- 公共壳层与页脚：[`public/js/layout.js`](public/js/layout.js) — `injectShell()`（进度条/背景遮罩/Toast/确认对话框）+ `injectFooter()`（全站页脚，登录页跳过）
+- 共享常量：[`public/js/constants.js`](public/js/constants.js) — 与后端同值约定（如批量 Tier 上限 200），修改一端必须同步另一端
+- 工具函数：[`public/js/utils.js`](public/js/utils.js) — `debounce`, `trapFocus`, `formatUserPlayTime`, `lockPageScroll`/`unlockPageScroll`, `toggleMobileMenu`, `initProgressBar`
+- 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换（`html.dark-mode`）、自定义背景 overlay
+- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js)（带安全 URL 校验）
+- Tags 翻译：[`initTranslations()`](public/js/translations.js)
   - IndexedDB 缓存：`vn-shelf-translations`
   - 缓存键：`tagTranslations`
   - 策略：缓存优先 + 后台版本检查 + 自动更新事件 `translations-updated`
+- 第三方依赖：vendor 自托管（`public/js/vendor/`），版本锁定在 `package.json`，`npm run fetch:vendor` 拉取；禁止运行时 CDN
 
 ### 页面组件（`public/js/components/`）
 
 | 组件 | 文件 | 说明 |
 |------|------|------|
-| `vnShelf` | [`vnShelf.js`](public/js/components/vnShelf.js) | 主页书架：列表加载、搜索、排序、详情/编辑弹窗 |
+| `vnShelf` | [`vnShelf.js`](public/js/components/vnShelf.js) | 主页书架：列表加载、搜索、排序、详情/编辑弹窗；列表渲染窗口化（IntersectionObserver 哨兵自动追加 + 「加载更多」按钮） |
 | `tierlistPage` | [`tierlistPage.js`](public/js/components/tierlistPage.js) | Tier List：拖拽排序、跨 Tier 移动、批量更新 |
-| `settingsPage` | [`settingsPage.js`](public/js/components/settingsPage.js) | 设置：VNDB Token、密码、索引、导入导出、外观 |
+| `settingsPage` | [`settingsPage.js`](public/js/components/settingsPage.js) | 设置：VNDB Token、密码、索引、导入导出、外观、语言切换 |
 | `loginPage` | [`loginPage.js`](public/js/components/loginPage.js) | 登录/初始化 |
 | `statsPage` | [`statsPage.js`](public/js/components/statsPage.js) | 统计数据展示 |
+| `confirmDialog` | [`confirmDialog.js`](public/js/components/confirmDialog.js) | 全局确认对话框（`$store.app.confirm()` Promise 接口） |
 
 ### Tier List 前端行为
 
@@ -352,6 +371,8 @@ tests/
 6. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表，不直接暴露给前端。
 7. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 D1 数据库与 Queue 后再运行 `npm run dev`。
 8. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500。
+9. **CSS 分模块**：`public/css/` 下链接顺序固定为 base → forms → cards-detail → 页面文件；JS 注入的共享 DOM（壳层/页脚）样式进 `base.css`。
+10. **i18n 双语**：新增用户可见文案必须走 `data-i18n*`/`t()` 并同步 `zh-CN.js` 与 `en.js`，双向 parity 测试会卡住漂移。
 <!-- TRELLIS:START -->
 # Trellis Instructions
 
