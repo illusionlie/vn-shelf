@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Code Review Checklist 逐条核对（a11y / i18n / CSS 放置 / 质量门）"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复核 footer 链接/壳层注入是否复用既有模式而非新发明"}

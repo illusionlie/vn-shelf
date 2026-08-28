@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "CSS 模块放置（layout.js 注入的共享 DOM → base.css）、i18n t()/data-i18n 契约与双语 parity、a11y 总则、lint+test 质量门"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine data 组件模式、mixin 组合约定、显式 this 绑定等组件契约"}

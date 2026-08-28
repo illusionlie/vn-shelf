@@ -19,6 +19,7 @@
  * - settings.*   设置页静态文案
  * - stats.*      统计页静态文案
  * - tier.*       Tier List 页静态文案
+ * - footer.*     站点页脚（layout.js injectFooter 注入，跨页共享）
  *
  * 插值占位符用 `{name}`，由 t(key, params) 替换。
  * HTML 静态文案（nav/meta/页域）的 zh 值 = 迁移前 HTML 字面量逐字复制（等值替换）。
@@ -216,7 +217,9 @@ export default {
     tagsManualLabel: '标签（手动模式）',
     tagsManualPlaceholder: '多个标签用逗号分隔，例如：神作, 催泪, 神曲',
     tagsManualHint: '当前为手动标签模式，请输入自定义标签。',
-    tagsVndbHint: '当前为 VNDB 标签模式，标签来自 VNDB 数据。如需自定义标签，请在设置中切换为手动模式。'
+    tagsVndbHint: '当前为 VNDB 标签模式，标签来自 VNDB 数据。如需自定义标签，请在设置中切换为手动模式。',
+    loadMore: '加载更多',
+    showingCount: '已显示 {shown} / {total} 条'
   },
   login: {
     setPasswordLabel: '设置管理员密码 *',
@@ -339,5 +342,8 @@ export default {
     nameLabel: 'Tier 名称',
     namePlaceholder: '例如：S',
     colorLabel: 'Tier 颜色'
+  },
+  footer: {
+    dataFrom: '数据来自'
   }
 };

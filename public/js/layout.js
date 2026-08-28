@@ -69,3 +69,42 @@ export function injectShell() {
     shell.innerHTML = SHELL_TEMPLATE;
   }
 }
+
+// 站点页脚（08-28）。与 SHELL_TEMPLATE 不同：footer 是 in-flow 内容，必须挂在 body
+// 末尾而非 #app-shell（壳层全是 position:fixed 元素且位于 body 顶部）。
+// 「© 年份 VN Shelf」为品牌+符号+数字，跨语言同形不占 i18n key（年份由 JS 填，
+// 绕开 applyI18nDom 不支持 {year} 插值的限制）；链接文本 VNDB / GitHub 为品牌名，
+// 与 header 导航硬编码 "Tier List" 同一先例。
+const FOOTER_TEMPLATE = `
+  <footer class="site-footer">
+    <span class="site-footer-copy">© <span data-footer-year></span> VN Shelf</span>
+    <span class="site-footer-source">
+      <span data-i18n="footer.dataFrom"></span>
+      <a href="https://vndb.org" target="_blank" rel="noopener noreferrer">VNDB</a>
+    </span>
+    <a
+      class="site-footer-github"
+      href="https://github.com/illusionlie/vn-shelf"
+      target="_blank"
+      rel="noopener noreferrer"
+      data-i18n-aria-label="nav.githubRepo"
+    >GitHub</a>
+  </footer>
+`;
+
+/**
+ * 把站点页脚追加到 body 末尾。幂等：已有 .site-footer 时静默跳过。
+ * 登录页（body.login-page，overflow:hidden 全屏布局）跳过——footer 不可见也无意义。
+ * 调用时机须在 applyI18nDom 首遍扫描之前（见 app.js），footer 的 data-i18n
+ * 标记才能随首遍翻译就位。
+ */
+export function injectFooter() {
+  if (document.body.classList.contains('login-page')) return;
+  if (document.querySelector('.site-footer')) return;
+
+  const template = document.createElement('template');
+  template.innerHTML = FOOTER_TEMPLATE.trim();
+  const footer = template.content.firstElementChild;
+  footer.querySelector('[data-footer-year]').textContent = new Date().getFullYear();
+  document.body.appendChild(footer);
+}

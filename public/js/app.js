@@ -11,7 +11,7 @@ import { statsPage } from './components/statsPage.js';
 import { tierlistPage } from './components/tierlistPage.js';
 import { vnShelf } from './components/vnShelf.js';
 import { applyI18nDom, initI18n, t } from './i18n.js';
-import { injectShell } from './layout.js';
+import { injectFooter, injectShell } from './layout.js';
 import { initTheme, toggleTheme, initBackground } from './theme.js';
 import { initProgressBar, toggleMobileMenu } from './utils.js';
 
@@ -23,6 +23,9 @@ const i18nReady = initI18n();
 
 // 在 Alpine 初始化前注入公共壳层（进度条 / 背景遮罩 / Toast / confirmDialog）
 injectShell();
+// 站点页脚（登录页自动跳过）；须在下方 applyI18nDom 首遍扫描前注入，
+// footer 的 data-i18n 标记才能随首遍翻译就位
+injectFooter();
 
 // HTML 静态文案两遍应用（幂等，见 i18n.js applyI18nDom）：
 // 第一遍同步执行——zh-CN 默认用户即终态（等值替换零观感）；

@@ -200,7 +200,9 @@ export default {
     tagsManualLabel: 'Tags (manual mode)',
     tagsManualPlaceholder: 'Separate tags with commas, e.g. masterpiece, tearjerker, great music',
     tagsManualHint: 'Manual tag mode is active; enter your own tags.',
-    tagsVndbHint: 'VNDB tag mode is active and tags come from VNDB data. To use custom tags, switch to manual mode in Settings.'
+    tagsVndbHint: 'VNDB tag mode is active and tags come from VNDB data. To use custom tags, switch to manual mode in Settings.',
+    loadMore: 'Load more',
+    showingCount: 'Showing {shown} / {total}'
   },
   login: {
     setPasswordLabel: 'Set admin password *',
@@ -323,5 +325,8 @@ export default {
     nameLabel: 'Tier name',
     namePlaceholder: 'e.g. S',
     colorLabel: 'Tier color'
+  },
+  footer: {
+    dataFrom: 'Data from'
   }
 };

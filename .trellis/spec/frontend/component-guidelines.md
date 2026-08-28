@@ -126,3 +126,29 @@ See `.trellis/spec/frontend/quality-guidelines.md` — a11y is fully codified th
 - **Routing `settingsPage.loadConfig` through the appearance Store.** `/api/config/appearance` is public and excludes auth-only fields (`hasVndbApiToken`/`hasPassword`). Settings UI reads those, so `loadConfig` must stay on authenticated `/api/config` — don't unify onto the appearance Store (B2 learned this).
 - **Adding a per-page toast/progress/background block.** These shared shell elements are injected by `public/js/layout.js` `injectShell()` (B3). Copy-pasting them per HTML page is a DRY violation and a fall-back path drift risk.
 - **Reaching for native `confirm()` in a new flow.** Forbidden per quality-guidelines — use `await this.$store.app.confirm({...})`. Native confirm blocks, is un-stylable, and its OK/Cancel semantics are ambiguous (import mode 「OK=合并 / Cancel=替换」 antipattern).
+
+---
+
+## Scenario: 长列表渲染窗口化（08-28 固化，样板：首页书架）
+
+**What**：条目量级达到几百以上时，`x-for` 全量渲染的 DOM/绑定数是实际瓶颈（数据本身极小）。不引入分页/虚拟滚动，用「窗口切片 + 哨兵追加」：
+
+```js
+// 参考实现：vnShelf.js（RENDER_PAGE_SIZE / AUTO_LOAD_BUDGET）
+visibleCount: PAGE_SIZE,          // 窗口大小；x-for 绑定 visibleList 而非 filteredList
+autoLoadsLeft: BUDGET,            // 自动追加预算，用尽转「加载更多」按钮（保证 footer 可达）
+get visibleList() { return this.filteredList.slice(0, this.visibleCount); },
+get hasMore()     { return this.filteredList.length > this.visibleCount; },
+```
+
+**契约要点**：
+
+- 全量列表（`filteredList`）保留用于过滤/计数；`x-for` 只消费 getter 切片。搜索/排序/过滤/重载四处显式 `resetRenderWindow()`（保持可 grep，不用 `$watch`）。
+- IntersectionObserver 哨兵带 `rootMargin` 预取；**IO 只在交叉状态跳变时触发**——追加后哨兵仍在视口内不会自动再触发，每次追加后必须 `$nextTick` 手动复检一次。
+- 无 IO 环境降级 `visibleCount = Infinity` 全量渲染，不报错。
+- 自动预算用尽后必须给手动按钮——纯无限滚动会让 in-flow footer 永远不可达。
+- MPA 无需 disconnect observer（与 `setupTranslationsRefresh` 同一前提）。
+
+**Why**：一次拉取 + 本地即时过滤/排序是本项目首页的核心体验资产，服务端分页会摧毁它；窗口化以约 30 行解决唯一真实瓶颈（DOM 节点数）。
+
+**Related**：quality-guidelines.md（column-flex + auto-margin shrink-wrap 陷阱——配套 sticky footer 布局时实证踩中）。

@@ -136,9 +136,9 @@
       </div>
     </template>
 
-    <!-- 卡片网格 -->
+    <!-- 卡片网格（x-for 只渲染窗口切片 visibleList，全量过滤结果保留在 filteredList） -->
     <div class="cards-grid" x-show="!isLoading && filteredList.length > 0">
-      <template x-for="vn in filteredList" :key="vn.id">
+      <template x-for="vn in visibleList" :key="vn.id">
         <div class="vn-card" role="button" tabindex="0" :aria-label="vn.titleCn || vn.titleJa || vn.title" @click="openDetail(vn)" @keydown.enter.space.prevent="openDetail(vn)">
           <div class="vn-card-image-wrapper" x-data="{ showNsfw: false }">
             <img
@@ -181,6 +181,22 @@
           </div>
         </div>
       </template>
+    </div>
+
+    <!-- 渲染窗口控制区：已显示计数（仅超一窗时出现）+ 自动预算用尽后的手动按钮 + IO 哨兵 -->
+    <div class="render-window-controls" x-show="!isLoading && filteredList.length > 0">
+      <span
+        class="render-window-count text-muted"
+        x-show="showRenderStats"
+        x-text="$t('index.showingCount', { shown: Math.min(visibleCount, filteredList.length), total: filteredList.length })"
+      ></span>
+      <button
+        class="btn btn-secondary"
+        x-show="hasMore && autoLoadsLeft === 0"
+        @click="loadMore()"
+        data-i18n="index.loadMore"
+      ></button>
+      <div class="render-sentinel" x-ref="renderSentinel" x-show="hasMore" aria-hidden="true"></div>
     </div>
   </main>
 

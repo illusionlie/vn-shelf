@@ -15,6 +15,12 @@ const VN_STATUS_OPTIONS = ['playing', 'finished', 'stalled', 'dropped'];
 // VNDB ID 直连模式判定（与 src/utils.js isValidVNDBId 同口径）
 const VNDB_ID_RE = /^v\d+$/;
 
+// 渲染窗口化：x-for 只渲染 filteredList 的前 visibleCount 条（首页私有常量，
+// 不进 constants.js——那里只放跨端共享约定）。30 条约覆盖 1.5 个桌面首屏。
+const RENDER_PAGE_SIZE = 30;
+// 自动追加预算：用尽后转「加载更多」手动按钮，保证 footer 可被抵达（无限滚动与页脚的冲突解）
+const AUTO_LOAD_BUDGET = 2;
+
 export function vnShelf() {
   return {
     ...createTagsView(),
@@ -29,6 +35,11 @@ export function vnShelf() {
     showEdit: false,
     editForm: {},
     _initialized: false,
+
+    // ===== 渲染窗口化（哨兵自动追加 + 手动「加载更多」）=====
+    visibleCount: RENDER_PAGE_SIZE,
+    autoLoadsLeft: AUTO_LOAD_BUDGET,
+    _renderObserver: null,
 
     // ===== VNDB 搜索（添加弹窗 isNew 分支）=====
     vndbSearchText: '',        // 输入框绑定（选中后由 selectVndbResult 回填 editForm.vndbId）
@@ -50,6 +61,74 @@ export function vnShelf() {
       await this.loadConfig();
       await this.initTranslations();
       await this.loadVNList();
+      // 列表就绪后再挂哨兵：此时 Alpine 已完成首轮 DOM walk，$refs 保证可用；
+      // IO 在 observe 时会立即回报一次当前交叉状态，超高首屏靠它 + 复检链自动补窗
+      this.setupRenderSentinel();
+    },
+
+    // x-for 数据源：filteredList 的窗口切片（getter 由 Alpine 响应式追踪依赖）
+    get visibleList() {
+      return this.filteredList.slice(0, this.visibleCount);
+    },
+
+    get hasMore() {
+      return this.filteredList.length > this.visibleCount;
+    },
+
+    // 计数文本仅在一窗装不下时出现（R4：≤一窗时哨兵/按钮/计数均不渲染）
+    get showRenderStats() {
+      return this.filteredList.length > RENDER_PAGE_SIZE;
+    },
+
+    // 窗口重置点：loadVNList（含增删改后重载）/ handleSearch /
+    // handleStatusFilterChange / handleSortChange 四处显式调用，保持可 grep
+    resetRenderWindow() {
+      this.visibleCount = RENDER_PAGE_SIZE;
+      this.autoLoadsLeft = AUTO_LOAD_BUDGET;
+    },
+
+    // 「加载更多」按钮：手动追加一窗并恢复自动预算
+    loadMore() {
+      this.visibleCount += RENDER_PAGE_SIZE;
+      this.autoLoadsLeft = AUTO_LOAD_BUDGET;
+      this.$nextTick(() => this.recheckRenderSentinel());
+    },
+
+    setupRenderSentinel() {
+      // 无 IntersectionObserver 的环境降级为全量渲染（R6）
+      if (!('IntersectionObserver' in window)) {
+        this.visibleCount = Infinity;
+        return;
+      }
+      // rootMargin 预取：哨兵距视口底 400px 即触发，滚动到底前完成追加
+      this._renderObserver = new IntersectionObserver((entries) => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          this.autoAppendRenderPage();
+        }
+      }, { rootMargin: '400px' });
+      if (this.$refs.renderSentinel) {
+        this._renderObserver.observe(this.$refs.renderSentinel);
+      }
+    },
+
+    autoAppendRenderPage() {
+      if (!this.hasMore || this.autoLoadsLeft <= 0) return;
+      this.visibleCount += RENDER_PAGE_SIZE;
+      this.autoLoadsLeft -= 1;
+      // IO 仅在交叉状态跳变时触发：追加后哨兵若仍在视口内（未离开过）不会自动
+      // 再触发，故每次追加后手动复检一次（短列表/超高视口边界兜底）
+      this.$nextTick(() => this.recheckRenderSentinel());
+    },
+
+    recheckRenderSentinel() {
+      const el = this.$refs.renderSentinel;
+      if (!el || !this.hasMore || this.autoLoadsLeft <= 0) return;
+      // x-show 隐藏（hasMore=false）时 getBoundingClientRect 全零，但上面的
+      // hasMore 守卫已先行拦截，此处元素必为可见态
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight + 400) {
+        this.autoAppendRenderPage();
+      }
     },
 
     async loadVNList() {
@@ -58,6 +137,7 @@ export function vnShelf() {
         const res = await vnAPI.getList({ sort: this.sortBy });
         this.vnList = res.data || [];
         this.filteredList = this.applyFilters(this.vnList);
+        this.resetRenderWindow();
       } catch (error) {
         this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadFailed')), 'error');
       } finally {
@@ -97,10 +177,12 @@ export function vnShelf() {
 
     handleSearch() {
       this.filteredList = this.applyFilters(this.vnList);
+      this.resetRenderWindow();
     },
 
     handleStatusFilterChange() {
       this.filteredList = this.applyFilters(this.vnList);
+      this.resetRenderWindow();
     },
 
     // 卡片徽章仅渲染已配色的四状态；白名单外的值（如后端预留的 wishlist）
@@ -163,6 +245,7 @@ export function vnShelf() {
 
       // 重放当前搜索 + 状态过滤，保持 filteredList 与排序结果同步
       this.filteredList = this.applyFilters(this.vnList);
+      this.resetRenderWindow();
     },
 
     // ===== VNDB 搜索：双模式输入（v<id> 直连 / 名称模糊搜索）=====

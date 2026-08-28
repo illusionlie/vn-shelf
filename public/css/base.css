@@ -82,6 +82,9 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   padding-top: 120px;
+  /* column flex：让 main 撑满剩余高度，footer 在短页（空书架等）也能贴底 */
+  display: flex;
+  flex-direction: column;
   transition: padding-left var(--transition-medium), color var(--transition-medium), background-color var(--transition-medium);
 }
 
@@ -193,6 +196,47 @@ img { max-width: 100%; height: auto; display: block; }
   max-width: 1500px;
   margin: 0 auto;
   padding: 0 5%;
+}
+
+/* body 为 column flex：main 撑满剩余高度把 footer 推到底部。
+   必须显式 width:100%——flex 规范规定 cross 轴存在 auto margin 时 align-items:stretch
+   不生效，item 退化为 shrink-to-fit，auto-fill 网格会坍缩成单列（实证回归）；
+   width:100% + max-width + margin auto 才等价于原 block 布局的居中行为。 */
+main.container {
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+/* ===== Footer - Liquid Glass（与 .main-header 呼应；layout.js injectFooter 全站注入，登录页除外）===== */
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 40px;
+  padding: 14px 5%;
+  background: var(--header-bg-color);
+  backdrop-filter: blur(8px) saturate(180%);
+  border-top: 1px solid var(--border-color);
+  color: var(--muted-text-color);
+  font-size: 0.85rem;
+}
+
+.site-footer a {
+  color: var(--secondary-text-color);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.site-footer a:hover {
+  color: var(--accent-color);
+}
+
+.site-footer-source {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
 }
 
 /* ===== Header - Liquid Glass ===== */
