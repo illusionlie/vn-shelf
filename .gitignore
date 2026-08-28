@@ -16,10 +16,9 @@ wrangler.toml
 # Wrangler 本地 D1 数据库
 data/
 
-# 项目计划
+# AI 副产物
 .ace-tool/
-.omc/
-.kilo/
+.playwright-mcp/
 
 # Claude Code 个人本地配置
 .claude/settings.local.json
