@@ -754,3 +754,36 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: 首页列表渲染窗口化与全站 Footer
+
+**Date**: 2026-08-28
+**Task**: 首页列表渲染窗口化与全站 Footer
+**Branch**: `master`
+
+### Summary
+
+实现首页渲染窗口化（visibleList 切片 + IO 哨兵 + 自动预算转手动按钮）与全站共享 footer（layout.js injectFooter）。修复 column flex + auto margin 导致的网格 shrink-wrap 坍缩回归。lint+187 tests 全绿，Playwright 实测 AC1-AC8 全过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `064a8ac` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

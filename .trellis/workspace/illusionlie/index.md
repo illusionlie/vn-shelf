@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
-- **Last Active**: 2026-07-27
+- **Total Sessions**: 18
+- **Last Active**: 2026-08-28
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~756 | Active |
+| `journal-1.md` | ~789 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-08-28 | 首页列表渲染窗口化与全站 Footer | `064a8ac` | `master` |
 | 17 | 2026-07-27 | 添加条目 VNDB 模糊搜索（07-26 任务全程） | `04335b3`, `8ac43b6`, `2864211` | `master` |
 | 16 | 2026-07-20 | 统计页四维扩展与概览区迭代 | `74a9975`, `d310944`, `aee5b56`, `b3cb61d` | `master` |
 | 15 | 2026-07-12 | 主页卡片评分个人分优先（回退 VNDB 分） | `d6f9564`, `a422ad4` | `master` |
