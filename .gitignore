@@ -19,6 +19,7 @@ data/
 # AI 副产物
 .ace-tool/
 .playwright-mcp/
+videos/
 
 # Claude Code 个人本地配置
 .claude/settings.local.json
