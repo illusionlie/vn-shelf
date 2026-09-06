@@ -414,3 +414,70 @@ await client.request('/vn', { filters: ['search', '=', q], fields, results: limi
 const client = new VNDBClient(auth.settings.vndbApiToken);
 await client.request('/vn', { filters: ['search', '=', q], fields, sort: 'searchrank', results: limit });
 ```
+
+---
+
+## Scenario: 部署工作流资源预检（deploy.yml preflight，09-05 起）
+
+### 1. Scope / Trigger
+
+- Trigger：基础设施接线（D1 / Queue / Secrets 注入 `wrangler.toml`）。`.github/workflows/deploy.yml` 在部署前按名预检/创建 Cloudflare 资源，D1 id 运行时解析。改动 `wrangler.toml.example` 的 `database_name` 或 `queue` 名字、或新增需要预建的绑定类型时，必须同步本节。
+- 来源：任务 `09-05-deploy-auto-provision`（research：`wrangler-provisioning.md`）。
+
+### 2. Signatures
+
+- 步骤：`Ensure Cloudflare resources (D1 + Queue)`，`id: ensure_resources`，位于 `Fetch Account ID` 之后、`Generate wrangler.toml from template` 之前。
+- 使用的 wrangler 命令（4.x，均为账号级、无需配置文件）：
+  - `wrangler d1 list --json` → `[{uuid, name, ...}]`（内部分页拉全）
+  - `wrangler d1 create <name>`（同名已存在会报错，**必须先查再建**）
+  - `wrangler queues info <name>`（不存在 → 非零退出；`queues list` **无 `--json`**，不要用它做脚本解析）
+  - `wrangler queues create <name>`（同名已存在会报错）
+- Step output：`d1_id`（D1 uuid），供 sed 替换 `__D1_DATABASE_ID__`。
+
+### 3. Contracts
+
+- Secrets：`WORKER_NAME`、`CF_API_TOKEN` 必填；`CF_D1_DATABASE_ID` **可选覆盖**；`CF_ACCOUNT_ID`、`CUSTOM_DOMAIN` 可选。
+- Token 权限：Workers 编辑模板 + **D1 Edit** + **Queues Edit**（创建资源必需）。
+- Step env：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`WRANGLER_HIDE_BANNER="true"`、`WRANGLER_SEND_METRICS="false"`、`D1_NAME=vn-shelf-db`、`QUEUE_NAME=vn-index-queue`、`PROVIDED_D1_ID=${{ secrets.CF_D1_DATABASE_ID }}`。
+- `D1_NAME` / `QUEUE_NAME` 与 `wrangler.toml.example` 的 `database_name` / `queue` **同值约定**，改一处必改另一处。
+- 不回写 GitHub Secrets（Action 无写权限）；id 每次运行按名解析。
+- 日志：`::add-mask::$D1_ID` 必须在写 `$GITHUB_OUTPUT` 之前；只打印末 4 位。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|---|---|
+| `PROVIDED_D1_ID` 有值且 uuid 存在于账号 | 复用，不创建 |
+| `PROVIDED_D1_ID` 有值但 uuid 不存在 | `::error::` 退出 1，不创建任何资源 |
+| 无 `PROVIDED_D1_ID`，`vn-shelf-db` 存在 | 复用其 uuid |
+| 无 `PROVIDED_D1_ID`，`vn-shelf-db` 缺失 | `::warning::`（明示 NEW EMPTY database）→ `d1 create` → 再查拿 uuid；仍取不到 → `::error::` 退出 1 |
+| `queues info` 成功 | 复用 |
+| `queues info` 失败 | 打印其 stderr → `queues create`；create 失败原样冒泡（`set -euo pipefail`），不吞鉴权/权限错误 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：新增需要预建的资源（如 KV）→ 同一步骤内加「查 → 缺则建」分支，名字放 env 并与模板同值；输出走 `$GITHUB_OUTPUT`。
+- Base：Durable Object（`[[migrations]]`）与 Assets 部署时自动创建，**不要**加预检。
+- Bad：依赖 `wrangler deploy` 自动建 Queue（源码硬报错 `Queue "x" does not exist`）；用 `wrangler deploy --x-provision`（隐藏 experimental，且不含 Queue）；直接 `create` 靠报错判存在；按 `database_name` 校验用户提供的 id（用户既有库可能不叫 `vn-shelf-db`）。
+
+### 6. Tests Required
+
+- 无真实账号的 stub 模拟（fake `npx` + fake `jq` 置于 PATH，`GITHUB_OUTPUT` 指向临时文件），覆盖矩阵四路径并断言：调用序列（是否出现 `d1 create` / `queues create`）、退出码、`::warning::`/`::error::`/`::add-mask::` 出现与否、`GITHUB_OUTPUT` 内容。
+- `node -e "require('js-yaml').load(...)"` 校验 YAML + 抽取 `run` 块 `bash -n`。
+- 步骤顺序断言：`Fetch Account ID < Ensure Cloudflare resources < Generate wrangler.toml`。
+
+### 7. Wrong vs Correct
+
+```bash
+# Wrong：banner 走 stdout 会污染 JSON；靠 create 报错判存在
+DB_ID=$(npx wrangler d1 list --json | jq -r '.[0].uuid')      # 未设 WRANGLER_HIDE_BANNER，且取第一个而非按名
+npx wrangler queues create vn-index-queue || true              # 吞掉了权限错误
+
+# Correct：显式关 banner；按名查、缺则建；失败冒泡
+export WRANGLER_HIDE_BANNER=true
+D1_ID=$(npx wrangler d1 list --json | jq -r --arg n "$D1_NAME" '.[] | select(.name == $n) | .uuid' | head -n1)
+[[ -n "$D1_ID" ]] || { npx wrangler d1 create "$D1_NAME"; D1_ID=$(...再查一次); }
+npx wrangler queues info "$QUEUE_NAME" >/dev/null 2>/tmp/q.err || { cat /tmp/q.err; npx wrangler queues create "$QUEUE_NAME"; }
+```
+
+> **Warning**：wrangler 版本 banner 经 `console.log` 写 **stdout**（实测无 `--json` 时 84 bytes）。任何在脚本中解析 wrangler `--json` 输出的地方，都要显式设 `WRANGLER_HIDE_BANNER=true`，不要依赖 `--json` 的隐式抑制。

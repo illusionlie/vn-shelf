@@ -8,7 +8,7 @@
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Conventions](./conventions.md) | CORS 策略、settings 复用契约、API 响应信封（B6c）、D1 schema 迁移契约（07-11）、条目状态枚举契约（07-11）、wrangler 配置双轨、VNDB 搜索代理端点（07-26） | Active |
+| [Conventions](./conventions.md) | CORS 策略、settings 复用契约、API 响应信封（B6c）、D1 schema 迁移契约（07-11）、条目状态枚举契约（07-11）、wrangler 配置双轨、VNDB 搜索代理端点（07-26）、部署工作流资源预检（09-05） | Active |
 
 ---
 
