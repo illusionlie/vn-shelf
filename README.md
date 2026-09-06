@@ -39,28 +39,29 @@
 
 部署工作流位于 `.github/workflows/deploy.yml`，需要配置以下 Secrets：
 
-- `WORKER_NAME`
-- `CF_API_TOKEN`
-- `CF_D1_DATABASE_ID`
-- `CF_ACCOUNT_ID`（可选，不填则通过 API token 自动获取）
+- `WORKER_NAME`（必填）
+- `CF_API_TOKEN`（必填）
+- `CF_D1_DATABASE_ID`（可选，仅在需要绑定既有/非默认名 `vn-shelf-db` 的数据库时填写；不填则按名查找 `vn-shelf-db`，缺失自动创建）
+- `CF_ACCOUNT_ID`（可选，不填则通过 API token 自动获取；token 挂了多个账号时建议显式填写）
 - `CUSTOM_DOMAIN`（可选）
 
 ### 获取 Cloudflare API Token
 
 1. 登录 Cloudflare 控制台，进入“管理账户” -> “API 令牌”页面。
 2. 点击“创建令牌”按钮，选择“编辑 Cloudflare Workers”使用模板。
-3. 在权限部分点击“添加更多”，选择“Queues”，并选择“编辑”权限。
+3. 在权限部分点击“添加更多”，依次添加“D1”与“Queues”，权限均选择“编辑”（工作流会用它们自动创建数据库与队列）。
 4. 点击“继续以显示摘要” -> “创建令牌”按钮，复制生成的 API Token。
 
-### 获取 Cloudflare D1 Database ID
+### D1 数据库与 Queue（自动创建）
 
-1. 登录 Cloudflare 控制台，进入"存储和数据库" -> "D1 SQL Database"页面。
-2. 创建一个 D1 数据库（或使用现有），复制数据库 ID，即为 `CF_D1_DATABASE_ID`。
+部署工作流会在部署前自动预检并按需创建以下资源，**无需手工在控制台创建**：
 
-### 创建 Queue
+- D1 数据库 `vn-shelf-db`：按名查找，存在则复用其 ID，缺失则自动创建。
+- Queue `vn-index-queue`：存在则复用，缺失则自动创建。
 
-1. 登录 Cloudflare 控制台，进入“Compute” -> “Queues”页面。
-2. 点击“创建队列”按钮，队列名称为`vn-index-queue`，点击“创建”按钮。
+预检步骤是幂等的，重复运行不会重复创建。如需绑定一个既有的 D1 数据库（例如名字不是 `vn-shelf-db`），在 Cloudflare 控制台“存储和数据库” -> “D1 SQL Database”页面复制其数据库 ID，填入 `CF_D1_DATABASE_ID`；此时工作流只校验该 ID 存在、不会创建新库，ID 无效则部署失败。
+
+> 注意：若 `vn-shelf-db` 被删除且未设置 `CF_D1_DATABASE_ID`，下次部署会自动新建一个**空库**并在日志中给出 `::warning::` 提示，请留意数据是否符合预期。
 
 ### 配置 Secrets
 

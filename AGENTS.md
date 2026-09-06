@@ -360,6 +360,9 @@ tests/
   - ESLint
   - Node 内置测试（`npm run test`）
   - Wrangler deploy dry-run（依赖 lint + test，基于 `wrangler.toml.example` 生成临时配置）
+- 手动部署（[`deploy.yml`](.github/workflows/deploy.yml)，`workflow_dispatch`）
+  - 部署前 `Ensure Cloudflare resources` 步骤按名预检/创建 D1 `vn-shelf-db` 与 Queue `vn-index-queue`（先查再建、幂等），D1 id 运行时解析并注入模板；`CF_D1_DATABASE_ID` 仅为可选覆盖（有值只校验存在、不创建）
+  - 必填 Secrets 仅 `WORKER_NAME` + `CF_API_TOKEN`（token 需含 Workers / D1 / Queues 编辑权限）
 
 ## 开发注意事项
 
