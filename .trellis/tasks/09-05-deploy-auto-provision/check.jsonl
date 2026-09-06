@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "核对 D1 id 遮蔽与配置双轨约定是否被遵守"}
+{"file": ".trellis/tasks/09-05-deploy-auto-provision/research/wrangler-provisioning.md", "reason": "核对脚本使用的 wrangler 命令/flag 与核实结果一致（如 queues list 无 --json）"}

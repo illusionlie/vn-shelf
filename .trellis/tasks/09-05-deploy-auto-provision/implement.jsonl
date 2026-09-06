@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "wrangler 配置双轨约定（D1 id 视为敏感信息、toml 被 gitignore）与 D1 schema 走运行时 initDB 的契约"}
+{"file": ".trellis/tasks/09-05-deploy-auto-provision/research/wrangler-provisioning.md", "reason": "wrangler 4.92 CLI 能力与 deploy 对缺失资源行为的一手核实，preflight 脚本设计依据"}
