@@ -787,3 +787,38 @@ B6c：successResponse 向后兼容扩展第三参 extra，6 条偏离端点（au
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: 部署 Action 自动预检/创建 D1 与 Queue 资源
+
+**Date**: 2026-09-07
+**Task**: 部署 Action 自动预检/创建 D1 与 Queue 资源
+**Branch**: `master`
+
+### Summary
+
+deploy.yml 新增 Ensure Cloudflare resources 步骤：d1 list --json 按名解析/创建 vn-shelf-db、queues info/create 预建 vn-index-queue，先查再建幂等；CF_D1_DATABASE_ID 降为可选覆盖（按 uuid 校验、不创建）；uuid add-mask，缺库新建打 warning。核实 wrangler 4.92：deploy 不自动建 Queue、--x-provision 隐藏且不含 Queue、版本 banner 走 stdout（显式 WRANGLER_HIDE_BANNER=true）。README/AGENTS 同步，spec 沉淀 7 段契约。fake npx/jq stub 四路径模拟 + yaml/bash -n + lint/test 187 通过。子代理通道 Service Unavailable，implement/check 改 inline。真实账号首次运行待用户触发。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `732826b` | (see git log) |
+| `fa6e4d0` | (see git log) |
+| `206bf70` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
