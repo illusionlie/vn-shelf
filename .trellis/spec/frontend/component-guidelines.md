@@ -152,3 +152,42 @@ get hasMore()     { return this.filteredList.length > this.visibleCount; },
 **Why**：一次拉取 + 本地即时过滤/排序是本项目首页的核心体验资产，服务端分页会摧毁它；窗口化以约 30 行解决唯一真实瓶颈（DOM 节点数）。
 
 **Related**：quality-guidelines.md（column-flex + auto-margin shrink-wrap 陷阱——配套 sticky footer 布局时实证踩中）。
+
+---
+
+## Scenario: 单条目就地更新（09-09 固化，样板：管理员单条目 VNDB 刷新）
+
+**What**：对列表中某一条做写操作后，不重拉整表、不 `resetRenderWindow()`，用响应实体就地替换该条：
+
+```js
+// 参考实现：vnShelf.js refreshVN / applyRefreshedEntry + public/js/vn-list-item.js
+refreshing: {},                                   // per-id busy map（普通对象，不用 Set）
+async refreshVN(id) {
+  if (!id || this.refreshing[id]) return;         // 同 id 重入守卫；不同 id 可并行
+  this.refreshing[id] = true;
+  try {
+    const res = await vnAPI.update(id, { refreshVNDB: true });
+    this.applyRefreshedEntry(res.data);
+  } finally { delete this.refreshing[id]; }
+},
+applyRefreshedEntry(entry) {
+  const idx = this.vnList.findIndex(item => item.id === entry.id);
+  if (idx !== -1) {
+    this.vnList[idx] = mergeVndbIntoListItem(this.vnList[idx], entry);   // 纯函数投影
+    this.filteredList = this.applyFilters(this.vnList);                 // 重放过滤，不重置窗口
+  }
+  if (this.selectedVN?.id === entry.id) this.selectedVN = entry;         // 已打开的详情同步
+}
+```
+
+**契约要点**：
+
+- **完整条目 → 列表项的投影是跨端同值约定**：`public/js/vn-list-item.js mergeVndbIntoListItem` 逐字段镜像 `src/repository.js rowToListItem`（`titleJa = vndb.titleJa || vndb.title`、`titleCn = user.titleCn || vndb.titleCn`、`rating` 非负归一、`developers` 数组守卫）。改一侧必须同步另一侧；`tests/public/vn-list-item.test.mjs` 钉住口径。纯模块零 DOM/API/i18n import（同 `tier-diff.js`），才能被 node:test 直接引用。
+- `x-for :key="vn.id"` 下同 id 换对象 → Alpine 复用 DOM 只刷绑定，卡片内 `x-data` 局部状态（如 `showNsfw`）保留。
+- 只替换本次操作真正改变的字段族（此处仅 VNDB 派生字段），其余沿用旧列表项——避免为一次点击重造全字段投影。
+- 排序不就地重排（避免卡片跳位）；搜索/状态筛选通过 `applyFilters` 重放，条目因标题变化不再匹配时消失是正确行为。
+- **后端 `saveVNEntry` 是 `INSERT OR REPLACE` 整行写入**：任何"先读后写"的在途请求都会用旧快照覆盖并发写、甚至复活刚被 DELETE 的行。因此同一条目在途期间，模板必须禁用其它会写该行的入口（编辑/删除 `:disabled="isRefreshing(id)"`）。根治（`updatedAt` 乐观锁）另立任务。
+
+**Why**：`loadVNList()` 语义上耦合了渲染窗口重置（首页核心体验），单条目写操作走它会丢滚动位置与已展开窗口；8 个字段的就地合并成本远低于整表重传。
+
+**Related**：quality-guidelines.md「busy 按钮用 aria-disabled 保焦点」「role=button 容器内嵌套控件的 .stop 契约」。
