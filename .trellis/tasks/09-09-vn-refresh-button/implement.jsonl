@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范入口：Pre-Development Checklist"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "icon-only button aria-label、friendlyErrorMessage 分层、CSS 模块归属、focus ring 单一全局规则、reduced-motion、t()/$t 与 data-i18n 互斥、res.data 信封解包"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "shared.js mixin 边界、Styling（BEM-ish + :class 状态）、长列表渲染窗口化 Scenario（勿重置窗口）"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "per-id busy map 属组件本地状态，不进 $store.app"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "新增纯模块 public/js/vn-list-item.js 的落位与命名"}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "API 响应信封契约（PUT 返回 data: entry）；仅补测试不改后端"}
+{"file": ".trellis/tasks/09-09-vn-refresh-button/research/current-state.md", "reason": "现状侦察：PUT refreshVNDB 分支、rowToListItem 口径、INSERT OR REPLACE 并发风险、卡片 z-index 阶梯、测试样板"}
