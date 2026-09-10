@@ -57,11 +57,12 @@ public/
     ├── markdown.js       # Markdown 渲染
     ├── translations.js   # Tags 翻译与 IndexedDB 缓存
     ├── tier-diff.js      # Tier 拖拽 diff 纯函数
+    ├── vn-list-item.js   # 纯函数：完整条目 → 列表项 VNDB 字段合并（镜像 rowToListItem，单条目刷新就地更新用）
     ├── vendor/           # 自托管第三方依赖（alpine/marked/purify + fetch-vendor.cjs 拉取脚本）
     └── components/
         ├── shared.js        # 跨页面共享 mixin（tags 视图 + 详情弹窗）
         ├── confirmDialog.js # 全局确认对话框（挂 $store.app.confirm() Promise 接口）
-        ├── vnShelf.js       # 主页书架组件（列表渲染窗口化：哨兵追加 + 加载更多）
+        ├── vnShelf.js       # 主页书架组件（列表渲染窗口化：哨兵追加 + 加载更多；管理员单条目 VNDB 刷新）
         ├── tierlistPage.js  # Tier List 页组件
         ├── settingsPage.js  # 设置页组件
         ├── loginPage.js     # 登录页组件
@@ -76,7 +77,8 @@ tests/
 │   ├── i18n.test.mjs
 │   ├── markdown.security.test.mjs
 │   ├── markdown.syntax.test.mjs
-│   └── tier-diff.test.mjs
+│   ├── tier-diff.test.mjs
+│   └── vn-list-item.test.mjs
 ├── queue/
 │   └── index.queue.test.mjs
 ├── router/
@@ -333,7 +335,7 @@ tests/
 
 | 组件 | 文件 | 说明 |
 |------|------|------|
-| `vnShelf` | [`vnShelf.js`](public/js/components/vnShelf.js) | 主页书架：列表加载、搜索、排序、详情/编辑弹窗；列表渲染窗口化（IntersectionObserver 哨兵自动追加 + 「加载更多」按钮） |
+| `vnShelf` | [`vnShelf.js`](public/js/components/vnShelf.js) | 主页书架：列表加载、搜索、排序、详情/编辑弹窗；列表渲染窗口化（IntersectionObserver 哨兵自动追加 + 「加载更多」按钮）；管理员单条目 VNDB 刷新（卡片封面图标钮 + 详情页脚文字钮，`PUT /api/vn/{id}` + `refreshVNDB`，成功后经 `mergeVndbIntoListItem` 就地更新不重置渲染窗口；同条目刷新中编辑/删除禁用） |
 | `tierlistPage` | [`tierlistPage.js`](public/js/components/tierlistPage.js) | Tier List：拖拽排序、跨 Tier 移动、批量更新 |
 | `settingsPage` | [`settingsPage.js`](public/js/components/settingsPage.js) | 设置：VNDB Token、密码、索引、导入导出、外观、语言切换 |
 | `loginPage` | [`loginPage.js`](public/js/components/loginPage.js) | 登录/初始化 |

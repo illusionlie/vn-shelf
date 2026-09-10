@@ -473,6 +473,14 @@ main.container {
   font-size: 0.8rem;
 }
 
+/* 共享禁用态：降透明度；pointer-events 同时压掉 .btn-*:hover 的位移 / 变色（禁用中不应有悬停反馈）。
+ * aria-disabled 分支给需要保持键盘焦点的 busy 按钮用（真 disabled 会把焦点丢到 body，弹窗内会逃出焦点陷阱） */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar {
   width: 8px;
@@ -603,6 +611,11 @@ main.container {
   position: sticky;
   bottom: 0;
   background: var(--modal-bg-color);
+}
+
+/* 页脚左靠按钮：把“从源同步”类操作与右侧“改我的数据”类操作在视觉上分开 */
+.modal-footer-start {
+  margin-right: auto;
 }
 
 /* 有背景图时让 body 背景色透明，使图片可见 */

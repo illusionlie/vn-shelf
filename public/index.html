@@ -154,6 +154,26 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
             </div>
             <span class="all-age-badge" x-show="vn.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>
+            <!-- 管理员单条目 VNDB 刷新：.stop 隔离整卡 openDetail（点击 + Enter/Space），同 .nsfw-overlay 先例。
+                 busy 态用 aria-disabled 而非 disabled：disabled 会让浏览器把焦点丢到 body（键盘用户失位）；重入由 refreshVN 守卫拦截 -->
+            <template x-if="$store.app.isAdmin">
+              <button
+                type="button"
+                class="vn-card-refresh-btn"
+                :aria-disabled="isRefreshing(vn.id) ? 'true' : 'false'"
+                :aria-busy="isRefreshing(vn.id) ? 'true' : 'false'"
+                :aria-label="$t('index.refreshVndbAriaLabel', { title: vn.titleCn || vn.titleJa || vn.title })"
+                :title="$t('common.refreshVndb')"
+                @click.stop="refreshVN(vn.id)"
+                @keydown.enter.space.stop
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+            </template>
           </div>
           <div class="vn-card-content">
             <h3 class="vn-card-title">
@@ -316,8 +336,19 @@
           </div>
 
           <div class="modal-footer" x-show="$store.app.isAdmin">
-            <button class="btn btn-secondary" @click="openEdit(selectedVN)" data-i18n="common.edit"></button>
-            <button class="btn btn-danger" @click="deleteVN()" data-i18n="common.delete"></button>
+            <!-- 刷新左靠（modal-footer-start）：「从源同步」与「改我的数据」视觉分组；同条目刷新中编辑/删除禁用（后端整行写入）。
+                 刷新钮自身用 aria-disabled（真 disabled 会让焦点掉出弹窗焦点陷阱） -->
+            <button
+              type="button"
+              class="btn btn-secondary modal-footer-start"
+              :aria-disabled="isRefreshing(selectedVN.id) ? 'true' : 'false'"
+              :aria-busy="isRefreshing(selectedVN.id) ? 'true' : 'false'"
+              @click="refreshVN(selectedVN.id)"
+            >
+              <span x-text="isRefreshing(selectedVN.id) ? $t('common.refreshing') : $t('common.refreshVndb')"></span>
+            </button>
+            <button type="button" class="btn btn-secondary" :disabled="isRefreshing(selectedVN.id)" @click="openEdit(selectedVN)" data-i18n="common.edit"></button>
+            <button type="button" class="btn btn-danger" :disabled="isRefreshing(selectedVN.id)" @click="deleteVN()" data-i18n="common.delete"></button>
           </div>
         </div>
       </template>

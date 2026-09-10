@@ -137,6 +137,72 @@
   padding: 4px 10px;
 }
 
+/*
+ * 管理员单条目 VNDB 刷新钮（仅 isAdmin 时由 x-if 渲染）：封面右上角 32px 玻璃圆钮，
+ * 与左上 .all-age-badge 对称。固定深色底 + 白图标，与主题变量解耦（同状态章策略），
+ * 任何封面上都可读。
+ *
+ * z-index 阶梯：.vn-card::before 光扫 1 < .nsfw-overlay 5 < 徒章 / 本钮 10——NSFW 模糊封面上仍可点。
+ * 显现策略：桌面默认透明，卡片 hover / focus-within（卡片自身获焦即匹配）时显现；
+ * busy 时常显（鼠标离开也能看到转动）；触屏（hover: none）常显。opacity 不影响 hit-test，
+ * 但桌面上鼠标在卡上时钮必已显现，不存在隐形误触。
+ * 焦点环由 base.css 全局 :focus-visible 规则提供，此处不写 outline。
+ * spinner 为功能性反馈，按规范在 reduced-motion 下保留；opacity/颜色过渡非位移，无需 reduce 规则。
+ */
+.vn-card-refresh-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.vn-card:hover .vn-card-refresh-btn,
+.vn-card:focus-within .vn-card-refresh-btn,
+.vn-card-refresh-btn[aria-busy="true"] {
+  opacity: 1;
+}
+
+.vn-card-refresh-btn:hover {
+  background: var(--accent-color);
+  border-color: transparent;
+}
+
+/* busy 用 aria-disabled/aria-busy 而非 disabled：disabled 会把键盘焦点丢到 body */
+.vn-card-refresh-btn[aria-busy="true"] {
+  cursor: progress;
+}
+
+.vn-card-refresh-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.vn-card-refresh-btn[aria-busy="true"] svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@media (hover: none) {
+  .vn-card-refresh-btn {
+    opacity: 1;
+  }
+}
+
 .vn-card-image {
   width: 100%;
   aspect-ratio: 7 / 10;

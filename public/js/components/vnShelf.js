@@ -6,6 +6,7 @@ import { friendlyErrorMessage, vnAPI, vndbAPI } from '../api.js';
 import { t } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import { debounce, formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
+import { mergeVndbIntoListItem } from '../vn-list-item.js';
 
 import { createDetailModal, createTagsView } from './shared.js';
 
@@ -35,6 +36,10 @@ export function vnShelf() {
     showEdit: false,
     editForm: {},
     _initialized: false,
+
+    // 单条目 VNDB 刷新的 per-id busy map：{ [vnId]: true }。同 id 重入被守卫拦截，不同 id 可并行。
+    // 用普通对象而非 Set，避免依赖集合类型的响应式细节。
+    refreshing: {},
 
     // ===== 渲染窗口化（哨兵自动追加 + 手动「加载更多」）=====
     visibleCount: RENDER_PAGE_SIZE,
@@ -81,7 +86,8 @@ export function vnShelf() {
     },
 
     // 窗口重置点：loadVNList（含增删改后重载）/ handleSearch /
-    // handleStatusFilterChange / handleSortChange 四处显式调用，保持可 grep
+    // handleStatusFilterChange / handleSortChange 四处显式调用，保持可 grep。
+    // applyRefreshedEntry（单条目就地刷新）有意不重置，保留滚动位置与已展开窗口。
     resetRenderWindow() {
       this.visibleCount = RENDER_PAGE_SIZE;
       this.autoLoadsLeft = AUTO_LOAD_BUDGET;
@@ -581,6 +587,42 @@ export function vnShelf() {
         await this.loadVNList();
       } catch (error) {
         this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.deleteFailed')), 'error');
+      }
+    },
+
+    isRefreshing(id) {
+      return Boolean(id && this.refreshing[id]);
+    },
+
+    // 单条目 VNDB 刷新：只传 refreshVNDB，用户字段由后端三态语义（未出现 = 保持）原样保留。
+    // 成功后就地合并（不走 loadVNList，避免重置渲染窗口 / 滚动位置）。
+    // 后端 saveVNEntry 为 INSERT OR REPLACE 整行写入，在途期间同条目的编辑/删除由模板禁用，
+    // 避免刷新落库复活已删行或覆盖并发编辑。
+    async refreshVN(id) {
+      if (!id || this.refreshing[id]) return;
+      this.refreshing[id] = true;
+      try {
+        const res = await vnAPI.update(id, { refreshVNDB: true });
+        this.applyRefreshedEntry(res.data);
+        this.$store.app.addToast(t('toast.refreshOk'));
+      } catch (error) {
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.refreshFailed')), 'error');
+      } finally {
+        delete this.refreshing[id];
+      }
+    },
+
+    // 用完整条目就地替换列表项（仅 VNDB 派生字段）与已打开的详情。
+    // 排序不就地重排（避免卡片跳位）；搜索/状态筛选重放，标题变化导致不再匹配时卡片会消失。
+    applyRefreshedEntry(entry) {
+      if (!entry?.id) return;
+      const idx = this.vnList.findIndex(item => item.id === entry.id);
+      if (idx !== -1) {
+        this.vnList[idx] = mergeVndbIntoListItem(this.vnList[idx], entry);
+        this.filteredList = this.applyFilters(this.vnList); // 不 resetRenderWindow
+      }
+      if (this.selectedVN?.id === entry.id) {
+        this.selectedVN = entry;
       }
     },
 

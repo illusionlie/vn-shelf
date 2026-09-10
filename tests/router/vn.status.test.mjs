@@ -25,6 +25,9 @@ const utilsSourcePath = path.join(repoRoot, 'src', 'utils.js');
  *
  * utils 不打桩——复制真实 src/utils.js，错误信封形态命中真实实现。
  * 导入宽松归一（entryToRow）在 tests/d1/repository.test.mjs 覆盖。
+ *
+ * 09-09-vn-refresh-button：同一 handler（handleUpdateVN）的 `refreshVNDB` 分支也在本套件覆盖
+ * （仅传 refreshVNDB 时用户字段原样保留；fetchVNDB 抛错 → 500 且不落库），见文末 section。
  */
 
 const INVALID_STATUS_MESSAGE = '状态值无效，仅支持 playing/finished/stalled/dropped/wishlist';
@@ -139,6 +142,8 @@ export async function getIndexTaskStatus() {
 
   const vndbStubCode = `
 export async function fetchVNDB(id) {
+  // refreshVNDB 失败分支哨兵：v500 模拟上游不可用
+  if (id === 'v500') throw new Error('upstream down');
   return {
     title: 'Stub VN ' + id,
     titleJa: 'Stub VN ' + id,
@@ -312,6 +317,57 @@ test('PUT /api/vn/:id：非法值 → 400 且原值不变', async () => {
     assert.deepEqual(payload, { success: false, error: INVALID_STATUS_MESSAGE });
     assert.equal(state.saveCalls.length, 0, '校验失败不触发 saveVNEntry');
     assert.equal(state.entries.v17.user.status, 'stalled', '原值保持');
+  } finally {
+    await cleanup();
+  }
+});
+
+// ============ refreshVNDB（09-09-vn-refresh-button）============
+
+test('PUT /api/vn/:id：仅传 refreshVNDB → 重拉 VNDB 覆盖 vndb，用户字段原样保留', async () => {
+  const existing = createExistingEntry('v17', 'finished');
+  existing.user.titleCn = '我的译名';
+  existing.user.personalRating = 9.5;
+  existing.user.review = '很好';
+  existing.user.tags = ['自定义标签'];
+  const userBefore = JSON.parse(JSON.stringify(existing.user));
+
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    entries: { v17: existing }
+  });
+
+  try {
+    const { response, payload } = await sendJSON(routerModule, 'PUT', '/api/vn/v17', { refreshVNDB: true });
+    assert.equal(response.status, 200);
+    assert.equal(payload.success, true);
+    assert.equal(payload.data.id, 'v17');
+    assert.equal(payload.data.vndb.title, 'Stub VN v17', 'vndb 被 fetchVNDB 结果覆盖');
+    assert.equal(payload.data.vndb.rating, 8);
+    assert.deepEqual(payload.data.user, userBefore, '用户字段逐项保持（三态语义：未出现 = 保持）');
+    assert.equal(state.saveCalls.length, 1, '成功路径落库一次');
+    assert.equal(state.entries.v17.vndb.title, 'Stub VN v17');
+    assert.deepEqual(state.entries.v17.user, userBefore);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('PUT /api/vn/:id：refreshVNDB 上游失败 → 500 错误信封，不落库、本地数据不变', async () => {
+  const existing = createExistingEntry('v500', 'playing');
+  const vndbBefore = JSON.parse(JSON.stringify(existing.vndb));
+
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    entries: { v500: existing }
+  });
+
+  try {
+    const { response, payload } = await sendJSON(routerModule, 'PUT', '/api/vn/v500', { refreshVNDB: true });
+    assert.equal(response.status, 500);
+    assert.equal(payload.success, false);
+    assert.ok(typeof payload.error === 'string' && payload.error.startsWith('VNDB API错误'), payload.error);
+    assert.equal(Object.prototype.hasOwnProperty.call(payload, 'code'), false, '错误信封无 code');
+    assert.equal(state.saveCalls.length, 0, '上游失败不触发 saveVNEntry');
+    assert.deepEqual(state.entries.v500.vndb, vndbBefore, '原 vndb 数据保持');
   } finally {
     await cleanup();
   }
