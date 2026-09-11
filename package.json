@@ -1,6 +1,6 @@
 {
   "name": "vn-shelf",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "description": "视觉小说书架 - 部署于Cloudflare Worker",
   "main": "src/index.js",
