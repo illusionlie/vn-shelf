@@ -822,3 +822,38 @@ deploy.yml 新增 Ensure Cloudflare resources 步骤：d1 list --json 按名解�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: vn-refresh-button: admin single-entry VNDB refresh (card icon + detail footer, in-place update)
+
+**Date**: 2026-09-11
+**Task**: vn-refresh-button: admin single-entry VNDB refresh (card icon + detail footer, in-place update)
+**Branch**: `master`
+
+### Summary
+
+Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the home shelf. Reused PUT /api/vn/{id} refreshVNDB (no backend code change; +2 router regression tests). Frontend: card cover icon button (hover/focus-within reveal, always-on for hover:none, z-index 10 above NSFW overlay, .stop on click + enter/space) and detail-footer text button; in-place update via new pure module public/js/vn-list-item.js mergeVndbIntoListItem mirroring rowToListItem (8 unit tests), no render-window reset; per-id busy map; Edit/Delete disabled while the same entry refreshes because saveVNEntry is INSERT OR REPLACE. Playwright finding: native disabled on the focused trigger drops focus to body (escapes modal trap) -> switched to aria-disabled + JS guard. Added shared .btn:disabled/.btn[aria-disabled] and .modal-footer-start. 5 i18n keys (zh-CN/en). lint 0, tests 197/197. Spec updates: component-guidelines in-place-update Scenario, quality-guidelines busy-button focus + nested-control .stop + cover z-index ladder. Sub-agents (research/implement/check) all failed with provider 503 -> done inline. Known cosmetic defect: commit ca49323 subject has U+FFFD for the word 刷 (user chose to keep).
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ca49323` | (see git log) |
+| `267e17f` | (see git log) |
+| `20e02e4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

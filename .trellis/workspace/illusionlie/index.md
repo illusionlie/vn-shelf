@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
-- **Last Active**: 2026-09-07
+- **Total Sessions**: 20
+- **Last Active**: 2026-09-11
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~824 | Active |
+| `journal-1.md` | ~859 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-09-11 | vn-refresh-button: admin single-entry VNDB refresh (card icon + detail footer, in-place update) | `ca49323`, `267e17f`, `20e02e4` | `master` |
 | 19 | 2026-09-07 | 部署 Action 自动预检/创建 D1 与 Queue 资源 | `732826b`, `fa6e4d0`, `206bf70` | `master` |
 | 18 | 2026-08-28 | 首页列表渲染窗口化与全站 Footer | `064a8ac` | `master` |
 | 17 | 2026-07-27 | 添加条目 VNDB 模糊搜索（07-26 任务全程） | `04335b3`, `8ac43b6`, `2864211` | `master` |
