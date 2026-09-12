@@ -6,6 +6,7 @@ import {
   INDEX_TASK_ACTIVE_STATUSES,
   INDEX_TASK_TERMINAL_STATUSES
 } from './index-task.js';
+import { evaluateLoginAttempt } from './login-ratelimit.js';
 import {
   getVNEntry,
   saveVNEntry,
@@ -24,6 +25,7 @@ const INDEX_RECONCILE_MAX_ATTEMPTS = 6;
 const INDEX_RECONCILE_RETRY_INTERVAL_MS = INDEX_RECONCILE_INTERVAL_MS;
 const INDEX_START_LOCK_STORAGE_KEY = 'index:start-lock';
 const INDEX_START_LOCK_DEFAULT_TTL_MS = 30 * 1000;
+const LOGIN_RATE_LIMIT_STORAGE_KEY = 'login:rate-state';
 
 /**
  * 索引启动分布式锁 Durable Object（全局单例）
@@ -122,6 +124,93 @@ export class IndexStartLockDurableObject {
     const existing = await this.state.storage.get(INDEX_START_LOCK_STORAGE_KEY);
     return this.jsonResponse({
       lock: existing || null
+    });
+  }
+
+  jsonResponse(data, status = 200) {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+}
+
+/**
+ * 登录限流 Durable Object（每 IP 一个实例，存储失败计数与锁定状态）
+ *
+ * 判定逻辑全部委托 evaluateLoginAttempt 纯函数（src/login-ratelimit.js），
+ * 本类只做存储与协议分发；窗口/锁定到期靠请求时惰性判定，无需 alarm 清理。
+ * 与 IndexStartLockDurableObject 的 fail-closed 语义有意相反：本 DO 守护
+ * 可用性，绑定缺失时调用方 fail-open 放行（见 router.js 登录限流包装）。
+ */
+export class LoginRateLimiterDurableObject {
+  constructor(state) {
+    this.state = state;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/precheck') {
+      return this.handlePrecheck();
+    }
+
+    if (url.pathname === '/record') {
+      if (request.method !== 'POST') {
+        return this.jsonResponse({ success: false, error: 'Method Not Allowed' }, 405);
+      }
+
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+
+      return this.handleRecord(body?.success === true);
+    }
+
+    return this.jsonResponse({ success: false, error: 'Not Found' }, 404);
+  }
+
+  /**
+   * 登录前置检查：只读状态判定锁定，不落库（在 PBKDF2 之前调用，防穷举同时防 CPU 消耗）
+   */
+  async handlePrecheck() {
+    const stored = await this.state.storage.get(LOGIN_RATE_LIMIT_STORAGE_KEY);
+    // success:true 语义为「即使密码正确是否放行」，与锁定期间拒绝正确密码的口径一致；
+    // 结果不回写，计数推进仅发生在 /record
+    const { allowed, retryAfterSec } = evaluateLoginAttempt(stored, {
+      now: Date.now(),
+      success: true
+    });
+
+    return this.jsonResponse({
+      allowed,
+      retryAfterSec: retryAfterSec ?? null
+    });
+  }
+
+  /**
+   * 登录结果回写：按结果推进状态机并持久化（成功清零，失败累计/触发锁定）
+   */
+  async handleRecord(success) {
+    const stored = await this.state.storage.get(LOGIN_RATE_LIMIT_STORAGE_KEY);
+    const next = evaluateLoginAttempt(stored, { now: Date.now(), success });
+
+    await this.state.storage.put(LOGIN_RATE_LIMIT_STORAGE_KEY, {
+      failures: next.failures,
+      windowStart: next.windowStart,
+      lockUntil: next.lockUntil
+    });
+
+    return this.jsonResponse({
+      allowed: next.allowed,
+      retryAfterSec: next.retryAfterSec ?? null,
+      failures: next.failures,
+      lockUntil: next.lockUntil
     });
   }
 
@@ -385,48 +474,57 @@ export default {
       }
     }
 
-    // 基于条目结果汇总任务状态，增加节流避免每个批次都触发全量扫描
-    for (const [taskId, taskMeta] of touchedTasks.entries()) {
-      const before = await getIndexStatus(env);
-      if (before.taskId !== taskId || !INDEX_TASK_ACTIVE_STATUSES.has(before.status)) {
-        continue;
+    // 基于条目结果汇总任务状态，增加节流避免每个批次都触发全量扫描。
+    // 编排循环兜底：走到此处消息多已 ack，异常向 queue() 调用方抛出只会让 runtime
+    // 记一次未处理异常并可能触发消息重投（重投会被幂等结果表挡住但徒增噪音），
+    // 故仅告警不 rethrow（对比：消息级处理与延迟 reconcile 各自有更细粒度的 catch）
+    try {
+      for (const [taskId, taskMeta] of touchedTasks.entries()) {
+        const before = await getIndexStatus(env);
+        if (before.taskId !== taskId || !INDEX_TASK_ACTIVE_STATUSES.has(before.status)) {
+          continue;
+        }
+
+        const hasSettledInBatch = taskMeta.settledCount > 0;
+        const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : Number.NaN;
+        const remaining = Math.max(0, (before.total || 0) - (before.processed || 0));
+        const shouldReconcileNearCompletion = hasSettledInBatch && remaining <= taskMeta.settledCount;
+
+        // 高频批次下仅在临近完成时即时汇总，其余路径统一延迟汇总降载
+        if (!shouldReconcileNearCompletion) {
+          const delayedByMs = getDelayedReconcileDelayMs(lastReconciledAtMs);
+          scheduleDelayedReconcile(taskId, taskMeta, delayedByMs, 'throttled-window');
+          continue;
+        }
+
+        const next = await reconcileIndexStatusFromItems(env, taskId);
+
+        console.log('[index][queue-reconcile]', {
+          taskId,
+          status: next.status,
+          processed: next.processed,
+          total: next.total,
+          failedCount: next.failed?.length || 0,
+          settledInBatch: taskMeta.settledCount
+        });
+
+        if (
+          before.taskId === taskId &&
+          INDEX_TASK_ACTIVE_STATUSES.has(before.status) &&
+          INDEX_TASK_TERMINAL_STATUSES.has(next.status)
+        ) {
+          continue;
+        }
+
+        // 即时汇总后仍是 running，则兜底注册一次延迟汇总，保证最终可收敛
+        if (hasSettledInBatch && INDEX_TASK_ACTIVE_STATUSES.has(next.status)) {
+          scheduleDelayedReconcile(taskId, taskMeta, INDEX_RECONCILE_INTERVAL_MS, 'post-immediate-running');
+        }
       }
-
-      const hasSettledInBatch = taskMeta.settledCount > 0;
-      const lastReconciledAtMs = before.lastReconciledAt ? Date.parse(before.lastReconciledAt) : Number.NaN;
-      const remaining = Math.max(0, (before.total || 0) - (before.processed || 0));
-      const shouldReconcileNearCompletion = hasSettledInBatch && remaining <= taskMeta.settledCount;
-
-      // 高频批次下仅在临近完成时即时汇总，其余路径统一延迟汇总降载
-      if (!shouldReconcileNearCompletion) {
-        const delayedByMs = getDelayedReconcileDelayMs(lastReconciledAtMs);
-        scheduleDelayedReconcile(taskId, taskMeta, delayedByMs, 'throttled-window');
-        continue;
-      }
-
-      const next = await reconcileIndexStatusFromItems(env, taskId);
-
-      console.log('[index][queue-reconcile]', {
-        taskId,
-        status: next.status,
-        processed: next.processed,
-        total: next.total,
-        failedCount: next.failed?.length || 0,
-        settledInBatch: taskMeta.settledCount
+    } catch (error) {
+      console.warn('[queue] tail reconcile failed', {
+        error: error?.message || String(error)
       });
-
-      if (
-        before.taskId === taskId &&
-        INDEX_TASK_ACTIVE_STATUSES.has(before.status) &&
-        INDEX_TASK_TERMINAL_STATUSES.has(next.status)
-      ) {
-        continue;
-      }
-
-      // 即时汇总后仍是 running，则兜底注册一次延迟汇总，保证最终可收敛
-      if (hasSettledInBatch && INDEX_TASK_ACTIVE_STATUSES.has(next.status)) {
-        scheduleDelayedReconcile(taskId, taskMeta, INDEX_RECONCILE_INTERVAL_MS, 'post-immediate-running');
-      }
     }
   }
 };

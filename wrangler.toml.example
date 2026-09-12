@@ -27,9 +27,19 @@ max_batch_timeout = 1
 name = "INDEX_START_LOCK" # 不要修改此项
 class_name = "IndexStartLockDurableObject"
 
+# Durable Object 绑定（登录限流，每 IP 一实例）
+[[durable_objects.bindings]]
+name = "LOGIN_RATE_LOCK" # 不要修改此项
+class_name = "LoginRateLimiterDurableObject"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["IndexStartLockDurableObject"]
+
+# 新增 DO 类必须追加新 tag（Workers 迁移 tag 不可变，v1 已被索引锁占用）
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["LoginRateLimiterDurableObject"]
 
 # Worker Assets 配置（静态资源）
 [assets]

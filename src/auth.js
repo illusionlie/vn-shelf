@@ -50,18 +50,26 @@ export async function verifyJWT(token, secret) {
 
     const [encodedHeader, encodedPayload, signature] = parts;
 
-    // 验证签名
+    // 验证签名（固定 HMAC-SHA256，不随 header.alg 切换算法）
     const expectedSignature = await sign(`${encodedHeader}.${encodedPayload}`, secret);
     if (!constantTimeEqual(signature, expectedSignature)) {
+      return null;
+    }
+
+    // 解码并校验头部：alg 必须显式为 HS256（验签已固定 HMAC 使伪造 alg 本不可通过，
+    // 此条为纵深防御，拒绝 alg:none / HS384 等声明与实际算法不符的 token）
+    const header = JSON.parse(base64UrlDecode(encodedHeader));
+    if (header?.alg !== 'HS256') {
       return null;
     }
 
     // 解码载荷
     const payload = JSON.parse(base64UrlDecode(encodedPayload));
 
-    // 验证过期时间
+    // 过期时间收紧：exp 必须存在且为有限数值（无 exp 的 token 永不过期，直接拒绝）；
+    // 边界为 exp <= now 即拒绝（恰好到期即失效）
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
+    if (!Number.isFinite(payload.exp) || payload.exp <= now) {
       return null;
     }
 

@@ -258,6 +258,82 @@ async function handleAPI(request, env, path, method, ctx) {
 
 // ============ 认证接口 ============
 
+/**
+ * 获取登录限流粒度键：CF-Connecting-IP 在 Cloudflare 边缘恒存在；
+ * 本地 dev（wrangler dev 直连无边缘头）缺失时用固定占位键
+ */
+function getLoginRateLimitIp(request) {
+  return request.headers.get('CF-Connecting-IP') || 'local';
+}
+
+/**
+ * 取登录限流 DO stub；绑定缺失时 warn 并返回 null（fail-open 放行）。
+ * 与 INDEX_START_LOCK 的 fail-closed 语义有意相反：本限流守护的是可用性，
+ * 漏配绑定的代价退化为无限流，而不是登录全挂
+ */
+function getLoginRateLimitStub(env, ip) {
+  if (!env?.LOGIN_RATE_LOCK?.idFromName) {
+    console.warn('[auth][login-ratelimit] LOGIN_RATE_LOCK binding missing, fail-open');
+    return null;
+  }
+  return env.LOGIN_RATE_LOCK.get(env.LOGIN_RATE_LOCK.idFromName(ip));
+}
+
+/**
+ * 登录前置检查：锁定则返回 { allowed:false, retryAfterSec }，限流不可用时返回 null
+ * @returns {Promise<{allowed: boolean, retryAfterSec: number|null}|null>}
+ */
+async function precheckLoginRateLimit(env, ip) {
+  const stub = getLoginRateLimitStub(env, ip);
+  if (!stub) {
+    return null;
+  }
+
+  try {
+    const response = await stub.fetch('https://login-rate-lock/precheck');
+    if (!response.ok) {
+      console.warn('[auth][login-ratelimit] precheck non-ok', { status: response.status });
+      return null;
+    }
+    const payload = await response.json();
+    return {
+      allowed: payload.allowed !== false,
+      retryAfterSec: Number.isFinite(payload.retryAfterSec) ? payload.retryAfterSec : null
+    };
+  } catch (error) {
+    console.warn('[auth][login-ratelimit] precheck failed, fail-open', {
+      error: error?.message || String(error)
+    });
+    return null;
+  }
+}
+
+/**
+ * 回写登录结果（成功清零计数，失败累计）。同步 await 保证第 5 次失败后的
+ * 下一次请求立即被锁；写失败仅告警，不影响登录主流程
+ */
+async function recordLoginResult(env, ip, success) {
+  const stub = getLoginRateLimitStub(env, ip);
+  if (!stub) {
+    return;
+  }
+
+  try {
+    const response = await stub.fetch('https://login-rate-lock/record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success })
+    });
+    if (!response.ok) {
+      console.warn('[auth][login-ratelimit] record non-ok', { status: response.status });
+    }
+  } catch (error) {
+    console.warn('[auth][login-ratelimit] record failed', {
+      error: error?.message || String(error)
+    });
+  }
+}
+
 async function handleAuthStatus(request, env) {
   const initialized = await isInitialized(env);
   const auth = await authMiddleware(request, env);
@@ -310,10 +386,24 @@ async function handleLogin(request, env) {
     return errorResponse('请输入密码', 400);
   }
 
+  // 锁定判定先于 PBKDF2（防穷举同时防 CPU 消耗），限流不可用时 fail-open 放行
+  const rateLimitIp = getLoginRateLimitIp(request);
+  const precheck = await precheckLoginRateLimit(env, rateLimitIp);
+  if (precheck && !precheck.allowed) {
+    // 文案不泄露密码对错：锁定期间正确密码同样收到本响应
+    const response = errorResponse('登录尝试次数过多，请稍后再试', 429);
+    response.headers.set('Retry-After', String(precheck.retryAfterSec ?? 600));
+    return response;
+  }
+
   // 单次加载 settings：密码校验与 JWT 签发复用同一对象，避免重复查询
   const settings = await getSettings(env);
 
   const valid = await verifyAdminPassword(settings, password);
+
+  // 同步回写结果：保证第 5 次失败落库后，下一次请求的 precheck 立即被锁
+  await recordLoginResult(env, rateLimitIp, valid);
+
   if (!valid) {
     return errorResponse('密码错误', 401);
   }

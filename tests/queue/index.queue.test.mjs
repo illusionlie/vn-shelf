@@ -11,6 +11,7 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const sourcePath = path.join(repoRoot, 'src', 'index.js');
 const indexTaskSourcePath = path.join(repoRoot, 'src', 'index-task.js');
 const utilsSourcePath = path.join(repoRoot, 'src', 'utils.js');
+const loginRatelimitSourcePath = path.join(repoRoot, 'src', 'login-ratelimit.js');
 
 function createQueueMessage(body) {
   return {
@@ -30,6 +31,7 @@ async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImp
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const indexTaskSourceCode = await fs.readFile(indexTaskSourcePath, 'utf8');
   const utilsSourceCode = await fs.readFile(utilsSourcePath, 'utf8');
+  const loginRatelimitSourceCode = await fs.readFile(loginRatelimitSourcePath, 'utf8');
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vn-shelf-queue-test-'));
   const testId = `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -48,6 +50,7 @@ async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImp
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
   const indexTaskModulePath = path.join(tempDir, 'index-task.mjs');
   const utilsRealPath = path.join(tempDir, 'utils.real.mjs');
+  const loginRatelimitRealPath = path.join(tempDir, 'login-ratelimit.real.mjs');
   const workerPath = path.join(tempDir, 'index.worker.mjs');
 
   const repositoryStubCode = `
@@ -104,8 +107,10 @@ export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
     .replace(/from '\.\/router\.js';/, "from './router.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.mjs';")
-    // utils 直接复用真实实现（纯函数无依赖）：index.js 顶层 500 复用 errorResponse 后新增此依赖
-    .replace(/from '\.\/utils\.js';/, "from './utils.real.mjs';");
+    // utils / login-ratelimit 直接复用真实实现（纯函数无依赖）：
+    // 前者为 index.js 顶层 500 复用 errorResponse，后者为 LoginRateLimiterDurableObject 判定核心
+    .replace(/from '\.\/utils\.js';/, "from './utils.real.mjs';")
+    .replace(/from '\.\/login-ratelimit\.js';/, "from './login-ratelimit.real.mjs';");
 
   // 复用真实 index-task.js（状态集合常量单一来源），仅将其 repository 依赖指向测试桩
   const patchedIndexTaskSource = indexTaskSourceCode
@@ -116,6 +121,7 @@ export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(indexTaskModulePath, patchedIndexTaskSource, 'utf8');
   await fs.writeFile(utilsRealPath, utilsSourceCode, 'utf8');
+  await fs.writeFile(loginRatelimitRealPath, loginRatelimitSourceCode, 'utf8');
   await fs.writeFile(workerPath, patchedSource, 'utf8');
 
   const moduleUrl = `${pathToFileURL(workerPath).href}?test=${encodeURIComponent(testId)}`;
@@ -805,6 +811,126 @@ test('queue triggers original message retry when terminal failed result recordin
 
     assert.equal(message.ackCalled, false);
     assert.equal(message.retryCalled, true);
+  } finally {
+    await cleanup();
+  }
+});
+
+// ---- R4 尾部 reconcile 兜底（AC8）：编排抛错不得炸掉整个 queue() 调用 ----
+
+/**
+ * 临时接管 console.log/warn 收集输出，用于断言批处理摘要仍产出
+ */
+async function withCapturedConsole(fn) {
+  const logs = [];
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  console.log = (...args) => logs.push(['log', ...args]);
+  console.warn = (...args) => logs.push(['warn', ...args]);
+  try {
+    return { logs, result: await fn() };
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+  }
+}
+
+test('queue 尾部编排 getIndexStatus 抛错时 queue() 仍正常完成且摘要产出', async () => {
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    repoImpl: {
+      getVNEntry: async id => ({ id, vndb: {}, user: {} }),
+      recordIndexItemResult: async () => {},
+      // 消息处理成功 ack 之后，尾部编排的第一步（读状态）即抛错
+      getIndexStatus: async () => {
+        throw new Error('status read failed');
+      }
+    }
+  });
+
+  try {
+    const message = createQueueMessage({
+      vndbId: 'v17',
+      taskId: 'idx_tail_read_fail',
+      retryCount: 0
+    });
+
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not retry for success path');
+        }
+      }
+    };
+
+    const { logs } = await withCapturedConsole(() => worker.queue({ messages: [message] }, env, {}));
+
+    assert.equal(message.ackCalled, true, '消息 ack 语义不受尾部编排异常影响');
+    assert.ok(
+      logs.some(([level, prefix]) => level === 'log' && String(prefix).includes('[index][queue-item] success recorded')),
+      '批处理摘要（单条成功记录日志）仍应产出'
+    );
+    assert.ok(
+      logs.some(([level, prefix]) => level === 'warn' && String(prefix).includes('[queue] tail reconcile failed')),
+      '编排异常应以 warn 记录而非向 queue() 调用方抛出'
+    );
+  } finally {
+    await cleanup();
+  }
+});
+
+test('queue 尾部即时 reconcile 抛错时 queue() 仍正常完成', async () => {
+  const nowIso = new Date().toISOString();
+
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    repoImpl: {
+      getVNEntry: async id => ({ id, vndb: {}, user: {} }),
+      recordIndexItemResult: async () => {},
+      getIndexStatus: async () => ({
+        status: 'running',
+        taskId: 'idx_tail_reconcile_fail',
+        total: 2,
+        processed: 1,
+        failed: [],
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: null,
+        error: null,
+        lastReconciledAt: nowIso
+      }),
+      // 临近完成触发即时汇总路径，reconcile 本身抛错
+      reconcileIndexStatusFromItems: async () => {
+        throw new Error('reconcile query failed');
+      }
+    }
+  });
+
+  try {
+    const message = createQueueMessage({
+      vndbId: 'v18',
+      taskId: 'idx_tail_reconcile_fail',
+      retryCount: 0
+    });
+
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not retry for success path');
+        }
+      }
+    };
+
+    const { logs } = await withCapturedConsole(() => worker.queue({ messages: [message] }, env, {}));
+
+    assert.equal(message.ackCalled, true);
+    assert.ok(
+      logs.some(([level, prefix]) => level === 'log' && String(prefix).includes('[index][queue-item] success recorded')),
+      '批处理摘要仍产出'
+    );
+    assert.ok(
+      logs.some(([level, prefix]) => level === 'warn' && String(prefix).includes('[queue] tail reconcile failed')),
+      'reconcile 异常应以 warn 记录'
+    );
   } finally {
     await cleanup();
   }
