@@ -4,9 +4,9 @@
   "type": "module",
   "description": "视觉小说书架 - 部署于Cloudflare Worker",
   "main": "src/index.js",
-  "alpineVersion": "3.14.9",
-  "markedVersion": "18.0.5",
-  "purifyVersion": "3.4.11",
+  "alpineVersion": "3.17.2",
+  "markedVersion": "18.0.12",
+  "purifyVersion": "3.4.15",
   "scripts": {
     "dev": "wrangler dev",
     "fetch:vendor": "node public/js/vendor/fetch-vendor.cjs",
