@@ -19,7 +19,8 @@ async function loadModule({ repoImpl = {}, createClientImpl } = {}) {
   const testId = `ulist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   globalThis.__ulistImportTestRegistry = globalThis.__ulistImportTestRegistry || new Map();
-  globalThis.__ulistImportTestRegistry.set(testId, { repoImpl, createClientImpl });
+  const state = { repoImpl, createClientImpl, httpCacheCalls: 0 };
+  globalThis.__ulistImportTestRegistry.set(testId, state);
 
   const repoStub = `
 const state = globalThis.__ulistImportTestRegistry.get('${testId}');
@@ -32,6 +33,14 @@ export const saveIndexStatus = pick('saveIndexStatus', async () => {});
 export const saveVNEntry = pick('saveVNEntry', async () => {});
 export const listIndexableVNIds = pick('listIndexableVNIds', async () => []);
 export async function getSettings() { return { vndbApiToken: 'tk' }; }
+`;
+
+  // http-cache 桩：记录 bump 调用次数（导入落库写 → 缓存版本失效断言用）
+  const httpCacheStub = `
+const state = globalThis.__ulistImportTestRegistry.get('${testId}');
+export async function bumpCacheVersion() {
+  state.httpCacheCalls += 1;
+}
 `;
 
   // vndb stub：复用真实 mapUListItemToEntry，但 createVNDBClient 走注入
@@ -47,19 +56,23 @@ ${vndbSourceCode.replace(/import \{ getSettings \} from '\.\/repository\.js';/, 
 
   const repoStubPath = path.join(tempDir, 'repository.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
+  const httpCacheStubPath = path.join(tempDir, 'http-cache.stub.mjs');
   const modulePath = path.join(tempDir, 'ulist-import.mjs');
 
   const patched = sourceCode
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
-    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
+    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
+    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';");
 
   await fs.writeFile(repoStubPath, repoStub, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStub, 'utf8');
+  await fs.writeFile(httpCacheStubPath, httpCacheStub, 'utf8');
   await fs.writeFile(modulePath, patched, 'utf8');
 
   const mod = await import(`${pathToFileURL(modulePath).href}?t=${testId}`);
   return {
     mod,
+    state,
     async cleanup() {
       globalThis.__ulistImportTestRegistry.delete(testId);
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -97,7 +110,7 @@ function ulistItem(id, labelIds = [2], extra = {}) {
 test('startUListImport：分页拉取 + 跳过已存在 + skipped 计数', async () => {
   const saved = [];
   const savedStatuses = [];
-  const { mod, cleanup } = await loadModule({
+  const { mod, state, cleanup } = await loadModule({
     repoImpl: {
       getIndexStatus: async () => ({ status: 'idle', type: 'index', startedAt: '2026-01-01T00:00:00Z' }),
       saveIndexStatus: async (_e, s) => { savedStatuses.push(JSON.parse(JSON.stringify(s))); },
@@ -125,6 +138,31 @@ test('startUListImport：分页拉取 + 跳过已存在 + skipped 计数', async
     assert.equal(terminal.skipped, 2); // v1 已存在 + v3 wishlist
     assert.equal(terminal.processed, 4);
     assert.deepEqual(terminal.failed, []);
+
+    // imported=2 > 0 → 终态前 bump 一次缓存版本（公开访客缓存键失效）
+    assert.equal(state.httpCacheCalls, 1);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('runUListImport：纯 skipped（imported=0）不 bump 缓存版本', async () => {
+  const { mod, state, cleanup } = await loadModule({
+    repoImpl: {
+      getIndexStatus: async () => ({ status: 'idle', type: 'index', startedAt: '2026-01-01T00:00:00Z' }),
+      saveIndexStatus: async () => {},
+      saveVNEntry: async () => {},
+      listIndexableVNIds: async () => ['v1'] // 全部命中已存在 / wishlist
+    },
+    createClientImpl: () => makeClient([
+      { results: [ulistItem('v1'), ulistItem('v2', [5])], more: false }
+    ])
+  });
+
+  try {
+    const result = await mod.startUListImport({}, null);
+    assert.equal(result.ok, true);
+    assert.equal(state.httpCacheCalls, 0, 'imported=0：数据未变不 bump');
   } finally {
     await cleanup();
   }

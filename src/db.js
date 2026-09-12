@@ -46,7 +46,10 @@ export const MIGRATIONS = [
   { version: 2, statements: [
     "ALTER TABLE index_tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'index'",
     'ALTER TABLE index_tasks ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0'
-  ] }
+  ] },
+  // v3（09-12-public-cache-and-index）：书架默认排序（getVNList ORDER BY created_at DESC）
+  // 的支撑索引，消除全表扫描 + 文件排序。status 不建索引是有意决策（列表全量加载后前端筛选）。
+  { version: 3, statements: ['CREATE INDEX IF NOT EXISTS idx_vn_entries_created ON vn_entries(created_at DESC)'] }
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

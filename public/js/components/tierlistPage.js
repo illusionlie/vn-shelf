@@ -65,7 +65,10 @@ export function tierlistPage() {
 
     async loadTiers({ silent = false } = {}) {
       try {
-        const res = await tierAPI.getList();
+        // 管理员传 no-store 绕过浏览器 HTTP 缓存（写后回读实时性）
+        const res = await tierAPI.getList(
+          this.$store.app.isAdmin ? { cache: 'no-store' } : {}
+        );
         this.tiers = Array.isArray(res.data)
           ? [...res.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           : [];
@@ -84,7 +87,11 @@ export function tierlistPage() {
 
     async loadVNList({ silent = false } = {}) {
       try {
-        const res = await vnAPI.getList();
+        // 管理员传 no-store 绕过浏览器 HTTP 缓存（写后回读实时性）
+        const res = await vnAPI.getList(
+          {},
+          this.$store.app.isAdmin ? { cache: 'no-store' } : {}
+        );
         this.allVN = Array.isArray(res.data) ? res.data : [];
         this.normalizeTierSortForAllVN();
         this.rebuildTierGroups();

@@ -140,7 +140,12 @@ export function vnShelf() {
     async loadVNList() {
       this.isLoading = true;
       try {
-        const res = await vnAPI.getList({ sort: this.sortBy });
+        // 管理员传 no-store 绕过浏览器 HTTP 缓存（访客态副本写后可能陈旧 60s），
+        // 访客路径不动：继续吃浏览器 + 边缘两层缓存
+        const res = await vnAPI.getList(
+          { sort: this.sortBy },
+          this.$store.app.isAdmin ? { cache: 'no-store' } : {}
+        );
         this.vnList = res.data || [];
         this.filteredList = this.applyFilters(this.vnList);
         this.resetRenderWindow();

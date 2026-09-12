@@ -11,6 +11,7 @@
  * INDEX_START_LOCK Durable Object（由 router 层持锁调用，与索引任务互斥）。
  */
 
+import { bumpCacheVersion } from './http-cache.js';
 import {
   getIndexStatus,
   saveIndexStatus,
@@ -197,6 +198,20 @@ export async function runUListImport(env, client, userId, taskId, startedAt = no
       completedAt: nowIso(),
       error: error?.message || '导入中断，请重试（已导入条目会自动跳过）'
     }));
+  }
+
+  // 本任务发生真实落库写 → 自增数据版本（公开访客缓存键失效）。
+  // runUListImport 整体已运行在 ctx.waitUntil 管线内，同步 bump 即可；
+  // 失败仅告警：60s TTL 兜底，纯 skipped 任务（imported=0）数据未变不 bump
+  if (imported > 0) {
+    try {
+      await bumpCacheVersion(env);
+    } catch (error) {
+      console.warn('[ulist][import] bump cache version failed', {
+        taskId,
+        error: error?.message || String(error)
+      });
+    }
   }
 
   return { total, imported, skipped, failed };

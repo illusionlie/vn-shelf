@@ -124,7 +124,7 @@ const DEMO_MIGRATIONS = [
 
 // ============ Tests ============
 
-test('真实 MIGRATIONS：v1 加 status 列、v2 加 index_tasks type/skipped 列，LATEST_SCHEMA_VERSION 为 2', async () => {
+test('真实 MIGRATIONS：v1 加 status 列、v2 加 index_tasks type/skipped 列、v3 建 created_at 索引，LATEST_SCHEMA_VERSION 为 3', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
@@ -133,15 +133,16 @@ test('真实 MIGRATIONS：v1 加 status 列、v2 加 index_tasks type/skipped �
       { version: 2, statements: [
         "ALTER TABLE index_tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'index'",
         'ALTER TABLE index_tasks ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0'
-      ] }
+      ] },
+      { version: 3, statements: ['CREATE INDEX IF NOT EXISTS idx_vn_entries_created ON vn_entries(created_at DESC)'] }
     ]);
-    assert.equal(db.LATEST_SCHEMA_VERSION, 2);
+    assert.equal(db.LATEST_SCHEMA_VERSION, 3);
   } finally {
     await cleanup();
   }
 });
 
-test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 2', async () => {
+test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 3', async () => {
   const { db, cleanup } = await loadDbModule();
 
   try {
@@ -162,8 +163,12 @@ test('全新库：initDB 建全部基线表并回放真实迁移，版本号落 
       "alter table index_tasks add column type text not null default 'index'",
       'alter table index_tasks add column skipped integer not null default 0'
     ], '全新库同样走全量迁移回放（基线冻结语义）');
-    assert.equal(await db.readSchemaVersion(fake), 2, '版本号推进到最新');
-    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号以字符串落库');
+    assert.ok(
+      fake.executedSql.includes('create index if not exists idx_vn_entries_created on vn_entries(created_at desc)'),
+      '全新库回放 v3 建 created_at 索引'
+    );
+    assert.equal(await db.readSchemaVersion(fake), 3, '版本号推进到最新');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '3', '版本号以字符串落库');
   } finally {
     await cleanup();
   }
@@ -184,7 +189,32 @@ test('真实迁移 v2：存量 v1 库（已有 status 列）initDB 后加 index_
       "alter table index_tasks add column type text not null default 'index'",
       'alter table index_tasks add column skipped integer not null default 0'
     ], '仅应用 v2 迁移，不重复 v1');
-    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号推进到 2');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '3', '版本号推进到 3');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('真实迁移 v3：存量 v2 库 initDB 后建 idx_vn_entries_created 索引且不重复 ALTER', async () => {
+  const { db, cleanup } = await loadDbModule();
+
+  try {
+    const fake = new FakeMigrationD1();
+    // 模拟已应用 v2 的存量库（status 列与 index_tasks 泛化均已就位）
+    fake.settings.set('schema_version', '2');
+
+    await db.initDB(fake);
+
+    assert.deepEqual(
+      fake.executedSql.filter(sql => sql.startsWith('alter table')),
+      [],
+      'v3 不含 ALTER，存量 v2 库不重复任何列变更'
+    );
+    assert.ok(
+      fake.executedSql.includes('create index if not exists idx_vn_entries_created on vn_entries(created_at desc)'),
+      'v3 建 created_at DESC 索引'
+    );
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '3', '版本号推进到 3');
   } finally {
     await cleanup();
   }
@@ -206,7 +236,7 @@ test('真实迁移 v1：存量 v0 库（含业务数据、无 schema_version 键
       "alter table index_tasks add column type text not null default 'index'",
       'alter table index_tasks add column skipped integer not null default 0'
     ], '存量 v0 库补齐 status 列及 index_tasks type/skipped 列');
-    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '2', '版本号推进到 2');
+    assert.equal(fake.settings.get(db.SCHEMA_VERSION_KEY), '3', '版本号推进到 3');
     assert.equal(fake.settings.get('config:settings'), '{"tagsMode":"vndb"}', '业务设置键不受迁移影响');
 
     // 幂等：已最新的库重入不再执行迁移语句
@@ -458,16 +488,16 @@ test('重入：同一 DB 重复 initDB 不重复执行，resetDBInitFlag 后重�
     assert.equal(fake.batchLog.length, batchCountAfterFirst, '同 isolate 重入不重复 batch');
     assert.equal(fake.executedSql.length, sqlCountAfterFirst, '同 isolate 重入不执行任何 SQL');
 
-    // 模拟迁移已全部应用后的新 isolate 冷启动
+    // 模拟迁移已全部应用后的新 isolate 冷启动（真实库版本 3 ≥ DEMO 版本 2 → 零执行）
     const finalVersion = await db.applyPendingMigrations(fake, DEMO_MIGRATIONS, await db.readSchemaVersion(fake));
-    assert.equal(finalVersion, 2);
+    assert.equal(finalVersion, 3);
     const altersAfterApply = fake.executedSql.filter(sql => sql.startsWith('alter table')).length;
 
     db.resetDBInitFlag();
     await db.initDB(fake);
     const rerunVersion = await db.applyPendingMigrations(fake, DEMO_MIGRATIONS, await db.readSchemaVersion(fake));
 
-    assert.equal(rerunVersion, 2);
+    assert.equal(rerunVersion, 3);
     assert.equal(
       fake.executedSql.filter(sql => sql.startsWith('alter table')).length,
       altersAfterApply,

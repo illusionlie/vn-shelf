@@ -27,7 +27,7 @@ function createQueueMessage(body) {
   };
 }
 
-async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImpl } = {}) {
+async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImpl, httpCacheImpl } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const indexTaskSourceCode = await fs.readFile(indexTaskSourcePath, 'utf8');
   const utilsSourceCode = await fs.readFile(utilsSourcePath, 'utf8');
@@ -42,12 +42,14 @@ async function loadWorkerModule({ repoImpl = {}, fetchVNDBImpl, handleRequestImp
   globalThis.__queueTestRegistry.set(testId, {
     repoImpl,
     fetchVNDBImpl,
-    handleRequestImpl
+    handleRequestImpl,
+    httpCacheImpl
   });
 
   const repositoryStubPath = path.join(tempDir, 'repository.stub.mjs');
   const routerStubPath = path.join(tempDir, 'router.stub.mjs');
   const vndbStubPath = path.join(tempDir, 'vndb.stub.mjs');
+  const httpCacheStubPath = path.join(tempDir, 'http-cache.stub.mjs');
   const indexTaskModulePath = path.join(tempDir, 'index-task.mjs');
   const utilsRealPath = path.join(tempDir, 'utils.real.mjs');
   const loginRatelimitRealPath = path.join(tempDir, 'login-ratelimit.real.mjs');
@@ -102,10 +104,18 @@ const fetchVNDBImpl = state.fetchVNDBImpl || (async () => ({ title: 'stub' }));
 export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
 `;
 
+  const httpCacheStubCode = `
+const state = globalThis.__queueTestRegistry?.get('${testId}') || {};
+const impl = state.httpCacheImpl || {};
+
+export const bumpCacheVersion = (...args) => (impl.bumpCacheVersion || (async () => {}))(...args);
+`;
+
   const patchedSource = sourceCode
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
     .replace(/from '\.\/router\.js';/, "from './router.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
+    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';")
     .replace(/from '\.\/index-task\.js';/, "from './index-task.mjs';")
     // utils / login-ratelimit 直接复用真实实现（纯函数无依赖）：
     // 前者为 index.js 顶层 500 复用 errorResponse，后者为 LoginRateLimiterDurableObject 判定核心
@@ -119,6 +129,7 @@ export const fetchVNDB = (...args) => fetchVNDBImpl(...args);
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
   await fs.writeFile(routerStubPath, routerStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
+  await fs.writeFile(httpCacheStubPath, httpCacheStubCode, 'utf8');
   await fs.writeFile(indexTaskModulePath, patchedIndexTaskSource, 'utf8');
   await fs.writeFile(utilsRealPath, utilsSourceCode, 'utf8');
   await fs.writeFile(loginRatelimitRealPath, loginRatelimitSourceCode, 'utf8');
@@ -931,6 +942,47 @@ test('queue 尾部即时 reconcile 抛错时 queue() 仍正常完成', async () 
       logs.some(([level, prefix]) => level === 'warn' && String(prefix).includes('[queue] tail reconcile failed')),
       'reconcile 异常应以 warn 记录'
     );
+  } finally {
+    await cleanup();
+  }
+});
+
+test('queue 成功落库后同步 bump 缓存版本；无落库写的批次不 bump', async () => {
+  const bumpCalls = [];
+
+  const { worker, cleanup } = await loadWorkerModule({
+    fetchVNDBImpl: async () => ({ title: 'ok' }),
+    repoImpl: {
+      getVNEntry: async id => ({ id, vndb: {}, user: {} }),
+      recordIndexItemResult: async () => {}
+    },
+    httpCacheImpl: {
+      bumpCacheVersion: async () => { bumpCalls.push(Date.now()); }
+    }
+  });
+
+  try {
+    // 无 ctx 的调用形态既有先例（tail reconcile fail 用例）：queue 语义不受 ctx 缺失影响
+    const env = {
+      VN_INDEX_QUEUE: {
+        async send() {
+          throw new Error('should not retry for success path');
+        }
+      }
+    };
+
+    // 批次一：无效消息体被跳过，无任何落库写 → 不 bump
+    const invalid = createQueueMessage({ notVndbId: true });
+    await worker.queue({ messages: [invalid] }, env, {});
+    assert.equal(invalid.ackCalled, true);
+    assert.equal(bumpCalls.length, 0, '无 vn_entries 落库写的批次不 bump');
+
+    // 批次二：消息成功走 saveVNEntry → 消息循环后同步 bump 一次
+    // （getIndexStatus 桩默认 idle → tail reconcile 直接跳过，隔离 bump 断言）
+    const success = createQueueMessage({ vndbId: 'v17', taskId: 'idx_cache_bump', retryCount: 0 });
+    await worker.queue({ messages: [success] }, env, {});
+    assert.equal(success.ackCalled, true);
+    assert.equal(bumpCalls.length, 1, '发生落库写的批次在消息循环后同步 bump 一次');
   } finally {
     await cleanup();
   }

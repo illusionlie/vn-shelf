@@ -116,7 +116,10 @@ export function friendlyErrorMessage(error, prefix = t('prefix.operationFailed')
 /**
  * 发送API请求
  * @param {string} endpoint - 端点
- * @param {Object} options - 请求选项
+ * @param {Object} options - 请求选项（method/body/headers 之外的字段经展开透传
+ *   至 fetch init；其中 cache:'no-store' 供管理员端公开 GET 绕过浏览器 HTTP
+ *   缓存——服务端对带 Cookie 请求回 no-store，但登录前 60s 内以访客态 fetch
+ *   过的浏览器副本仍可能被复用（HTTP 缓存按 URL 键控、不区分 Cookie 变化））
  * @returns {Promise<Object>}
  */
 async function apiRequest(endpoint, options = {}) {
@@ -214,23 +217,25 @@ export const vnAPI = {
   /**
    * 获取VN列表
    * @param {Object} params - 查询参数
+   * @param {Object} [options] - apiRequest 选项（管理员传 { cache: 'no-store' } 防陈旧）
    */
-  async getList(params = {}) {
+  async getList(params = {}, options = {}) {
     const query = new URLSearchParams();
     if (params.sort) query.set('sort', params.sort);
     if (params.search) query.set('search', params.search);
     if (params.untiered) query.set('untiered', 'true');
 
     const queryString = query.toString();
-    return apiRequest(`/vn${queryString ? '?' + queryString : ''}`);
+    return apiRequest(`/vn${queryString ? '?' + queryString : ''}`, options);
   },
 
   /**
    * 获取单个VN详情
    * @param {string} id - VNDB ID
+   * @param {Object} [options] - apiRequest 选项（管理员传 { cache: 'no-store' } 防陈旧）
    */
-  async get(id) {
-    return apiRequest(`/vn/${id}`);
+  async get(id, options = {}) {
+    return apiRequest(`/vn/${id}`, options);
   },
 
   /**
@@ -301,9 +306,10 @@ export const vnAPI = {
 export const tierAPI = {
   /**
    * 获取 Tier 列表
+   * @param {Object} [options] - apiRequest 选项（管理员传 { cache: 'no-store' } 防陈旧）
    */
-  async getList() {
-    return apiRequest('/tier');
+  async getList(options = {}) {
+    return apiRequest('/tier', options);
   },
 
   /**
@@ -356,9 +362,10 @@ export const tierAPI = {
 export const statsAPI = {
   /**
    * 获取统计数据
+   * @param {Object} [options] - apiRequest 选项（管理员传 { cache: 'no-store' } 防陈旧）
    */
-  async get() {
-    return apiRequest('/stats');
+  async get(options = {}) {
+    return apiRequest('/stats', options);
   }
 };
 

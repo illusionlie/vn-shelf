@@ -108,7 +108,11 @@ export function createDetailModal() {
 
     async openDetail(vn) {
       try {
-        const res = await vnAPI.get(vn.id);
+        // 管理员传 no-store 绕过浏览器 HTTP 缓存（登录前访客态副本写后可能陈旧 60s）
+        const res = await vnAPI.get(
+          vn.id,
+          this.$store.app.isAdmin ? { cache: 'no-store' } : {}
+        );
         this.selectedVN = res.data;
         if (!this.showDetail) {
           lockPageScroll();

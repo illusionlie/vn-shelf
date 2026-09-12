@@ -11,6 +11,16 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const sourcePath = path.join(repoRoot, 'src', 'router.js');
 const utilsSourcePath = path.join(repoRoot, 'src', 'utils.js');
 
+// router.js 顶层 import 依赖（公开端点缓存包裹与写路径版本失效）。
+// 本套件不触达缓存行为：servePublicCached 直通 handler、bump 为 no-op，
+// 缓存语义由 tests/router/http-cache.test.mjs 以真实实现覆盖
+const HTTP_CACHE_STUB_CODE = `export async function servePublicCached(request, env, ctx, path, handler) {
+  return handler();
+}
+export async function bumpCacheVersion() {}
+`;
+
+
 async function loadRouterModule({ authenticated = true, vndbApiToken = 'token-1', searchResults = [], searchError = null } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
   const utilsSourceCode = await fs.readFile(utilsSourcePath, 'utf8');
@@ -120,7 +130,8 @@ export class VNDBClient {
     .replace(/from '\.\/index-task\.js';/, "from './index-task.stub.mjs';")
     .replace(/from '\.\/ulist-import\.js';/, "from './ulist-import.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.real.mjs';")
-    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
+    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
+    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
@@ -128,6 +139,7 @@ export class VNDBClient {
   await fs.writeFile(path.join(tempDir, 'ulist-import.stub.mjs'), 'export async function startUListImport() { return { ok: true, taskId: "ulist_stub" }; }\n', 'utf8');
   await fs.writeFile(utilsRealPath, utilsSourceCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
+  await fs.writeFile(path.join(tempDir, 'http-cache.stub.mjs'), HTTP_CACHE_STUB_CODE, 'utf8');
   await fs.writeFile(routerPath, patchedSource, 'utf8');
 
   const moduleUrl = `${pathToFileURL(routerPath).href}?test=${encodeURIComponent(testId)}`;

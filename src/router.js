@@ -11,6 +11,7 @@ import {
   setAdminPassword,
   isInitialized
 } from './auth.js';
+import { bumpCacheVersion, servePublicCached } from './http-cache.js';
 import { getIndexTaskStatus, startIndexTask } from './index-task.js';
 import {
   getVNList,
@@ -55,6 +56,49 @@ const PUBLIC_CORS_PATH_PATTERNS = [
 
 function isPublicCorsPath(path) {
   return PUBLIC_CORS_PATH_PATTERNS.some(pattern => pattern.test(path));
+}
+
+// 访客缓存路径集合 = PUBLIC_CORS_PATH_PATTERNS 去掉 /api/config/appearance：
+// 该端点维持既有 max-age=300 简单缓存，不引入 ETag / 版本键机制
+const PUBLIC_CACHE_PATH_PATTERNS = [
+  /^\/api\/vn$/,
+  /^\/api\/vn\/v\d+$/,
+  /^\/api\/stats$/,
+  /^\/api\/tier$/
+];
+
+function isPublicCachePath(path) {
+  return PUBLIC_CACHE_PATH_PATTERNS.some(pattern => pattern.test(path));
+}
+
+/**
+ * 写路径缓存版本失效：经 ctx.waitUntil 异步 bump cache:version（换钥匙式失效，
+ * 旧版本边缘缓存键自然失联）。bump 失败仅记日志不影响写响应——访客侧最坏 60s
+ * TTL 陈旧上界兜底，管理员路径不吃缓存不受影响（R3）。
+ */
+function scheduleCacheBump(env, ctx) {
+  if (!ctx || typeof ctx.waitUntil !== 'function') {
+    return;
+  }
+
+  ctx.waitUntil(
+    bumpCacheVersion(env).catch(error => {
+      console.warn('[http-cache] bump cache version failed', {
+        error: error?.message || String(error)
+      });
+    })
+  );
+}
+
+/**
+ * 数据写 handler 的统一出口：成功（2xx）才 bump 缓存版本，失败/校验 4xx 不失效
+ */
+async function invalidatePublicCacheAfterWrite(env, ctx, handler) {
+  const response = await handler();
+  if (response.ok) {
+    scheduleCacheBump(env, ctx);
+  }
+  return response;
 }
 
 let startIndexRequestLockTail = Promise.resolve();
@@ -106,9 +150,19 @@ export async function handleRequest(request, env, ctx) {
 
   // API路由
   if (path.startsWith('/api/')) {
-    const response = await handleAPI(request, env, path, method, ctx);
+    // 公开缓存路径的 GET 改走访客缓存包裹器（ETag 协商 + 边缘 Cache API +
+    // 管理员 Cookie 绕过），handler 内部零改动；CORS 附加保持在出口统一处理
+    let response;
+    if (method === 'GET' && isPublicCachePath(path)) {
+      response = await servePublicCached(request, env, ctx, path, () =>
+        handleAPI(request, env, path, method, ctx)
+      );
+    } else {
+      response = await handleAPI(request, env, path, method, ctx);
+    }
 
-    // 仅公开只读端点的 GET 响应附加 CORS 头，认证/写操作端点一律不加
+    // 仅公开只读端点的 GET 响应附加 CORS 头，认证/写操作端点一律不加；
+    // 304 与缓存命中路径同样在此统一附加（servePublicCached 返回可变头副本）
     if (method === 'GET' && isPublicCorsPath(path)) {
       response.headers.set('Access-Control-Allow-Origin', '*');
     }
@@ -171,26 +225,26 @@ async function handleAPI(request, env, path, method, ctx) {
   const auth = await authMiddleware(request, env);
 
   if (path === '/api/vn' && method === 'POST') {
-    return handleCreateVN(request, env, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleCreateVN(request, env, auth));
   }
 
   if (path === '/api/vn/tier/batch' && method === 'PUT') {
-    return handleBatchUpdateVNTier(request, env, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleBatchUpdateVNTier(request, env, auth));
   }
 
   if (path.match(/^\/api\/vn\/v\d+\/tier$/) && method === 'PUT') {
     const id = path.split('/')[3];
-    return handleUpdateVNTier(request, env, id, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleUpdateVNTier(request, env, id, auth));
   }
 
   if (path.match(/^\/api\/vn\/v\d+$/) && method === 'PUT') {
     const id = path.split('/').pop();
-    return handleUpdateVN(request, env, id, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleUpdateVN(request, env, id, auth));
   }
 
   if (path.match(/^\/api\/vn\/v\d+$/) && method === 'DELETE') {
     const id = path.split('/').pop();
-    return handleDeleteVN(request, env, id, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleDeleteVN(request, env, id, auth));
   }
 
   if (path === '/api/index/start' && method === 'POST') {
@@ -218,11 +272,11 @@ async function handleAPI(request, env, path, method, ctx) {
   }
 
   if (path === '/api/tier' && method === 'POST') {
-    return handleCreateTier(request, env, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleCreateTier(request, env, auth));
   }
 
   if (path === '/api/tier/order' && method === 'PUT') {
-    return handleUpdateTierOrder(request, env, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleUpdateTierOrder(request, env, auth));
   }
 
   if (path.match(/^\/api\/tier\/[^/]+$/) && method === 'PUT') {
@@ -232,7 +286,7 @@ async function handleAPI(request, env, path, method, ctx) {
     if (!id) {
       return errorResponse('Tier ID 无效', 400);
     }
-    return handleUpdateTier(request, env, id, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleUpdateTier(request, env, id, auth));
   }
 
   if (path.match(/^\/api\/tier\/[^/]+$/) && method === 'DELETE') {
@@ -242,7 +296,7 @@ async function handleAPI(request, env, path, method, ctx) {
     if (!id) {
       return errorResponse('Tier ID 无效', 400);
     }
-    return handleDeleteTier(request, env, id, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleDeleteTier(request, env, id, auth));
   }
 
   if (path === '/api/export' && method === 'GET') {
@@ -250,7 +304,7 @@ async function handleAPI(request, env, path, method, ctx) {
   }
 
   if (path === '/api/import' && method === 'POST') {
-    return handleImport(request, env, auth);
+    return invalidatePublicCacheAfterWrite(env, ctx, () => handleImport(request, env, auth));
   }
 
   return errorResponse('Not Found', 404);

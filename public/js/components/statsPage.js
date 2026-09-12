@@ -36,7 +36,10 @@ export function statsPage() {
     async loadStats() {
       this.isLoading = true;
       try {
-        const res = await statsAPI.get();
+        // 管理员传 no-store 绕过浏览器 HTTP 缓存（访客态副本写后可能陈旧 60s）
+        const res = await statsAPI.get(
+          this.$store.app.isAdmin ? { cache: 'no-store' } : {}
+        );
         this.stats = res.data;
         this.selectedYear = this.timelineYears[0] || '';
       } catch (error) {

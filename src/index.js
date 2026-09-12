@@ -2,6 +2,7 @@
  * VN Shelf - Cloudflare Worker入口
  */
 
+import { bumpCacheVersion } from './http-cache.js';
 import {
   INDEX_TASK_ACTIVE_STATUSES,
   INDEX_TASK_TERMINAL_STATUSES
@@ -265,6 +266,9 @@ export default {
   async queue(batch, env, ctx) {
     const touchedTasks = new Map();
     const canUseWaitUntil = Boolean(ctx && typeof ctx.waitUntil === 'function');
+    // 本批是否发生 vn_entries 落库写：消息循环后据此同步 bump 缓存版本
+    // （每批一次，不随消息数放大；失败仅告警不影响队列语义，60s TTL 兜底）
+    let vnDataWritten = false;
 
     function getDelayedReconcileDelayMs(lastReconciledAtMs) {
       if (!Number.isFinite(lastReconciledAtMs)) {
@@ -408,6 +412,7 @@ export default {
         // 更新VNDB数据
         entry.vndb = vndbData;
         await saveVNEntry(env, entry);
+        vnDataWritten = true;
 
         // 3. 幂等写入单条结果（按 taskId + vndbId 唯一）
         await recordIndexItemResult(env, {
@@ -471,6 +476,18 @@ export default {
             message.retry();
           }
         }
+      }
+    }
+
+    // 本批发生 vn_entries 落库写 → 同步自增数据版本（公开访客缓存键失效；
+    // 管理员路径不吃缓存不受影响）。失败仅告警：60s TTL 是陈旧上界兜底
+    if (vnDataWritten) {
+      try {
+        await bumpCacheVersion(env);
+      } catch (error) {
+        console.warn('[index][queue] bump cache version failed', {
+          error: error?.message || String(error)
+        });
       }
     }
 
