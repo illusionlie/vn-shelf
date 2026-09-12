@@ -903,4 +903,28 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 
 [OK] **Completed** — 待办：09-12-public-cache-and-index 与 09-12-detail-modal-unification 两任务规划已批准，随时 task.py start 实施。
 
+
+## Session 23: 公开端点缓存与 created_at 索引全流程交付
+
+**Date**: 2026-09-12
+**Task**: 09-12-public-cache-and-index
+**Branch**: `master`
+
+### Summary
+
+版本键缓存设计全流程交付（implement → check → 手测 → spec → 提交）：src/http-cache.js 的 servePublicCached 包裹四个公开 GET（ETag `"vshelf-N"` + 访客 `public, max-age=60` + Cache API 合成键 `__cv=N` 副本），purge = bump 换钥匙（settings 第 4 命名空间 cache:version 单语句原子自增），规避 Cache API 无通配删除。管理员三不原则（永不 match/put/304 + no-store）——check 阶段论证：bump 走 waitUntil 有毫秒窗口，允许 304 会以旧 ETag 命中陈旧。写路径 12 处 bump（10 写路由经 invalidatePublicCacheAfterWrite 分发层 + queue 批级同步 bump + ulist imported>0）；六个 router patch 桩 + queue/ulist 桩全员同步 http-cache 桩（依赖图陷阱）。D3 前端 no-store 五处（check 补齐第 5 处 shared.openDetail，P1）。迁移 v3 idx_vn_entries_created，EXPLAIN 实证走索引。248/248 全绿（+13）。端到端实测：v17 建删两写版本 0→1→2 轮转、旧 ETag INM 得 200（防陈旧）、管理员页面自身请求 no-store（Network 级证据）。发现 Playwright 与用户浏览器共享配置且 8787 是用户自己的 dev 实例（有效管理员会话），借机关闭任务 1 遗留的 settings 管理员冒烟。8788 后台实例死于 SQLITE_BUSY（d1 execute 并发锁，环境问题非代码缺陷）。教训：design 的「queue() 无 ctx」与事实不符——implement 前置核实抓到；手测 URL 变体要注意查询串是缓存键一部分（首次测裸 /api/vn 误判未命中）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `61bd2a6` | feat(cache): 公开读端点缓存 + 版本键 + created_at 索引 |
+| `dfaf477` | docs(spec): 缓存与版本键契约沉淀 |
+| `fbbbd78` | docs(task): 验收记录与偏离说明 |
+| `f18f209` | chore(task): archive |
+
+### Status
+
+[OK] **Completed** — 待办：09-12-detail-modal-unification 规划已批准待实施；缓存任务遗留生产域名 curl 复核 + 3 条 P2 小项。
+
 [OK] **Completed**
