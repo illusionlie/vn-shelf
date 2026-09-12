@@ -877,4 +877,30 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 
 ### Status
 
+
+## Session 22: 代码库侦察三任务立项 + 安全加固小包全流程交付
+
+**Date**: 2026-09-12
+**Task**: 09-12-security-hardening-bundle（另立项 public-cache-and-index、detail-modal-unification 待实施）
+**Branch**: `master`
+
+### Summary
+
+双 Explore 子代理侦察前后端后确定四条规划线，用户选定三条立项并批准。安全加固任务全流程交付（trellis-implement → trellis-check → 手测 → spec → 提交）：(1) 登录限流——src/login-ratelimit.js 纯函数状态机（5 败/15min 窗口锁 10min）+ LoginRateLimiterDurableObject（/precheck /record，每 IP idFromName 实例，无 alarm 惰性过期）+ handleLogin 同步 await record，precheck 先于 PBKDF2；绑定缺失 fail-open（与 INDEX_START_LOCK fail-closed 相反：可用性 vs 数据正确性）。(2) verifyJWT 收紧：alg===HS256 强校验 + exp 有限数值且 >now（原 `payload.exp &&` 短路使缺 exp 永不过期）。(3) vendor 全量升级 alpine 3.17.2 / marked 18.0.12（CVE-2026-41680）/ purify 3.4.15。(4) queue() 尾部 reconcile 编排循环兜底 try/catch。新增 tests/auth/ 域（jwt 直测 20 + 限流纯函数 10）+ router 限流 6（DO 桩内嵌真实纯函数防假绿）+ queue 注入 2；197→235 全绿。手测：Playwright 五页面冒烟（Alpine 跨 3 minor 无回归）、XSS 浏览器侧（onerror 转义 + javascript: 链接禁用）、curl 限流实测（5×401→429+Retry-After:600）。spec 沉淀登录限流 Scenario（7 段）+ JWT Convention；AGENTS.md 同步。教训：design 误记"无 markdown 单测"实际 tests/public/markdown.* 存在且对新版本全绿——侦察结论要 grep 验证而非推断。遗留：管理员侧 settings 冒烟（本地密码不公开）、线上 tail 观察 binding missing 告警。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3cf5cc4` | feat(auth): 登录限流 + JWT 收紧 + queue 兜底 |
+| `58627c6` | chore(deps): vendor 全量升级 |
+| `e2d5ad0` | docs(spec): 登录限流与 JWT 契约沉淀 |
+| `b3ecca7` | docs(task): 安全加固任务工件 |
+| `cb5744d` | docs(task): 另两任务规划工件 |
+| `b7ee0ed` | chore(task): archive |
+
+### Status
+
+[OK] **Completed** — 待办：09-12-public-cache-and-index 与 09-12-detail-modal-unification 两任务规划已批准，随时 task.py start 实施。
+
 [OK] **Completed**
