@@ -4,7 +4,7 @@ This file provides guidance to agents when working with code in this repository.
 
 ## 项目概述
 
-VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项目无构建步骤，直接部署 ES Modules 与 `public/` 静态资源。
+VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项目无构建步骤，直接部署 ES Modules 与 `public/` 静态资源。静态页面由 Worker Assets 提供（`html_handling = "auto-trailing-slash"`，`/login` 等无 `.html` 路径均可访问）。
 
 ## Build / Test / Deploy Commands
 
@@ -21,82 +21,48 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 ```text
 src/
 ├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject
-├── index-task.js   # 索引任务逻辑（启动、状态查询）
+├── index-task.js   # 索引任务启动与状态查询
 ├── ulist-import.js # VNDB ulist 用户列表导入管线
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
 ├── repository.js   # D1 数据访问层
 ├── stats.js        # 统计聚合纯函数（computeStats，/api/stats 数据源）
 ├── auth.js         # JWT + 密码哈希认证
-├── vndb.js         # VNDB API 客户端
+├── vndb.js         # VNDB API 客户端与字段映射（含 ulist 状态映射常量）
 └── utils.js        # 通用工具函数
 
 public/
-├── index.html
-├── login.html
-├── settings.html
-├── stats.html
-├── tier.html
-├── cover.webp
-├── favicon.ico
-├── robots.txt
-├── css/
-│   ├── base.css          # 设计变量/重置/壳层/页眉页脚/弹窗/Toast/返回顶部 FAB（全站共享，链接顺序最前）
-│   ├── forms.css         # 表单控件
-│   ├── cards-detail.css  # 首页卡片网格 + 详情 + 渲染窗口控制区
-│   └── login.css / settings.css / stats.css / tier.css  # 页面级样式
+├── index.html / login.html / settings.html / stats.html / tier.html
+├── cover.webp / favicon.ico / robots.txt
+├── css/                # base（全站共享）→ forms → cards-detail → 页面级样式
 └── js/
-    ├── app.js            # Alpine.js 入口：i18n 初始化 + 壳层/页脚注入 + 全局 Store + 组件注册
+    ├── app.js            # Alpine.js 入口（i18n 初始化 + 壳层注入 + 组件注册）
     ├── api.js            # API 封装
-    ├── i18n.js           # i18n：t() 取词 + applyI18nDom() 静态文案应用 + setLocale()
-    ├── locales/          # 词典：zh-CN.js（默认）+ en.js（叶子 key 双向 parity 有测试卡住）
-    ├── layout.js         # injectShell() 公共壳层（含返回顶部 FAB）+ injectFooter() 站点页脚（登录页跳过）
-    ├── constants.js      # 前端共享常量（与后端同值约定，勿单方修改）
-    ├── utils.js          # 工具函数（debounce, trapFocus, formatUserPlayTime, lockPageScroll/unlockPageScroll, toggleMobileMenu, initProgressBar）
-    ├── theme.js          # 主题切换（html.dark-mode）+ 自定义背景
+    ├── i18n.js           # t() / applyI18nDom() / setLocale()
+    ├── locales/          # 词典：zh-CN.js（默认）+ en.js
+    ├── layout.js         # injectShell() 公共壳层 + injectFooter() 页脚
+    ├── constants.js      # 前端共享常量
+    ├── utils.js          # 工具函数
+    ├── theme.js          # 主题切换 + 自定义背景
     ├── markdown.js       # Markdown 渲染
     ├── translations.js   # Tags 翻译与 IndexedDB 缓存
     ├── tier-diff.js      # Tier 拖拽 diff 纯函数
-    ├── vn-list-item.js   # 纯函数：完整条目 → 列表项 VNDB 字段合并（镜像 rowToListItem，单条目刷新就地更新用）
-    ├── vendor/           # 自托管第三方依赖（alpine/marked/purify + fetch-vendor.cjs 拉取脚本）
+    ├── vn-list-item.js   # 完整条目 → 列表项合并纯函数
+    ├── vendor/           # 自托管第三方依赖（fetch-vendor.cjs 拉取脚本）
     └── components/
         ├── shared.js        # 跨页面共享 mixin（tags 视图 + 详情弹窗）
-        ├── confirmDialog.js # 全局确认对话框（挂 $store.app.confirm() Promise 接口）
-        ├── vnShelf.js       # 主页书架组件（列表渲染窗口化：哨兵追加 + 加载更多；管理员单条目 VNDB 刷新）
-        ├── tierlistPage.js  # Tier List 页组件
-        ├── settingsPage.js  # 设置页组件
-        ├── loginPage.js     # 登录页组件
-        └── statsPage.js     # 统计页组件
+        ├── confirmDialog.js # 全局确认对话框
+        ├── vnShelf.js       # 主页书架
+        ├── tierlistPage.js  # Tier List 页
+        ├── settingsPage.js  # 设置页
+        ├── loginPage.js     # 登录页
+        └── statsPage.js     # 统计页
 
-tests/
-├── d1/
-│   ├── migrations.test.mjs
-│   └── repository.test.mjs
-├── public/
-│   ├── i18n.keys.test.mjs
-│   ├── i18n.test.mjs
-│   ├── markdown.security.test.mjs
-│   ├── markdown.syntax.test.mjs
-│   ├── tier-diff.test.mjs
-│   └── vn-list-item.test.mjs
-├── queue/
-│   └── index.queue.test.mjs
-├── router/
-│   ├── config.update.test.mjs
-│   ├── envelope.test.mjs
-│   ├── index.start.test.mjs
-│   ├── vn.status.test.mjs
-│   └── vndb.search.test.mjs
-├── stats/
-│   └── compute.test.mjs
-└── vndb/
-    ├── search.test.mjs
-    ├── ulist-import.test.mjs
-    └── ulist-mapping.test.mjs
+tests/              # node --test，按域分目录：d1 / public / queue / router / stats / vndb
 
 .github/workflows/
-├── ci.yml
-└── deploy.yml
+├── ci.yml          # lint + test + deploy dry-run
+└── deploy.yml      # 手动部署（workflow_dispatch）
 ```
 
 ## Worker 执行模型
@@ -114,103 +80,43 @@ tests/
 
 路由总入口：[`handleAPI()`](src/router.js)
 
-### 认证接口
-
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/api/auth/status` | 获取初始化 + 登录状态 | 公开 |
+| GET | `/api/auth/status` | 初始化 + 登录状态 | 公开 |
 | POST | `/api/auth/init` | 初始化管理员密码（可同时写入 `vndbApiToken`） | 仅未初始化 |
 | POST | `/api/auth/login` | 登录 | 公开 |
 | POST | `/api/auth/logout` | 登出 | 公开 |
 | GET | `/api/auth/verify` | 验证 Token | 公开 |
-
-### VN 接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/vn` | 获取 VN 列表（支持 `sort`, `search`, `untiered`） | 公开 |
-| GET | `/api/vn/{id}` | 获取单个 VN（ID 格式：`v17`） | 公开 |
+| GET | `/api/vn` | VN 列表（`sort` / `search` / `untiered`） | 公开 |
+| GET | `/api/vn/{id}` | 单个 VN（ID 格式 `v17`） | 公开 |
 | POST | `/api/vn` | 创建 VN 条目 | 需认证 |
 | PUT | `/api/vn/{id}` | 更新 VN（支持 `refreshVNDB`） | 需认证 |
 | DELETE | `/api/vn/{id}` | 删除 VN | 需认证 |
-| PUT | `/api/vn/{id}/tier` | 更新单条 VN 的 Tier 归属与排序 | 需认证 |
-| PUT | `/api/vn/tier/batch` | 批量更新 VN 的 Tier 归属与排序（上限 200） | 需认证 |
-
-### Tier 接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/tier` | 获取 Tier 列表 | 公开 |
+| PUT | `/api/vn/{id}/tier` | 更新单条 Tier 归属与排序 | 需认证 |
+| PUT | `/api/vn/tier/batch` | 批量更新 Tier 归属（上限 200） | 需认证 |
+| GET | `/api/tier` | Tier 列表 | 公开 |
 | POST | `/api/tier` | 创建 Tier | 需认证 |
 | PUT | `/api/tier/order` | 更新 Tier 顺序 | 需认证 |
 | PUT | `/api/tier/{id}` | 更新 Tier 名称/颜色 | 需认证 |
-| DELETE | `/api/tier/{id}` | 删除 Tier（会先清空条目归属） | 需认证 |
-
-### 统计接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/stats` | 获取统计聚合（概览四项 / 状态计数 / 评分直方图与分歧榜 / 完成时间线 / 开发商与标签 Top） | 公开 |
-
-> data 层字段：既有四项（`total`/`totalPlayTimeMinutes`/`avgRating`/`avgPersonalRating`，语义不变）+ `statusCounts`、`ratingHistograms`（round 取整 1-10 分桶）、`ratingDiff`（个人 vs VNDB 双评分分歧榜）、`timeline`（按 `finish_date` 的月度聚合与通关跨度）、`topDevelopers`、`topTags`（vndb/user 双列表）。聚合口径与 shape 见 [`src/stats.js`](src/stats.js) 头注。
-
-### 索引接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
+| DELETE | `/api/tier/{id}` | 删除 Tier（先清空条目归属） | 需认证 |
+| GET | `/api/stats` | 统计聚合（口径与 shape 见 [`src/stats.js`](src/stats.js) 头注） | 公开 |
 | POST | `/api/index/start` | 启动批量索引 | 需认证 |
-| GET | `/api/index/status` | 获取索引/导入状态（返回体含 `type`/`skipped`） | 需认证 |
-| POST | `/api/ulist/import` | 启动 VNDB ulist 用户列表导入 | 需认证 |
-
-### VNDB 搜索接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/vndb/search` | VNDB 模糊搜索（`q` 关键词，trim 后必填、超 100 字符截断；`limit` clamp 1..20 默认 10；添加条目弹窗候选来源） | 需认证 |
-
-### 配置接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
+| GET | `/api/index/status` | 索引/导入任务状态（含 `type`/`skipped`） | 需认证 |
+| POST | `/api/ulist/import` | 启动 VNDB ulist 导入 | 需认证 |
+| GET | `/api/vndb/search` | VNDB 模糊搜索（`q` trim 后必填、超 100 字符截断；`limit` clamp 1..20 默认 10） | 需认证 |
 | GET | `/api/config` | 获取配置（脱敏） | 需认证 |
-| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags 配置 / 外观配置） | 需认证 |
-| GET | `/api/config/appearance` | 获取外观与公开 tags 配置（`backgroundUrl` / `backgroundOverlay` / `backgroundBlur` / `tagsMode` / `translateTags` / `translationUrl`） | 公开 |
-
-### 导入导出接口
-
-| 方法 | 路径 | 说明 | 权限 |
-|------|------|------|------|
-| GET | `/api/export` | 导出数据（含 `entries` 和 `tierList`） | 需认证 |
-| POST | `/api/import` | 导入数据（`merge` / `replace`，支持 `tierList`） | 需认证 |
-
-## 页面与静态资源路由
-
-页面和静态资源由 Worker Assets 提供，配置见 [`wrangler.toml.example`](wrangler.toml.example)。
-
-| 路径 | 说明 |
-|------|------|
-| `/` 或 `/index.html` | 首页 |
-| `/login` | 登录页 |
-| `/settings` | 设置页 |
-| `/stats` | 统计页 |
-| `/tier` | Tier List 页 |
-| `/css/*.css` | 样式（base → forms → cards-detail → 页面文件，链接顺序固定） |
-| `/js/*.js` | 前端模块 |
-
-> `html_handling = "auto-trailing-slash"`，因此页面路由使用无 `.html` 形式也可访问。
+| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags / 外观） | 需认证 |
+| GET | `/api/config/appearance` | 外观与公开 tags 配置 | 公开 |
+| GET | `/api/export` | 导出数据（`entries` + `tierList`） | 需认证 |
+| POST | `/api/import` | 导入数据（`merge`/`replace`，支持 `tierList`） | 需认证 |
 
 ## Queue 处理机制（批量索引）
 
 - Queue 绑定：`VN_INDEX_QUEUE`（配置见 [`wrangler.toml.example`](wrangler.toml.example)）
-- 消费逻辑：[`queue()`](src/index.js)
-- 索引启动：[`startIndexTask()`](src/index-task.js)，状态查询 [`getIndexTaskStatus()`](src/index-task.js)
-- 分布式锁：[`IndexStartLockDurableObject`](src/index.js) 提供启动互斥，绑定名 `INDEX_START_LOCK`
-- 重试策略：最多 3 次，重试延迟 60 秒（`retryCount` 累增）
-- 幂等结果：按 `taskId + vndbId` 写入 `index_task_items` 表，成功结果对失败回写具有"粘性"
-- 汇总机制：[`reconcileIndexStatusFromItems()`](src/repository.js) 基于 `index_task_items` 表汇总 `processed/failed`
-- 延迟汇总：高频批次下仅临近完成时即时汇总，其余走 `ctx.waitUntil` 延迟汇总降载（最多 6 次，间隔 5s）
-- 状态终态：`completed` 或 `partial`，D1 模式下聚合列表由 SQL 实时计算，无需手动重建
-- 终态清理：汇总转入终态时自动清理 `index_task_items` 表对应记录
+- 消费逻辑：[`queue()`](src/index.js)；任务启动/状态查询：[`src/index-task.js`](src/index-task.js)
+- 重试策略与延迟汇总频率见 `src/index.js` 顶部常量（`INDEX_MAX_RETRY` 等）
+- 幂等结果：按 `taskId + vndbId` 写入 `index_task_items` 表，成功结果对失败回写具有"粘性"；[`reconcileIndexStatusFromItems()`](src/repository.js) 据此汇总 `processed/failed`，高频批次下部分汇总走 `ctx.waitUntil` 延迟执行降载
+- 状态终态 `completed` / `partial`，转入终态时自动清理 `index_task_items` 对应记录
 
 ## 认证系统
 
@@ -232,11 +138,10 @@ tests/
 
 ## VNDB ulist 用户列表导入
 
-- 管线：`src/ulist-import.js` 的 `startUListImport(env, ctx)` → `getAuthInfo` 取 uid → 建 `type='ulist_import'` 任务 → `ctx.waitUntil` 分页拉取 + 映射 + `saveVNEntry`
-- 执行模型：waitUntil 分页循环（每页 ≤100，`vn.*` 一次拉全）；开始时一次性预载已存在 id 集合到内存，逐条命中判断走内存避免 N 次 subrequest
-- 状态映射（07-11 固化）：label `1→playing, 2→finished, 3→stalled, 4→dropped, 5→wishlist`；多 label 终态优先 `2>4>3>1` 单值化；纯 wishlist（仅 label5、无 1-4）跳过；无 1-4 标签 → status null；`vote/10→personalRating`（vote 空→0）；`started→startDate`、`finished→finishDate`。映射常量与 `mapUListItemToEntry()` 落 `src/vndb.js`
-- 进度语义：total（拉取到条目数）、processed、skipped（已存在 + 纯 wishlist）、failed（写库失败）；终态 `completed`/`partial`
-- 任务状态复用 `index_tasks` 表（`type` 列区分 index/ulist_import，`skipped` 列记录跳过数）；启动端点 `POST /api/ulist/import` 复用 `INDEX_START_LOCK` Durable Object 与索引任务互斥；进度查询复用 `GET /api/index/status`（返回体含 `type`/`skipped`，前端按 `type` 区分文案）
+- 管线：[`startUListImport()`](src/ulist-import.js) → `getAuthInfo` 取 uid → 建 `type='ulist_import'` 任务 → `ctx.waitUntil` 分页拉取（每页 ≤100）+ 映射 + `saveVNEntry`；开始时预载已存在 id 集合到内存，避免 N 次 subrequest
+- label → status 映射与多 label 单值化优先级固化在 [`src/vndb.js`](src/vndb.js) 常量与头注（`ULIST_LABEL_TO_STATUS` 等），回归由 `tests/vndb/ulist-mapping.test.mjs` 卡住
+- 进度语义：total（拉取条目数）/ processed / skipped（已存在 + 纯 wishlist）/ failed；终态 `completed`/`partial`
+- 任务复用 `index_tasks` 表与 `INDEX_START_LOCK` 互斥；进度查询复用 `GET /api/index/status`，前端按返回体 `type` 区分文案
 
 ## 数据结构
 
@@ -263,10 +168,10 @@ tests/
   user: {
     titleCn: "自定义中文名",
     personalRating: 9.0,
-    playTime: "60小时30分钟",
-    playTimeHours: 60,
+    playTimeHours: 60,             // 写入仅接受此二字段
     playTimePartMinutes: 30,
-    playTimeMinutes: 3630,
+    playTime: "60小时30分钟",       // 仅输出（派生），写入时忽略
+    playTimeMinutes: 3630,         // 仅输出（派生），写入时忽略
     review: "评价内容",
     startDate: "2024-01-01",
     finishDate: "2024-02-01",
@@ -314,70 +219,37 @@ tests/
 
 ## 前端架构
 
-- 入口：[`public/js/app.js`](public/js/app.js) — i18n 初始化 + 公共壳层/页脚注入 + Alpine 全局 Store 注册 + 组件注册（胶水层）
-- API 封装：[`public/js/api.js`](public/js/api.js)
-- i18n：[`public/js/i18n.js`](public/js/i18n.js) + [`locales/`](public/js/locales/)（zh-CN 默认 + en）
-  - HTML 静态文案走 `data-i18n*` 标记，由 `applyI18nDom()` 应用（同步首遍 + 词典就绪后第二遍）
-  - JS 动态文案走 `t()`，Alpine 内联表达式走 `$t` magic
-  - 新增 key 必须双语词典同步（`tests/public/i18n.keys.test.mjs` 双向 parity 强制）
-- 公共壳层与页脚：[`public/js/layout.js`](public/js/layout.js) — `injectShell()`（进度条/背景遮罩/Toast/确认对话框/返回顶部 FAB：IO 哨兵 scrollY>600 显隐 + safe-area 兜底，纯 DOM 无 Alpine 依赖）+ `injectFooter()`（全站页脚，登录页跳过）
-- 共享常量：[`public/js/constants.js`](public/js/constants.js) — 与后端同值约定（如批量 Tier 上限 200），修改一端必须同步另一端
-- 工具函数：[`public/js/utils.js`](public/js/utils.js) — `debounce`, `trapFocus`, `formatUserPlayTime`, `lockPageScroll`/`unlockPageScroll`, `toggleMobileMenu`, `initProgressBar`
-- 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换（`html.dark-mode`）、自定义背景 overlay
-- Markdown 渲染：[`renderMarkdown()`](public/js/markdown.js)（带安全 URL 校验）
-- Tags 翻译：[`initTranslations()`](public/js/translations.js)
-  - IndexedDB 缓存：`vn-shelf-translations`
-  - 缓存键：`tagTranslations`
-  - 策略：缓存优先 + 后台版本检查 + 自动更新事件 `translations-updated`
-- 第三方依赖：vendor 自托管（`public/js/vendor/`），版本锁定在 `package.json`，`npm run fetch:vendor` 拉取；禁止运行时 CDN
+- 入口：[`public/js/app.js`](public/js/app.js)（胶水层：i18n 初始化 + 壳层/页脚注入 + Store 与组件注册）；API 封装：[`public/js/api.js`](public/js/api.js)
+- i18n：HTML 静态文案走 `data-i18n*` 标记由 `applyI18nDom()` 应用，JS 动态文案走 `t()`，Alpine 内联表达式走 `$t` magic；新增 key 必须同步 `zh-CN.js` 与 `en.js`（`tests/public/i18n.keys.test.mjs` 双向 parity 强制）
+- 公共壳层/页脚：[`public/js/layout.js`](public/js/layout.js)（纯 DOM 注入，无 Alpine 依赖）
+- 前后端同值常量在 [`public/js/constants.js`](public/js/constants.js)（如批量 Tier 上限 200），修改一端必须同步另一端
+- 第三方依赖 vendor 自托管（版本锁定在 `package.json`，`npm run fetch:vendor` 拉取），禁止运行时 CDN
 
 ### 页面组件（`public/js/components/`）
 
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| `vnShelf` | [`vnShelf.js`](public/js/components/vnShelf.js) | 主页书架：列表加载、搜索、排序、详情/编辑弹窗；列表渲染窗口化（IntersectionObserver 哨兵自动追加 + 「加载更多」按钮）；管理员单条目 VNDB 刷新（卡片封面图标钮 + 详情页脚文字钮，`PUT /api/vn/{id}` + `refreshVNDB`，成功后经 `mergeVndbIntoListItem` 就地更新不重置渲染窗口；同条目刷新中编辑/删除禁用） |
-| `tierlistPage` | [`tierlistPage.js`](public/js/components/tierlistPage.js) | Tier List：拖拽排序、跨 Tier 移动、批量更新 |
-| `settingsPage` | [`settingsPage.js`](public/js/components/settingsPage.js) | 设置：VNDB Token、密码、索引、导入导出、外观、语言切换 |
-| `loginPage` | [`loginPage.js`](public/js/components/loginPage.js) | 登录/初始化 |
-| `statsPage` | [`statsPage.js`](public/js/components/statsPage.js) | 统计数据展示 |
-| `confirmDialog` | [`confirmDialog.js`](public/js/components/confirmDialog.js) | 全局确认对话框（`$store.app.confirm()` Promise 接口） |
-
-### Tier List 前端行为
-
-- 页面：[`public/tier.html`](public/tier.html)
-- 逻辑：[`tierlistPage`](public/js/components/tierlistPage.js)
-- 支持拖拽排序与跨 Tier 移动，调用批量接口 `/api/vn/tier/batch`
-- 前端分片提交批量更新，单批上限与后端一致为 200
+| 组件 | 说明 |
+|------|------|
+| `vnShelf` | 主页书架：列表/搜索/排序、详情与编辑弹窗、渲染窗口化（哨兵追加 + 加载更多）、管理员单条目 VNDB 刷新 |
+| `tierlistPage` | Tier List：拖拽排序、跨 Tier 移动、分片批量提交（单批上限 200） |
+| `settingsPage` | 设置：VNDB Token、密码、索引、导入导出、外观、语言切换 |
+| `loginPage` | 登录/初始化 |
+| `statsPage` | 统计数据展示 |
 
 ## 测试与 CI
 
-- Queue 行为测试：[`tests/queue/index.queue.test.mjs`](tests/queue/index.queue.test.mjs)
-   - 覆盖重试补发、ack/retry 分支、失败结果写入异常分支
-- D1 数据访问层测试：[`tests/d1/repository.test.mjs`](tests/d1/repository.test.mjs)
-- 统计聚合纯函数测试：[`tests/stats/compute.test.mjs`](tests/stats/compute.test.mjs)
-- Markdown 安全测试：[`tests/public/markdown.security.test.mjs`](tests/public/markdown.security.test.mjs)
-- 索引启动路由测试：[`tests/router/index.start.test.mjs`](tests/router/index.start.test.mjs)
-- 配置更新路由测试：[`tests/router/config.update.test.mjs`](tests/router/config.update.test.mjs)
-- CI（[`ci.yml`](.github/workflows/ci.yml)）
-  - ESLint
-  - Node 内置测试（`npm run test`）
-  - Wrangler deploy dry-run（依赖 lint + test，基于 `wrangler.toml.example` 生成临时配置）
-- 手动部署（[`deploy.yml`](.github/workflows/deploy.yml)，`workflow_dispatch`）
-  - 部署前 `Ensure Cloudflare resources` 步骤按名预检/创建 D1 `vn-shelf-db` 与 Queue `vn-index-queue`（先查再建、幂等），D1 id 运行时解析并注入模板；`CF_D1_DATABASE_ID` 仅为可选覆盖（有值只校验存在、不创建）
-  - 必填 Secrets 仅 `WORKER_NAME` + `CF_API_TOKEN`（token 需含 Workers / D1 / Queues 编辑权限）
+- 测试：`npm run test`（node --test），文件布局见架构树 `tests/`
+- CI（[`ci.yml`](.github/workflows/ci.yml)）：ESLint → Node 测试 → Wrangler deploy dry-run（基于 `wrangler.toml.example` 生成临时配置）
+- 手动部署（[`deploy.yml`](.github/workflows/deploy.yml)，`workflow_dispatch`）：部署前幂等预检/创建 D1 `vn-shelf-db` 与 Queue `vn-index-queue`；所需 Secrets 与配置步骤见 README
 
 ## 开发注意事项
 
-1. **无构建步骤**：直接修改 `src/` 与 `public/` 文件即可。
-2. **静态资源优先**：非 API 路由优先从 Assets 返回，API 才进入 Router。
-3. **游玩时长字段约定**：后端仅接受 `playTimeHours` + `playTimePartMinutes`，不再接受旧字段 `playTime` / `playTimeMinutes` 作为输入。
-4. **Tier 一致性**：删除 Tier 时先清理条目归属，再落库 Tier 列表。
-5. **导入前全量校验**：`/api/import` 会先校验所有条目与 `tierList` 结构，再执行写入。
-6. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表，不直接暴露给前端。
-7. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 D1 数据库与 Queue 后再运行 `npm run dev`。
-8. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500。
-9. **CSS 分模块**：`public/css/` 下链接顺序固定为 base → forms → cards-detail → 页面文件；JS 注入的共享 DOM（壳层/页脚）样式进 `base.css`。
-10. **i18n 双语**：新增用户可见文案必须走 `data-i18n*`/`t()` 并同步 `zh-CN.js` 与 `en.js`，双向 parity 测试会卡住漂移。
+1. **游玩时长字段**：后端仅接受 `playTimeHours` + `playTimePartMinutes`；`playTime` / `playTimeMinutes` 为派生输出字段，不作为输入。
+2. **Tier 一致性**：删除 Tier 时先清理条目归属，再落库 Tier 列表。
+3. **导入前全量校验**：`/api/import` 会先校验所有条目与 `tierList` 结构，再执行写入。
+4. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表，不直接暴露给前端。
+5. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 D1 数据库与 Queue 后再运行 `npm run dev`。
+6. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500。
+7. **CSS 分模块**：`public/css/` 下链接顺序固定为 base → forms → cards-detail → 页面文件；JS 注入的共享 DOM（壳层/页脚）样式进 `base.css`。
 <!-- TRELLIS:START -->
 # Trellis Instructions
 

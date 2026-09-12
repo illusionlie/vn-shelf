@@ -107,11 +107,7 @@ cp wrangler.toml.example wrangler.toml
 
 ### 3) Cloudflare 资源准备
 
-确保已创建并绑定：
-
-- 1 个 D1 数据库
-- 1 个 Queue
-- 1 个 Durable Object（`IndexStartLockDurableObject`）
+模板已包含全部绑定（D1 / Queue / Durable Object / 静态资源）。Durable Object 由 Worker 代码直接导出，无需在控制台创建；D1 数据库与 Queue 仅在实际部署时需要，可由部署工作流自动创建（见上文「GitHub Actions 部署指南」）。本地 `npm run dev` 由 wrangler 本地模拟运行。
 
 ### 4) 启动本地开发
 
@@ -129,9 +125,23 @@ npm run tail      # 查看 Worker 实时日志
 npm run deploy    # 部署到 Cloudflare Workers
 ```
 
-## API 及技术详情
+## API 说明
 
-见 [AGENTS.md](./AGENTS.md)
+所有接口均在 `/api/*` 前缀下，返回 JSON。列表/详情读取、统计与外观配置为公开接口；其余（全部写操作及部分管理用查询）需管理员登录（JWT + HttpOnly Cookie）。
+
+| 分组 | 端点 | 说明 |
+|------|------|------|
+| 认证 | `GET /api/auth/status`、`GET /api/auth/verify`、`POST /api/auth/init`、`POST /api/auth/login`、`POST /api/auth/logout` | 管理员初始化、登录与登出 |
+| VN 条目 | `GET` / `POST /api/vn`、`GET` / `PUT` / `DELETE /api/vn/{id}` | 条目增删改查；`PUT` 支持 `refreshVNDB` 从 VNDB 刷新 |
+| Tier 归属 | `PUT /api/vn/{id}/tier`、`PUT /api/vn/tier/batch` | 单条 / 批量（上限 200）Tier 归属与排序 |
+| Tier 列表 | `GET` / `POST /api/tier`、`PUT /api/tier/order`、`PUT` / `DELETE /api/tier/{id}` | Tier 增删改与排序 |
+| 统计 | `GET /api/stats` | 概览、状态计数、评分直方图、完成时间线、Top 榜 |
+| 索引与导入 | `POST /api/index/start`、`GET /api/index/status`、`POST /api/ulist/import` | 批量索引与 VNDB ulist 用户列表导入 |
+| VNDB 搜索 | `GET /api/vndb/search` | 添加条目弹窗的候选搜索 |
+| 配置 | `GET` / `PUT /api/config`、`GET /api/config/appearance` | Token / 密码 / tags / 外观；`appearance` 为公开只读 |
+| 备份 | `GET /api/export`、`POST /api/import` | 导出 / 导入库数据（含 Tier 列表，支持 `merge` / `replace`） |
+
+请求参数、数据结构与内部实现等技术详情见 [AGENTS.md](./AGENTS.md)。
 
 ## 许可证
 
