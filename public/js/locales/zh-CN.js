@@ -37,6 +37,7 @@ export default {
     edit: '编辑',
     delete: '删除',
     close: '关闭',
+    backToTop: '返回顶部',
     colon: '：',
     details: '详情',
     clear: '清除',

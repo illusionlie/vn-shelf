@@ -727,6 +727,82 @@ body.has-bg-image {
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* ===== Back-to-top FAB（layout.js 壳层注入，全站生效）===== */
+
+/* 显隐哨兵：锚 ICB 文档原点（#app-shell 无 positioned 祖先），让 IO 阈值
+   不受 body padding-top（fixed header 让位）影响，scrollY>600 即触发 */
+.back-to-top-sentinel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.back-to-top {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  /* header 100 之下、modal-overlay 1000 之下：弹窗叠层盖过 FAB，且下方规则再隐藏兜底 */
+  z-index: 90;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--modal-bg-color);
+  color: var(--secondary-text-color);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 隐藏三件套：visibility 参与 transition（离散插值——两端任一可见即全程可见），
+     隐藏时待 opacity 走完才不可见，避免淡出途中突然消失；pointer-events 兜底
+     保证隐藏态不拦截底层卡片点击（移动端右下角与末排卡重叠） */
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--transition-medium),
+    visibility var(--transition-medium),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.back-to-top.visible {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.back-to-top:hover {
+  color: var(--primary-text-color);
+  /* 实色 accent 边 + 3px 光晕环：--border-glow（25%/30% 透明蓝）单独作 1px 边框时
+     在浅色磨砂面上几乎不可见（用户实测反馈），但作 spread ring 光晕恰好醒目且
+     亮/暗模式各自适配；box-shadow 声明整体替换，须重声明基础投影 */
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-medium), 0 0 0 3px var(--border-glow);
+}
+
+.back-to-top svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* 弹窗打开（body.modal-open 滚动锁定）或登录页（overflow:hidden 无滚动）时
+   FAB 无意义：直接隐藏。特异度 (0,2,1) > .back-to-top.visible 的 (0,2,0)，
+   无需 !important */
+body.modal-open .back-to-top,
+body.login-page .back-to-top {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ===== Page Title ===== */
 .page-title {
   font-size: 1.75rem;
@@ -799,6 +875,19 @@ body.has-bg-image {
 
   .toast {
     max-width: 100%;
+  }
+
+  /* FAB 收敛到 44px 触控最小值，贴边更紧，safe-area 兜底手势条 */
+  .back-to-top {
+    width: 44px;
+    height: 44px;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .back-to-top svg {
+    width: 20px;
+    height: 20px;
   }
 }
 

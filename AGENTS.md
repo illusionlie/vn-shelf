@@ -41,7 +41,7 @@ public/
 ├── favicon.ico
 ├── robots.txt
 ├── css/
-│   ├── base.css          # 设计变量/重置/壳层/页眉页脚/弹窗/Toast（全站共享，链接顺序最前）
+│   ├── base.css          # 设计变量/重置/壳层/页眉页脚/弹窗/Toast/返回顶部 FAB（全站共享，链接顺序最前）
 │   ├── forms.css         # 表单控件
 │   ├── cards-detail.css  # 首页卡片网格 + 详情 + 渲染窗口控制区
 │   └── login.css / settings.css / stats.css / tier.css  # 页面级样式
@@ -50,7 +50,7 @@ public/
     ├── api.js            # API 封装
     ├── i18n.js           # i18n：t() 取词 + applyI18nDom() 静态文案应用 + setLocale()
     ├── locales/          # 词典：zh-CN.js（默认）+ en.js（叶子 key 双向 parity 有测试卡住）
-    ├── layout.js         # injectShell() 公共壳层 + injectFooter() 站点页脚（登录页跳过）
+    ├── layout.js         # injectShell() 公共壳层（含返回顶部 FAB）+ injectFooter() 站点页脚（登录页跳过）
     ├── constants.js      # 前端共享常量（与后端同值约定，勿单方修改）
     ├── utils.js          # 工具函数（debounce, trapFocus, formatUserPlayTime, lockPageScroll/unlockPageScroll, toggleMobileMenu, initProgressBar）
     ├── theme.js          # 主题切换（html.dark-mode）+ 自定义背景
@@ -320,7 +320,7 @@ tests/
   - HTML 静态文案走 `data-i18n*` 标记，由 `applyI18nDom()` 应用（同步首遍 + 词典就绪后第二遍）
   - JS 动态文案走 `t()`，Alpine 内联表达式走 `$t` magic
   - 新增 key 必须双语词典同步（`tests/public/i18n.keys.test.mjs` 双向 parity 强制）
-- 公共壳层与页脚：[`public/js/layout.js`](public/js/layout.js) — `injectShell()`（进度条/背景遮罩/Toast/确认对话框）+ `injectFooter()`（全站页脚，登录页跳过）
+- 公共壳层与页脚：[`public/js/layout.js`](public/js/layout.js) — `injectShell()`（进度条/背景遮罩/Toast/确认对话框/返回顶部 FAB：IO 哨兵 scrollY>600 显隐 + safe-area 兜底，纯 DOM 无 Alpine 依赖）+ `injectFooter()`（全站页脚，登录页跳过）
 - 共享常量：[`public/js/constants.js`](public/js/constants.js) — 与后端同值约定（如批量 Tier 上限 200），修改一端必须同步另一端
 - 工具函数：[`public/js/utils.js`](public/js/utils.js) — `debounce`, `trapFocus`, `formatUserPlayTime`, `lockPageScroll`/`unlockPageScroll`, `toggleMobileMenu`, `initProgressBar`
 - 主题与背景：[`public/js/theme.js`](public/js/theme.js) — 主题切换（`html.dark-mode`）、自定义背景 overlay

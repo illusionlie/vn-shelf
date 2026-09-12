@@ -20,6 +20,7 @@ export default {
     edit: 'Edit',
     delete: 'Delete',
     close: 'Close',
+    backToTop: 'Back to top',
     colon: ': ',
     details: 'Details',
     clear: 'Clear',

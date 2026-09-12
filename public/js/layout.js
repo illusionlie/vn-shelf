@@ -13,6 +13,10 @@
  * 归一化后行为等价且在 Store 未就绪时不抛错）。
  *
  * 三块均为 position:fixed，DOM 位置变更不影响视觉层级。
+ *
+ * 09-12 增：返回顶部 FAB + 显隐哨兵（见 setupBackToTop），同为壳层成员，
+ * 纯 DOM API 接线（无 Alpine 依赖），aria-label 走 data-i18n-aria-label 由
+ * applyI18nDom 首遍扫描就位。
  */
 
 const SHELL_TEMPLATE = `
@@ -57,6 +61,16 @@ const SHELL_TEMPLATE = `
       </div>
     </template>
   </div>
+
+  <!-- 返回顶部显隐哨兵：锚文档原点，供 setupBackToTop 的 IO 观测（见下方注释） -->
+  <div class="back-to-top-sentinel" aria-hidden="true"></div>
+
+  <!-- 返回顶部 FAB：默认隐藏，滚过阈值后 .visible（setupBackToTop 控制） -->
+  <button type="button" class="back-to-top" data-i18n-aria-label="common.backToTop">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="18 15 12 9 6 15"></polyline>
+    </svg>
+  </button>
 `;
 
 /**
@@ -67,7 +81,41 @@ export function injectShell() {
   const shell = document.getElementById('app-shell');
   if (shell) {
     shell.innerHTML = SHELL_TEMPLATE;
+    setupBackToTop(shell);
   }
+}
+
+/**
+ * 返回顶部 FAB 接线（09-12）。
+ *
+ * 显隐 = IO 哨兵反向信号：哨兵为锚定 ICB 原点（文档 y=0）的 1px absolute 元素——
+ * 不用 in-flow 定位是因为 body 有 padding-top:120px（fixed header 让位），
+ * 会把阈值偏移掉一个 header 高度。rootMargin 上扩 600px 后，哨兵不可见 ⇔
+ * scrollY > 600 ⇔ FAB 显示。与首页 render-sentinel 同构（IO 惯例），免 scroll
+ * 监听/rAF 节流；bfcache 前后进退、iOS 弹性滚动负 scrollY、虚拟键盘引起的
+ * 视口缩放均由 IO 自动重算，无需手动同步。
+ *
+ * 点击 scrollTo 不带 behavior：交给 CSS html{scroll-behavior:smooth}，
+ * prefers-reduced-motion 下自动降级 instant（base.css 07-19 契约）。
+ *
+ * 无 IO 环境降级为常显（登录页无滚动，由 CSS body.login-page 隐藏）。
+ * 重复 injectShell 覆写时旧 IO 持有已脱离节点，至多对游离节点触发一次
+ * 无害回调，随 GC 回收，不需显式 disconnect。
+ */
+function setupBackToTop(shell) {
+  const btn = shell.querySelector('.back-to-top');
+  const sentinel = shell.querySelector('.back-to-top-sentinel');
+  if (!btn || !sentinel) return;
+
+  btn.addEventListener('click', () => {
+    window.scrollTo({ top: 0 });
+  });
+
+  if (!('IntersectionObserver' in window)) return;
+  new IntersectionObserver((entries) => {
+    const atTop = entries.some((entry) => entry.isIntersecting);
+    btn.classList.toggle('visible', !atTop);
+  }, { rootMargin: '600px 0px 0px 0px' }).observe(sentinel);
 }
 
 // 站点页脚（08-28）。与 SHELL_TEMPLATE 不同：footer 是 in-flow 内容，必须挂在 body
