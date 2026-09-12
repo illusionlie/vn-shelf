@@ -557,3 +557,88 @@ const stubDo = { async fetch(req) { /* storage 读写 + 委托 evaluateLoginAtte
 **Tests**：`tests/auth/jwt.test.mjs` 直测（不经 router 桩替换）：alg 伪造三态、缺 / 非数值 exp、`exp == now` 与 `now-1` 边界、篡改 payload / 签名、setAuthCookie（Secure 双形态）属性串、setAdminPassword ↔ verifyAdminPassword 往返。node ≥ 18 原生 WebCrypto / btoa / atob，无 polyfill（`tests/auth/` 为新纯后端直测域，先例 `tests/vndb/`）。
 
 **Related**：本任务同时新增 `tests/auth/` 目录；`constantTimeEqual` 保持未导出，经 `verifyPassword` / `verifyJWT` 行为断言覆盖。
+
+---
+
+## Scenario: 公开读端点缓存与版本键失效（09-12 起）
+
+### 1. Scope / Trigger
+
+- Trigger：改动 `src/http-cache.js`、公开 GET 端点的缓存/ETag 行为、写路由的版本 bump 接入、或新增公开只读端点时的缓存集合变更。
+- 来源：任务 `09-12-public-cache-and-index`。设计动因：**Workers Cache API 只能按精确 URL 删除、无通配 purge**，而 `/api/vn` 有 sort×search×untiered 不可枚举的查询串变体——故采用版本键设计，把 purge 变成"换钥匙"。
+
+### 2. Signatures
+
+```js
+// src/http-cache.js
+readCacheVersion(env)   // settings PK 点查，缺失 = 0；读前 initDB 复用 WeakSet 记忆化
+bumpCacheVersion(env)   // 单语句原子自增：INSERT ... ON CONFLICT(key) DO UPDATE SET value = value + 1
+buildEtag(version)      // `"vshelf-N"`（四个端点共用同一版本号）
+servePublicCached(request, env, ctx, path, handler, cachesImpl = globalThis.caches)
+                        // cachesImpl 参数注入是可测性契约，测试传桩断言 match/put
+
+// src/router.js
+PUBLIC_CACHE_PATH_PATTERNS          // 4 端点：/api/vn、/api/vn/v\d+、/api/stats、/api/tier（appearance 除外，维持 max-age=300 现状）
+invalidatePublicCacheAfterWrite(h)  // 写路由出口统一包裹：仅 2xx 才 ctx.waitUntil(bump)，bump 失败仅告警
+```
+
+### 3. Contracts
+
+- **缓存键 = `request.url + '__cv=' + version`（合成查询串）**：写后版本自增 → 旧键自然失联永不命中，60s TTL 兜底回收孤儿副本。缓存键天然含原查询串，变体不串味。
+- **访客路径**（无 `auth_token` Cookie）：200 响应附 ETag + `Cache-Control: public, max-age=60` 并 `cache.put` 合成键副本；`If-None-Match` 命中返回 304（空体，保留 ETag/Cache-Control）；**仅 200 落副本**——404 等带 ETag + max-age（浏览器 ≤60s 陈旧上界可接受）但不 put（Workers `cache.put` 对非 200 受限）。
+- **管理员三不原则**（Cookie 含 `auth_token` 即可，**不校验有效性**——判定缓存身份与 authMiddleware 鉴权职责分层）：**永不 match / 永不 put / 永不 304**，响应 `no-store` + ETag。Why：bump 走 `ctx.waitUntil` 有毫秒级窗口，写后立即带旧 ETag 回读时若允许 304 会命中陈旧数据——这正是 PRD 明令禁止的写后回读陈旧回归。
+- **ETag 全端点共用单一版本号**：跨端点误失效（改 tier 名使 vn 列表 ETag 变）成本 = 一次重算，换零 body 哈希、零 purge 复杂度，显式接受。
+- **`cache:version` 是 settings 表第 4 命名空间**（schema_version / config:settings / tier:list:meta / cache:version），必须独立读写——**禁止挂进 config:settings blob**（否则与管理员保存配置互相踩版本语义 + 读放大）。
+- **命中副本必须重建**：`new Response(cached.body, cached)`——Cache API 返回的 Response headers 不可变，外层 CORS 统一 `set` 需要可变头。CORS 附加保持 `handleRequest` 出口统一（304 / 命中 / 404 三路径全覆盖）。
+- **写路径 bump 接入**（12 处，漏一处 = 对应端点访客最长 60s 陈旧）：10 个写路由经 `invalidatePublicCacheAfterWrite` 分发层包裹（vn 三写含 refreshVNDB 分支、tier 归属两写、tier CRUD 四写、import）；queue 消费批级 `vnDataWritten` 标记 + 同步 bump 一次/批（不走 waitUntil，避免破坏既有 queue 测试计数语义）；ulist 导入 `imported > 0` 才 bump（纯 skipped 不 bump）。`PUT /api/config` 不 bump（不写 vn/tier 数据）。
+- **前端 D3**：管理员态的列表/统计/Tier/详情 GET 传 `cache: 'no-store'`（vnShelf.loadVNList、tierlistPage.loadTiers/loadVNList、statsPage.loadStats、shared.openDetail）——消除"登录前 60s 访客态副本被复用"的浏览器缓存登录切换窗口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|---|---|
+| 访客 INM 等于当前版本 ETag | 304 空体（ETag + Cache-Control 保留，CORS 由外层附加） |
+| 访客 INM 为旧版本 | 200 全量（旧缓存键失联，不误命中） |
+| 写路由 2xx | `ctx.waitUntil(bump)`，版本 +1，新旧 ETag 切换 |
+| 写路由 4xx（校验失败） | 不 bump |
+| bump 落库抛错 | `console.warn`，写响应不受影响 |
+| 带 auth_token Cookie（任意值） | 200 直查 + `no-store`，INM 也不 304 |
+| appearance 端点 | 维持 `max-age=300`、无 ETag（零变化） |
+
+### 5. Good/Base/Bad Cases
+
+- Good：新增公开只读端点 → 加入 `PUBLIC_CACHE_PATH_PATTERNS` + http-cache 测试补端点覆盖。
+- Base：不公开/写端点无需理会；`PUT /api/config` 类不写 vn/tier 的端点不接 bump。
+- Bad（禁止）：handler 内自加 Cache-Control（破坏出口统一）；`cache:version` 挂进 config blob；读改写三步自增版本（并发竞态）；允许管理员 304；给非 200 响应 `cache.put`。
+
+### 6. Tests Required
+
+- `tests/router/http-cache.test.mjs`：真实 router + http-cache + db 链路，caches 经第 6 参注入桩——访客 miss/ETag/CORS/合成键、二次命中 handler 零执行、查询串变体不串味、管理员三不原则、304 空体三头、写后版本自增旧键失联、4xx 不 bump + bump 抛错不破写响应、appearance 不入缓存。
+- **patch 桩同步纪律**：router.js 新增 `./http-cache.js` import 时，六个 router 桩（envelope / config.update / vndb.search / login.ratelimit / index.start / vn.status）+ queue 加载器 + ulist 桩必须全员同步直通/计数桩（依赖图陷阱，见信封 Scenario §6）。
+- `tests/d1/migrations.test.mjs`：v3（idx_vn_entries_created）存量库应用用例；EXPLAIN QUERY PLAN 走索引（无 TEMP B-TREE）。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：读改写自增版本（两请求并发读到同值，丢一次 bump → 访客多 60s 陈旧）
+const v = Number(await readCacheVersion(env));
+await saveCacheVersion(env, v + 1);
+
+// Correct：单语句原子自增，败者不丢更新
+await env.DB.prepare(
+  "INSERT INTO settings (key, value) VALUES ('cache:version', '1') " +
+  "ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)"
+).run();
+```
+
+```js
+// Wrong：管理员也走 304（bump 异步窗口内写后回读命中陈旧 304）
+if (request.headers.get('If-None-Match') === etag) return notModified();
+
+// Correct：三不原则——Cookie 在即直查 + no-store
+if (hasAuthCookie) {
+  const res = await handler();
+  res.headers.set('Cache-Control', 'no-store');
+  return res;
+}
+```

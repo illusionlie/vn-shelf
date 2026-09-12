@@ -26,6 +26,7 @@ src/
 ├── router.js       # API 路由分发与处理
 ├── db.js           # D1 Schema 定义与初始化
 ├── repository.js   # D1 数据访问层
+├── http-cache.js   # 公开读端点缓存（版本键 ETag + Cache API，管理员 no-store 直查）
 ├── stats.js        # 统计聚合纯函数（computeStats，/api/stats 数据源）
 ├── auth.js         # JWT + 密码哈希认证
 ├── login-ratelimit.js # 登录限流纯函数状态机（evaluateLoginAttempt）
@@ -113,6 +114,8 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 | GET | `/api/config/appearance` | 外观与公开 tags 配置 | 公开 |
 | GET | `/api/export` | 导出数据（`entries` + `tierList`） | 需认证 |
 | POST | `/api/import` | 导入数据（`merge`/`replace`，支持 `tierList`） | 需认证 |
+
+公开只读端点（`/api/vn`、`/api/vn/{id}`、`/api/stats`、`/api/tier`）支持 ETag 协商缓存与访客 60s 边缘缓存：数据写操作经 `cache:version` 版本键失效（详见 [`src/http-cache.js`](src/http-cache.js) 与 spec backend/conventions.md）；带 `auth_token` Cookie 的请求永远直查并返回 `no-store`。
 
 ## Queue 处理机制（批量索引）
 
