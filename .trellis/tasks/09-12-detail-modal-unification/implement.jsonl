@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范入口与各指南索引"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "modal role/Esc 契约、busy 按钮 aria-disabled 保焦点、role=button 内嵌控件 .stop、CSS 模块归属、t() 与 data-i18n 互斥、封面 z-index 阶梯"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "shared.js mixin 边界；09-09 单条目就地更新 Scenario（refreshVN 重构基准，不得回退）"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "per-id busy map 属组件本地状态，不进 $store.app"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "新模块 public/js/detail-modal.js 的落位与命名约定"}
+{"file": ".trellis/tasks/09-12-detail-modal-unification/research/current-state.md", "reason": "侦察事实：两份模板逐段对照与四处差异、app.js 注入时序契约、4 处生命周期重复位置、vnShelf 管理员动作重构基准"}

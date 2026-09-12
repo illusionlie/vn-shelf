@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "a11y 与禁止模式检查清单（modal role/Esc、focus ring、aria-disabled、friendlyError 分层）"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "核对 09-09 就地更新 Scenario 未回退（不重置渲染窗口、在途互斥）"}
+{"file": ".trellis/tasks/09-12-detail-modal-unification/research/current-state.md", "reason": "对照四处差异统一口径与 4 处生命周期替换是否齐全"}
