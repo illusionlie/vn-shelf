@@ -3,7 +3,7 @@
   "name": "public-cache-and-index",
   "title": "公开端点缓存与 created_at 索引",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
