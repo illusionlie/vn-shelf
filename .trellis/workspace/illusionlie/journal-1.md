@@ -927,4 +927,28 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 
 [OK] **Completed** — 待办：09-12-detail-modal-unification 规划已批准待实施；缓存任务遗留生产域名 curl 复核 + 3 条 P2 小项。
 
+
+## Session 24: 详情弹窗统一与弹窗生命周期重构全流程交付（三连收官）
+
+**Date**: 2026-09-12
+**Task**: 09-12-detail-modal-unification
+**Branch**: `master`
+
+### Summary
+
+弹窗统一全流程交付（implement → check → 手测 → spec → 提交）：新建 public/js/detail-modal.js 单一注入模板（index 版逐字基准，check 逐行 diff 确认仅 3 处设计内变更），两页 HTML 内联模板（~133 + ~95 行）删为 mount div；app.js 注入序 injectFooter 后、首遍 applyI18nDom 前。withModalGuard（utils.js createModalGuard({lockScroll}) → open/trap/close）替换 4 处逐字重复，静默降级与条件锁语义逐字保留，confirmDialog 走 lockScroll:false。statusBadgeLabel/statusIcon 上移 utils.js、VN_STATUS_OPTIONS 落 constants.js（与后端白名单注释互指）。Tier 页新能力：createDetailAdminActions mixin（宿主钩子展开覆盖）+ applyDetailEntryUpdated/Removed 进 tier 分组就地更新，页脚 admin 三钮中编辑 detailCanEdit 隐藏、访客 template x-if 不进 DOM。vnShelf 09-09 就地更新场景零回退（check 逐项核）。十星 CSS 死规则清理，i18n 零新增 key，248/248 全绿。手测（Playwright 管理员会话 + v17 牺牲条目）：两页字段口径逐项一致、tier 页刷新（busy/toast/无重载/弹窗保持）、删除（confirm→卡片 155→154 就地移除→API 零残留）、Esc 关闭。手测插曲两则：页面加载后新建条目不进客户端过滤列表（刷新才可见，易误判回归）；tier 卡片标题在 aria-label 不在 textContent。spec 沉淀「统一详情弹窗注入 Scenario」+「withModalGuard Convention」。至此 09-12 三任务（安全加固/缓存索引/弹窗统一）全部收官。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6edf91` | feat(ui): 详情弹窗统一 + Tier 页管理能力 + withModalGuard |
+| `b2994ff` | docs(spec): 弹窗注入 Scenario 与守卫契约 |
+| `09df6fb` | docs(task): 验收记录与偏离说明 |
+| `e6c16ee` | chore(task): archive |
+
+### Status
+
+[OK] **Completed** — 三连收官。遗留：书架页删除改就地 splice（微任务）、tier 页隐藏编辑钮方法引用（设计内安全）、焦点循环/en 文案日常观察。
+
 [OK] **Completed**
