@@ -21,6 +21,11 @@
             "type": "command",
             "command": "python .claude/hooks/session-start.py",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python .claude/hooks/inject-spec-context.py",
+            "timeout": 30
           }
         ]
       },
@@ -30,6 +35,11 @@
           {
             "type": "command",
             "command": "python .claude/hooks/session-start.py",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python .claude/hooks/inject-spec-context.py",
             "timeout": 30
           }
         ]
@@ -53,6 +63,18 @@
             "type": "command",
             "command": "python .claude/hooks/inject-subagent-context.py",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/inject-spec-context.py",
+            "timeout": 15
           }
         ]
       }
