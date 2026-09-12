@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "后端契约：API 响应信封、错误响应形态、settings 复用、wrangler 配置双轨约定"}
+{"file": ".trellis/tasks/09-12-security-hardening-bundle/research/current-state.md", "reason": "代码形态侦察：verifyJWT/handleLogin 插入点、DO 先例与迁移 tag 机制、queue 循环结构、vendor 锁定机制、测试桩技术"}
