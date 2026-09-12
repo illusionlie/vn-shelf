@@ -1,7 +1,8 @@
 /**
  * 纯函数：把完整条目（`GET/PUT /api/vn/:id` 的 `data`）中的 VNDB 元数据合并进列表项。
  *
- * 用于单条目 VNDB 刷新后的就地更新（vnShelf.applyRefreshedEntry），
+ * 用于单条目 VNDB 刷新后的就地更新（vnShelf / tierlistPage 的
+ * applyDetailEntryUpdated 钩子，经 createDetailAdminActions 调用），
  * 避免为一条记录重拉整表并重置渲染窗口。
  *
  * 【跨端同值约定】字段口径镜像 `src/repository.js` 的 `rowToListItem`：

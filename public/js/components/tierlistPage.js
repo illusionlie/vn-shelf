@@ -7,14 +7,20 @@ import { UNTIERED_KEY, DEFAULT_TIER_COLOR, MAX_BATCH_TIER_UPDATES } from '../con
 import { t } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import { computeTierDiff } from '../tier-diff.js';
-import { formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
+import { createModalGuard, formatUserPlayTime, statusBadgeLabel, statusIcon } from '../utils.js';
+import { mergeVndbIntoListItem } from '../vn-list-item.js';
 
-import { createDetailModal, createTagsView } from './shared.js';
+import { createDetailAdminActions, createDetailModal, createTagsView } from './shared.js';
 
 export function tierlistPage() {
   return {
     ...createTagsView(),
     ...createDetailModal(),
+    ...createDetailAdminActions(),
+
+    // 详情弹窗页脚「编辑」按钮开关（统一模板 detail-modal.js 引用）：
+    // 编辑表单注入另立后续任务，tier 页仅刷新 + 删除
+    detailCanEdit: false,
 
     tiers: [],
     allVN: [],
@@ -24,6 +30,8 @@ export function tierlistPage() {
 
     showTierEdit: false,
     editingTier: null,
+    // tier 编辑弹窗生命周期守卫（滚动锁 + 焦点陷阱）
+    _tierEditModalGuard: createModalGuard(),
     tierForm: {
       name: '',
       color: DEFAULT_TIER_COLOR
@@ -200,9 +208,7 @@ export function tierlistPage() {
         name: '',
         color: DEFAULT_TIER_COLOR
       };
-      if (!this.showTierEdit) {
-        lockPageScroll();
-      }
+      this._tierEditModalGuard.open();
       this.showTierEdit = true;
       this._trapTierEdit();
     },
@@ -213,18 +219,14 @@ export function tierlistPage() {
         name: tier?.name || '',
         color: tier?.color || DEFAULT_TIER_COLOR
       };
-      if (!this.showTierEdit) {
-        lockPageScroll();
-      }
+      this._tierEditModalGuard.open();
       this.showTierEdit = true;
       this._trapTierEdit();
     },
 
     _trapTierEdit() {
       this.$nextTick(() => {
-        if (this.$refs.tierEditModal) {
-          this._tierEditTrapRelease = trapFocus(this.$refs.tierEditModal);
-        }
+        this._tierEditModalGuard.trap(this.$refs.tierEditModal);
       });
     },
 
@@ -232,15 +234,7 @@ export function tierlistPage() {
       if (!this.showTierEdit) return;
       this.showTierEdit = false;
       this.editingTier = null;
-      if (this._tierEditTrapRelease) {
-        try {
-          this._tierEditTrapRelease();
-        } catch {
-          // 释放焦点陷阱失败时静默降级
-        }
-        this._tierEditTrapRelease = null;
-      }
-      unlockPageScroll();
+      this._tierEditModalGuard.close();
     },
 
     async saveTier() {
@@ -630,7 +624,32 @@ export function tierlistPage() {
       await this.onDrop(null, event);
     },
 
+    // ===== 详情管理员动作宿主钩子（覆盖 createDetailAdminActions 空实现）=====
+    // tier 页无渲染窗口，就地替换/移除 + 重建 tier 分组即可（不整表重拉、不重载页面）
+
+    // 单条目 VNDB 刷新后就地替换 allVN 条目并重建分组：mergeVndbIntoListItem 仅合并
+    // VNDB 派生字段，tierId/tierSort 沿用旧值，分组归属与排序不变；
+    // x-for :key 同 id 换对象，Alpine 复用 DOM 只刷绑定（卡片内 x-data 局部状态保留）。
+    applyDetailEntryUpdated(entry) {
+      if (!entry?.id) return;
+      const idx = this.allVN.findIndex(item => item.id === entry.id);
+      if (idx !== -1) {
+        this.allVN[idx] = mergeVndbIntoListItem(this.allVN[idx], entry);
+        this.rebuildTierGroups();
+      }
+    },
+
+    // 删除后就地移除条目并重建分组；tier 行本身保留（空分组自然显示「拖到这里」占位）
+    applyDetailEntryRemoved(id) {
+      this.allVN = this.allVN.filter(item => item.id !== id);
+      this.rebuildTierGroups();
+    },
+
     formatUserPlayTime,
+
+    // 状态徽章文案/图标：共享层导出（utils.js），详情弹窗与书架页同口径
+    statusBadgeLabel,
+    statusIcon,
 
     renderMarkdown
   };

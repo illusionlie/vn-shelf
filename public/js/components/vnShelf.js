@@ -3,15 +3,13 @@
  */
 
 import { friendlyErrorMessage, vnAPI, vndbAPI } from '../api.js';
+import { VN_STATUS_OPTIONS } from '../constants.js';
 import { t } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
-import { debounce, formatUserPlayTime, lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
+import { createModalGuard, debounce, formatUserPlayTime, statusBadgeLabel, statusIcon } from '../utils.js';
 import { mergeVndbIntoListItem } from '../vn-list-item.js';
 
-import { createDetailModal, createTagsView } from './shared.js';
-
-// 与 src/repository.js 的 VN_STATUS_VALUES 保持同步（后端另含预留的 wishlist，首期 UI 不暴露）
-const VN_STATUS_OPTIONS = ['playing', 'finished', 'stalled', 'dropped'];
+import { createDetailAdminActions, createDetailModal, createTagsView } from './shared.js';
 
 // VNDB ID 直连模式判定（与 src/utils.js isValidVNDBId 同口径）
 const VNDB_ID_RE = /^v\d+$/;
@@ -26,6 +24,11 @@ export function vnShelf() {
   return {
     ...createTagsView(),
     ...createDetailModal(),
+    ...createDetailAdminActions(),
+
+    // 详情弹窗页脚「编辑」按钮开关（统一模板 detail-modal.js 引用）：
+    // 编辑表单仅书架页提供；tier 页编辑注入另立后续任务
+    detailCanEdit: true,
 
     vnList: [],
     filteredList: [],
@@ -35,11 +38,9 @@ export function vnShelf() {
     isLoading: true,
     showEdit: false,
     editForm: {},
+    // 编辑弹窗生命周期守卫（滚动锁 + 焦点陷阱）
+    _editModalGuard: createModalGuard(),
     _initialized: false,
-
-    // 单条目 VNDB 刷新的 per-id busy map：{ [vnId]: true }。同 id 重入被守卫拦截，不同 id 可并行。
-    // 用普通对象而非 Set，避免依赖集合类型的响应式细节。
-    refreshing: {},
 
     // ===== 渲染窗口化（哨兵自动追加 + 手动「加载更多」）=====
     visibleCount: RENDER_PAGE_SIZE,
@@ -87,7 +88,7 @@ export function vnShelf() {
 
     // 窗口重置点：loadVNList（含增删改后重载）/ handleSearch /
     // handleStatusFilterChange / handleSortChange 四处显式调用，保持可 grep。
-    // applyRefreshedEntry（单条目就地刷新）有意不重置，保留滚动位置与已展开窗口。
+    // applyDetailEntryUpdated（单条目就地刷新）有意不重置，保留滚动位置与已展开窗口。
     resetRenderWindow() {
       this.visibleCount = RENDER_PAGE_SIZE;
       this.autoLoadsLeft = AUTO_LOAD_BUDGET;
@@ -196,31 +197,9 @@ export function vnShelf() {
       this.resetRenderWindow();
     },
 
-    // 卡片徽章仅渲染已配色的四状态；白名单外的值（如后端预留的 wishlist）
-    // 安全降级为不显示徽章，避免渲染无样式徽章或裸 i18n key
-    statusBadgeLabel(status) {
-      return VN_STATUS_OPTIONS.includes(status) ? t(`status.${status}`) : '';
-    },
-
-    // 内嵌单色 SVG 图标（fill/stroke 均用 currentColor，随状态章白字渲染）。
-    // 用内嵌 SVG 而非 ▶✓⏸✕ Unicode，避免 Windows 下被 emoji 字体劫持成彩色。
-    // 白名单外（含 null / wishlist）返回空串，配合 statusBadgeLabel 整章不渲染。
-    statusIcon(status) {
-      const icons = {
-        // 在玩：播放三角
-        playing: '<path d="M8 5v14l11-7z"/>',
-        // 已完成：对勾
-        finished: '<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
-        // 搁置：暂停双竖
-        stalled: '<path d="M7 5h3v14H7zM14 5h3v14h-3z"/>',
-        // 抛弃：叉
-        dropped: '<path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>'
-      };
-      const inner = icons[status];
-      return inner
-        ? `<svg class="status-badge-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${inner}</svg>`
-        : '';
-    },
+    // 状态徽章文案/图标：共享层导出（utils.js），卡片与详情弹窗两页同口径
+    statusBadgeLabel,
+    statusIcon,
 
     // 卡片评分：个人评分优先，未评分（后端存 0 / 缺失）回退 VNDB 分
     hasPersonalRating(vn) {
@@ -451,30 +430,18 @@ export function vnShelf() {
           isNew: true
         };
       }
-      if (!this.showEdit) {
-        lockPageScroll();
-      }
+      this._editModalGuard.open();
       this.showEdit = true;
 
       if (this.showDetail) {
-        // 从详情跳转到编辑：释放详情焦点陷阱（但不走 closeDetail，避免清空 selectedVN
+        // 从详情跳转到编辑：释放详情守卫（但不走 closeDetail，避免清空 selectedVN
         // 进而破坏编辑模态内 getDisplayTags(selectedVN || editForm) 的标签展示）
         this.showDetail = false;
-        if (this._detailTrapRelease) {
-          try {
-            this._detailTrapRelease();
-          } catch {
-            // 释放焦点陷阱失败时静默降级
-          }
-          this._detailTrapRelease = null;
-        }
-        unlockPageScroll();
+        this._detailModalGuard.close();
       }
 
       this.$nextTick(() => {
-        if (this.$refs.editModal) {
-          this._editTrapRelease = trapFocus(this.$refs.editModal);
-        }
+        this._editModalGuard.trap(this.$refs.editModal);
       });
     },
 
@@ -483,15 +450,7 @@ export function vnShelf() {
       this.showEdit = false;
       this.editForm = {};
       this.resetVndbSearch();
-      if (this._editTrapRelease) {
-        try {
-          this._editTrapRelease();
-        } catch {
-          // 释放焦点陷阱失败时静默降级
-        }
-        this._editTrapRelease = null;
-      }
-      unlockPageScroll();
+      this._editModalGuard.close();
     },
 
     formatUserPlayTime,
@@ -576,59 +535,23 @@ export function vnShelf() {
       }
     },
 
-    async deleteVN() {
-      const ok = await this.$store.app.confirm({
-        title: t('confirm.deleteVnTitle'),
-        message: t('confirm.deleteVnMessage'),
-        confirmText: t('confirm.deleteAction'),
-        danger: true
-      });
-      if (!ok) return;
+    // ===== 详情管理员动作宿主钩子（覆盖 createDetailAdminActions 空实现）=====
 
-      try {
-        await vnAPI.delete(this.selectedVN.id);
-        this.$store.app.addToast(t('toast.deleteOk'));
-        this.closeDetail();
-        await this.loadVNList();
-      } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.deleteFailed')), 'error');
-      }
-    },
-
-    isRefreshing(id) {
-      return Boolean(id && this.refreshing[id]);
-    },
-
-    // 单条目 VNDB 刷新：只传 refreshVNDB，用户字段由后端三态语义（未出现 = 保持）原样保留。
-    // 成功后就地合并（不走 loadVNList，避免重置渲染窗口 / 滚动位置）。
-    // 后端 saveVNEntry 为 INSERT OR REPLACE 整行写入，在途期间同条目的编辑/删除由模板禁用，
-    // 避免刷新落库复活已删行或覆盖并发编辑。
-    async refreshVN(id) {
-      if (!id || this.refreshing[id]) return;
-      this.refreshing[id] = true;
-      try {
-        const res = await vnAPI.update(id, { refreshVNDB: true });
-        this.applyRefreshedEntry(res.data);
-        this.$store.app.addToast(t('toast.refreshOk'));
-      } catch (error) {
-        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.refreshFailed')), 'error');
-      } finally {
-        delete this.refreshing[id];
-      }
-    },
-
-    // 用完整条目就地替换列表项（仅 VNDB 派生字段）与已打开的详情。
-    // 排序不就地重排（避免卡片跳位）；搜索/状态筛选重放，标题变化导致不再匹配时卡片会消失。
-    applyRefreshedEntry(entry) {
+    // 单条目 VNDB 刷新后就地替换列表项（仅 VNDB 派生字段，vn-list-item.js 投影）。
+    // 排序不就地重排（避免卡片跳位）；搜索/状态筛选重放，标题变化导致不再匹配时卡片会消失；
+    // 有意不 resetRenderWindow（保留滚动位置与已展开窗口）。已打开详情弹窗的同步由 mixin 统一处理。
+    applyDetailEntryUpdated(entry) {
       if (!entry?.id) return;
       const idx = this.vnList.findIndex(item => item.id === entry.id);
       if (idx !== -1) {
         this.vnList[idx] = mergeVndbIntoListItem(this.vnList[idx], entry);
-        this.filteredList = this.applyFilters(this.vnList); // 不 resetRenderWindow
+        this.filteredList = this.applyFilters(this.vnList);
       }
-      if (this.selectedVN?.id === entry.id) {
-        this.selectedVN = entry;
-      }
+    },
+
+    // 删除后整表重载（既有行为：loadVNList 语义上耦合渲染窗口重置，删除后回到列表态可接受）
+    async applyDetailEntryRemoved() {
+      await this.loadVNList();
     },
 
     renderMarkdown

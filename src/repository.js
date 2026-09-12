@@ -9,7 +9,7 @@ const TIER_COLOR_HEX_REGEX = /^#[0-9a-fA-F]{6}$/;
 const VNDB_ID_REGEX = /^v\d+$/;
 
 // 条目游玩状态白名单。wishlist 为未来 VNDB ulist 导入预留，首期 UI 不暴露。
-// 前端 public/js/components/vnShelf.js 的 VN_STATUS_OPTIONS 与此保持同步（不含 wishlist）。
+// 前端 public/js/constants.js 的 VN_STATUS_OPTIONS 与此保持同步（不含 wishlist）。
 export const VN_STATUS_VALUES = ['playing', 'finished', 'stalled', 'dropped', 'wishlist'];
 
 // 状态归一化唯一入口：合法值原样返回，非法/缺失一律 null（导入宽松策略依赖此处，不拒包）

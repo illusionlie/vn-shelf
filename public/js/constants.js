@@ -16,3 +16,10 @@ export const DEFAULT_TIER_COLOR = '#ff4757';
  * 与后端 src/router.js:35 MAX_BATCH_TIER_UPDATES 同源约定，勿单独修改一端。
  */
 export const MAX_BATCH_TIER_UPDATES = 200;
+
+/**
+ * 前端 UI 暴露的游玩状态白名单（状态徽章 / 筛选选项）。
+ * 与后端 src/repository.js VN_STATUS_VALUES 同源约定——后端另含预留的 wishlist，
+ * 首期 UI 不暴露；修改一端时必须同步另一端。
+ */
+export const VN_STATUS_OPTIONS = ['playing', 'finished', 'stalled', 'dropped'];

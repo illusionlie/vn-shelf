@@ -16,7 +16,7 @@
  */
 
 import { t } from '../i18n.js';
-import { trapFocus } from '../utils.js';
+import { createModalGuard } from '../utils.js';
 
 export function confirmDialog() {
   return {
@@ -28,7 +28,8 @@ export function confirmDialog() {
     danger: false,
     thirdText: '',
     _resolve: null,
-    _trapRelease: null,
+    // 焦点陷阱守卫；confirmDialog 叠加于内容模态之上，自身不重复锁/解锁页面滚动
+    _dialogGuard: createModalGuard({ lockScroll: false }),
     _lastFocus: null,
 
     init() {
@@ -41,9 +42,7 @@ export function confirmDialog() {
       this.$watch('visible', (val) => {
         if (val) {
           this.$nextTick(() => {
-            if (this.$refs.dialog) {
-              this._trapRelease = trapFocus(this.$refs.dialog);
-            }
+            this._dialogGuard.trap(this.$refs.dialog);
           });
         } else {
           this._releaseFocus();
@@ -110,14 +109,7 @@ export function confirmDialog() {
     },
 
     _releaseFocus() {
-      if (this._trapRelease) {
-        try {
-          this._trapRelease();
-        } catch {
-          // 释放陷阱失败时静默降级
-        }
-        this._trapRelease = null;
-      }
+      this._dialogGuard.close();
       if (this._lastFocus) {
         try {
           if (typeof this._lastFocus.focus === 'function') {

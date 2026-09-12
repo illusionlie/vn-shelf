@@ -1,4 +1,5 @@
 import { friendlyErrorMessage } from './api.js';
+import { VN_STATUS_OPTIONS } from './constants.js';
 import { t } from './i18n.js';
 
 /**
@@ -35,6 +36,43 @@ export function formatUserPlayTime(user) {
     return t('time.hours', { h: displayHours });
   }
   return t('time.minutes', { m: displayPartMinutes });
+}
+
+// =========== 状态徽章 ============
+
+/**
+ * 状态徽章文案（卡片与详情弹窗两页同口径）。
+ * 卡片徽章仅渲染已配色的四状态；白名单外的值（如后端预留的 wishlist / null）
+ * 返回空串，配合 statusIcon 整章不渲染，避免渲染无样式徽章或裸 i18n key。
+ * @param {string|null} status - 游玩状态
+ * @returns {string}
+ */
+export function statusBadgeLabel(status) {
+  return VN_STATUS_OPTIONS.includes(status) ? t(`status.${status}`) : '';
+}
+
+/**
+ * 状态徽章内嵌单色 SVG 图标（fill/stroke 均用 currentColor，随状态章白字渲染）。
+ * 用内嵌 SVG 而非 ▶✓⏸✕ Unicode，避免 Windows 下被 emoji 字体劫持成彩色。
+ * 白名单外返回空串，配合 statusBadgeLabel 整章不渲染。
+ * @param {string|null} status - 游玩状态
+ * @returns {string}
+ */
+export function statusIcon(status) {
+  const icons = {
+    // 在玩：播放三角
+    playing: '<path d="M8 5v14l11-7z"/>',
+    // 已完成：对勾
+    finished: '<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    // 搁置：暂停双竖
+    stalled: '<path d="M7 5h3v14H7zM14 5h3v14h-3z"/>',
+    // 抛弃：叉
+    dropped: '<path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>'
+  };
+  const inner = icons[status];
+  return inner
+    ? `<svg class="status-badge-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${inner}</svg>`
+    : '';
 }
 
 // =========== 滚动锁定 ============
@@ -170,6 +208,56 @@ export function trapFocus(el) {
       }
     } catch {
       // 还原焦点失败时静默降级
+    }
+  };
+}
+
+// =========== 弹窗生命周期守卫 ============
+
+/**
+ * 弹窗生命周期守卫：滚动锁与焦点陷阱的成对管理。
+ *
+ * 此前 4 处弹窗（详情 / 编辑 / tier 编辑 / confirmDialog）逐字重复
+ * 「lockPageScroll → trapFocus → try{release()}catch{} 静默降级 → unlockPageScroll」，
+ * 收敛为本工厂统一持有：
+ * - `open()`：锁定页面滚动（幂等——守卫已持锁时不重复计数，对应原「已打开不重复 lock」语义）
+ * - `trap(el)`：在容器上建立焦点陷阱并持有 release（el 为空时静默跳过）
+ * - `close()`：静默释放焦点陷阱（try/catch 降级语义逐字保留）+ 解锁滚动 + 置空
+ *
+ * trap 独立于 open：焦点陷阱须等 Alpine 渲染出模态 DOM 后（$nextTick 回调内）建立，
+ * 调度权留在调用方。confirmDialog 叠加于内容模态之上、自身不重复锁滚动，
+ * 用 `createModalGuard({ lockScroll: false })` 只取焦点陷阱部分。
+ *
+ * @param {Object} [opts]
+ * @param {boolean} [opts.lockScroll=true] - 是否管理页面滚动锁
+ * @returns {{ open(): void, trap(el: HTMLElement): void, close(): void }}
+ */
+export function createModalGuard({ lockScroll = true } = {}) {
+  let release = null;
+  let locked = false;
+  return {
+    open() {
+      if (!lockScroll || locked) return;
+      lockPageScroll();
+      locked = true;
+    },
+    trap(el) {
+      if (!el) return;
+      release = trapFocus(el);
+    },
+    close() {
+      if (release) {
+        try {
+          release();
+        } catch {
+          // 释放焦点陷阱失败时静默降级
+        }
+        release = null;
+      }
+      if (lockScroll && locked) {
+        unlockPageScroll();
+        locked = false;
+      }
     }
   };
 }

@@ -13,7 +13,7 @@ import {
   initTranslations,
   translateTags
 } from '../translations.js';
-import { lockPageScroll, trapFocus, unlockPageScroll } from '../utils.js';
+import { createModalGuard } from '../utils.js';
 
 const DEFAULT_TAGS_CONFIG = {
   tagsMode: 'vndb',
@@ -99,12 +99,83 @@ export function createTagsView() {
 }
 
 /**
+ * 详情弹窗管理员动作 mixin：单条目 VNDB 刷新与删除（09-09 就地更新场景的跨页复用）
+ *
+ * 刷新/删除的就地生效因页面列表结构而异（书架页 vnList/filteredList + 渲染窗口、
+ * tier 页 allVN + tier 分组），经两个宿主钩子交回：宿主组件用同名方法
+ * 覆盖 mixin 的空实现（对象展开后者覆盖，与 createTagsView 同惯例）：
+ * - `applyDetailEntryUpdated(entry)`：刷新成功后就地合并列表条目（不整表重拉、不重置渲染窗口）
+ * - `applyDetailEntryRemoved(id)`：删除成功后就地移除列表条目
+ *
+ * busy 语义按 09-09 spec Scenario：刷新钮 aria-disabled/aria-busy 保焦点（真 disabled
+ * 会让焦点掉出弹窗陷阱）；同条目刷新在途期间编辑/删除由模板联动禁用
+ * （后端 saveVNEntry 为 INSERT OR REPLACE 整行写入的在途互斥）。
+ */
+export function createDetailAdminActions() {
+  return {
+    // 单条目 VNDB 刷新的 per-id busy map：{ [vnId]: true }。同 id 重入被守卫拦截，不同 id 可并行。
+    // 用普通对象而非 Set，避免依赖集合类型的响应式细节。
+    refreshing: {},
+
+    isRefreshing(id) {
+      return Boolean(id && this.refreshing[id]);
+    },
+
+    // 单条目 VNDB 刷新：只传 refreshVNDB，用户字段由后端三态语义（未出现 = 保持）原样保留。
+    async refreshVN(id) {
+      if (!id || this.refreshing[id]) return;
+      this.refreshing[id] = true;
+      try {
+        const res = await vnAPI.update(id, { refreshVNDB: true });
+        if (res.data?.id) {
+          this.applyDetailEntryUpdated(res.data);
+          // 已打开的详情弹窗同步为新条目（完整实体，非列表项投影）
+          if (this.selectedVN?.id === id) {
+            this.selectedVN = res.data;
+          }
+        }
+        this.$store.app.addToast(t('toast.refreshOk'));
+      } catch (error) {
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.refreshFailed')), 'error');
+      } finally {
+        delete this.refreshing[id];
+      }
+    },
+
+    async deleteVN(id) {
+      const ok = await this.$store.app.confirm({
+        title: t('confirm.deleteVnTitle'),
+        message: t('confirm.deleteVnMessage'),
+        confirmText: t('confirm.deleteAction'),
+        danger: true
+      });
+      if (!ok) return;
+
+      try {
+        await vnAPI.delete(id);
+        this.$store.app.addToast(t('toast.deleteOk'));
+        this.closeDetail();
+        await this.applyDetailEntryRemoved(id);
+      } catch (error) {
+        this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.deleteFailed')), 'error');
+      }
+    },
+
+    // ===== 宿主钩子（两组件列表结构不同，展开覆盖此空实现）=====
+    applyDetailEntryUpdated() {},
+    applyDetailEntryRemoved() {}
+  };
+}
+
+/**
  * 详情弹窗 mixin
  */
 export function createDetailModal() {
   return {
     selectedVN: null,
     showDetail: false,
+    // 弹窗生命周期守卫（滚动锁 + 焦点陷阱）；vnShelf 从详情跳编辑时也经它释放
+    _detailModalGuard: createModalGuard(),
 
     async openDetail(vn) {
       try {
@@ -114,14 +185,11 @@ export function createDetailModal() {
           this.$store.app.isAdmin ? { cache: 'no-store' } : {}
         );
         this.selectedVN = res.data;
-        if (!this.showDetail) {
-          lockPageScroll();
-        }
+        // 首开才锁滚动（guard 幂等，已持锁不重复计数）
+        this._detailModalGuard.open();
         this.showDetail = true;
         this.$nextTick(() => {
-          if (this.$refs.detailModal) {
-            this._detailTrapRelease = trapFocus(this.$refs.detailModal);
-          }
+          this._detailModalGuard.trap(this.$refs.detailModal);
         });
       } catch (error) {
         this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadDetailFailed')), 'error');
@@ -132,15 +200,7 @@ export function createDetailModal() {
       if (!this.showDetail) return;
       this.showDetail = false;
       this.selectedVN = null;
-      if (this._detailTrapRelease) {
-        try {
-          this._detailTrapRelease();
-        } catch {
-          // 释放焦点陷阱失败时静默降级
-        }
-        this._detailTrapRelease = null;
-      }
-      unlockPageScroll();
+      this._detailModalGuard.close();
     }
   };
 }

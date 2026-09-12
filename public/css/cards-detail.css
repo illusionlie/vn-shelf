@@ -326,18 +326,9 @@
 }
 
 /* Star Rating Visualization */
-.stars-container {
-  display: flex;
-  gap: 2px;
-}
-
 .star {
   color: #FFD700;
   font-size: 1.1rem;
-}
-
-.star.empty {
-  color: var(--star-empty-color);
 }
 
 .vn-card-company {
@@ -492,10 +483,6 @@
   gap: 8px;
 }
 
-.detail-stars .stars-container {
-  gap: 2px;
-}
-
 .detail-stars .star {
   font-size: 1.2rem;
 }
@@ -509,10 +496,6 @@
 /* 个人评分使用不同颜色 */
 .detail-stars.personal-rating .star {
   color: var(--personal-rating-color);
-}
-
-.detail-stars.personal-rating .star.empty {
-  color: var(--star-empty-color);
 }
 
 .detail-stars.personal-rating .detail-rating-score {
