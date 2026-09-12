@@ -43,6 +43,7 @@ public/
     ├── i18n.js           # t() / applyI18nDom() / setLocale()
     ├── locales/          # 词典：zh-CN.js（默认）+ en.js
     ├── layout.js         # injectShell() 公共壳层 + injectFooter() 页脚
+    ├── detail-modal.js   # 统一详情弹窗注入模板（injectDetailModal，index/tier 共用）
     ├── constants.js      # 前端共享常量
     ├── utils.js          # 工具函数
     ├── theme.js          # 主题切换 + 自定义背景
@@ -52,7 +53,7 @@ public/
     ├── vn-list-item.js   # 完整条目 → 列表项合并纯函数
     ├── vendor/           # 自托管第三方依赖（fetch-vendor.cjs 拉取脚本）
     └── components/
-        ├── shared.js        # 跨页面共享 mixin（tags 视图 + 详情弹窗）
+        ├── shared.js        # 跨页面共享 mixin（tags 视图 + 详情弹窗 + 管理员动作 refreshVN/deleteVN）
         ├── confirmDialog.js # 全局确认对话框
         ├── vnShelf.js       # 主页书架
         ├── tierlistPage.js  # Tier List 页
@@ -237,7 +238,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 | 组件 | 说明 |
 |------|------|
 | `vnShelf` | 主页书架：列表/搜索/排序、详情与编辑弹窗、渲染窗口化（哨兵追加 + 加载更多）、管理员单条目 VNDB 刷新 |
-| `tierlistPage` | Tier List：拖拽排序、跨 Tier 移动、分片批量提交（单批上限 200） |
+| `tierlistPage` | Tier List：拖拽排序、跨 Tier 移动、分片批量提交（单批上限 200）、详情弹窗管理员刷新 + 删除（就地生效） |
 | `settingsPage` | 设置：VNDB Token、密码、索引、导入导出、外观、语言切换 |
 | `loginPage` | 登录/初始化 |
 | `statsPage` | 统计数据展示 |

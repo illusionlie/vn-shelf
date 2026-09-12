@@ -191,3 +191,34 @@ applyRefreshedEntry(entry) {
 **Why**：`loadVNList()` 语义上耦合了渲染窗口重置（首页核心体验），单条目写操作走它会丢滚动位置与已展开窗口；8 个字段的就地合并成本远低于整表重传。
 
 **Related**：quality-guidelines.md「busy 按钮用 aria-disabled 保焦点」「role=button 容器内嵌套控件的 .stop 契约」。
+
+---
+
+## Scenario: 统一详情弹窗注入（09-12 固化，样板：index/tier 共用弹窗）
+
+**What**：跨页面共享的弹窗模板走「JS 模板字符串 + mount 注入」（`public/js/detail-modal.js` 的 `injectDetailModal()`），页面 HTML 只留 `<div id="detail-modal-mount"></div>`——**mount 必须在页面 `x-data` 根内**（两页均为 `<body x-data>`，mount 放原弹窗位置即契约成立）。
+
+**契约要点**：
+
+- **注入时序**（app.js 固定顺序）：`injectShell() → injectFooter() → injectDetailModal() → applyI18nDom() 首遍`。两个前提：注入发生在 Alpine 接管之前（confirmDialog 经 injectShell 注入的成熟先例）+ 首遍 i18n 扫描之前（模板内 `data-i18n` 标记含嵌套 `<template>`，`applyI18nDom` 递归 `template.content` 处理）。**禁止 top-level await**（app.js 与 alpine.min.js 执行顺序约束）。
+- 无 mount 的页面（login/settings/stats）注入函数空操作，不报错。
+- **页脚 admin 按钮形态**：`<template x-if="$store.app.isAdmin">` 包裹（访客**不进 DOM**，勿改回 x-show）；「编辑」钮 `x-show="detailCanEdit"`（vnShelf `true`、tierlistPage `false`——编辑表单仍为 index 专属，后续任务再统一）。
+- **管理员动作 mixin**：`shared.js createDetailAdminActions()` 无参工厂 + **宿主钩子对象展开覆盖**（`applyDetailEntryUpdated` / `applyDetailEntryRemoved`）——不用工厂参数传钩子（组件对象构造时拿不到宿主 `this`，展开覆盖是 shared.js 既有惯例）；busy map 字段名沿用 `refreshing`。vnShelf 的钩子 = 09-09 就地更新（上方案板）；tierlistPage 的钩子 = tier 分组内按 id 替换/移除 + `rebuildTierGroups`（空 tier 行保留占位）。
+- **共享 helper 上移**：`statusBadgeLabel` / `statusIcon` → `utils.js` 导出（依赖 `t()`，组件挂 shorthand 引用、模板绑定名不变）；其白名单 `VN_STATUS_OPTIONS` → `constants.js`（与后端 `src/repository.js VN_STATUS_VALUES` 注释互指同步，UI 不含预留 wishlist）。
+
+**Why**：两份 95~133 行模板复制粘贴已实际漂移（评分形式、状态徽章、管理按钮三处分叉）；单一注入实现后两页字段口径由同一模板保证，Tier 页顺带获得管理员能力（刷新 + 删除，2026-09-12 用户决策）。
+
+**Related**：下方「弹窗生命周期守卫」；quality-guidelines.md CSS 模块归属（注入共享 DOM 样式归 base.css / detail 类归属不变）；`tests/public/i18n.keys.test.mjs`（统一模板复用既有 key，零新增）。
+
+---
+
+## Convention: 弹窗生命周期守卫（withModalGuard，09-12）
+
+**What**：`public/js/utils.js createModalGuard({ lockScroll = true })` → `{ open(), trap(el), close() }`，全部四类弹窗（详情 / index 编辑 / tier 编辑 / confirmDialog）的生命周期工具**仅存 utils.js**，禁止再手写 lock/trap/release 样板。
+
+**契约要点**：
+
+- `open()` / `close()` 配对锁滚动（幂等旗标防重复 lock——保留原「已开不重复 lockPageScroll」语义）；`close()` 内 `try { release() } catch { /* 静默降级 */ }` **逐字保留**旧 4 处重复块的语义。
+- `trap(el)` 独立于 `open()`：必须在 Alpine `$nextTick` 回调内调用（utils.js 不依赖 Alpine，与旧代码时序逐字等价）。
+- confirmDialog 用 `{ lockScroll: false }`：它叠加于内容模态之上，自身不锁滚动（close 只释放 trap 不动计数），`_lastFocus` 双还原逻辑不变。
+- 备选形态（勿采用）：`open(getEl)` 单入口——需要把 `$nextTick` 时序拉进守卫内部，utils.js 将被迫依赖 Alpine。
