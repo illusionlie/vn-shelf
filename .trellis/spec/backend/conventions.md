@@ -481,3 +481,79 @@ npx wrangler queues info "$QUEUE_NAME" >/dev/null 2>/tmp/q.err || { cat /tmp/q.e
 ```
 
 > **Warning**：wrangler 版本 banner 经 `console.log` 写 **stdout**（实测无 `--json` 时 84 bytes）。任何在脚本中解析 wrangler `--json` 输出的地方，都要显式设 `WRANGLER_HIDE_BANNER=true`，不要依赖 `--json` 的隐式抑制。
+
+---
+
+## Scenario: 登录限流（LoginRateLimiter，09-12 起）
+
+### 1. Scope / Trigger
+
+- Trigger：改动 `POST /api/auth/login` 鉴权流程、`src/login-ratelimit.js`、`LoginRateLimiterDurableObject`，或新增任何「DO 状态机 + 纯函数判定」类功能时参照。
+- 来源：任务 `09-12-security-hardening-bundle`。
+
+### 2. Signatures
+
+```js
+// src/login-ratelimit.js（纯函数，node --test 直测）
+LOGIN_MAX_FAILURES = 5; LOGIN_LOCK_MS = 600_000; LOGIN_WINDOW_MS = 900_000
+evaluateLoginAttempt(state, { now, success })
+// state = { failures, windowStart, lockUntil }（均可 null）
+//   → { allowed, failures, windowStart, lockUntil, retryAfterSec }
+
+// src/index.js LoginRateLimiterDurableObject（每 IP 一实例：env.LOGIN_RATE_LOCK.idFromName(ip)）
+GET  /precheck            → { allowed, retryAfterSec }（只读，不推进状态）
+POST /record  { success } → 推进状态机并持久化（storage 键 'login:rate-state'，无 alarm 惰性过期）
+```
+
+### 3. Contracts
+
+- handleLogin 插入顺序：password 非空校验 → precheck（锁定即 429 + `Retry-After` 秒头，**先于 getSettings / PBKDF2**）→ verifyAdminPassword → **同步 `await record`**（非 waitUntil——保证第 5 次失败后的下一次请求立即被锁）→ 签发 JWT。
+- IP 来源 `CF-Connecting-IP`，缺失（本地 dev）回退占位键 `'local'`。
+- **fail-open 降级**：`env.LOGIN_RATE_LOCK` 绑定缺失或 DO 请求失败 → `console.warn` + 放行。与 `INDEX_START_LOCK` 的 fail-closed（缺失 500）**语义相反且有理由**：索引锁守护数据正确性（宁可拒绝服务），限流锁守护的是可用性增强（漏配绑定不应弄挂登录）。
+- 新增 DO 类必须追加**新 migration tag**（本次 `tag = "v2"` + `new_sqlite_classes`），既有 tag 不可变；DO 部署期自动创建，deploy.yml 不加预检（见部署 Scenario Base case）。
+- 锁定语义：15 分钟窗口内连续 5 次失败 → 锁 10 分钟；锁内无论密码对错一律 429 且状态不变；成功登录清零；**锁到期但窗口未过期时再失败立即重锁**（窗口 15min > 锁 10min 的自然推论，已钉测试）；第 5 次 record 返回 `allowed: false` 但**该次响应仍是 401**——429 从第 6 次开始。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|---|---|
+| precheck 锁定中 | 429 + `Retry-After`（秒），不执行 getSettings / PBKDF2 |
+| 第 5 次密码错误 | 该次 401；状态写入 `lockUntil` |
+| 锁定期内正确密码 | 429（文案不泄露密码对错） |
+| 锁到期 + 正确密码 | 200 且计数清零 |
+| 绑定缺失 / DO 异常 | warn + 放行（fail-open，`npm run tail` 可见 `[auth][login-ratelimit] binding missing`） |
+
+### 5. Good/Base/Bad Cases
+
+- Good：新增同类「计数 + 锁定」功能时复用三层结构：**纯函数状态机（直测）+ DO 只做存储协议 + 路由层薄接线**。
+- Base：不动登录流程无需理会本契约。
+- Bad（禁止）：把判定逻辑写进 DO 壳或 router 内联（不可直测、桩复刻必假绿）；record 走 waitUntil（第 5 次失败后的并发请求存在未锁窗口）。
+
+### 6. Tests Required
+
+- `tests/auth/login-ratelimit.test.mjs`：纯函数全分支——锁内 success/failure 状态不变、窗口过期重开、到期即窗口内再锁、`retryAfterSec` 取整、成功清零。
+- `tests/router/login.ratelimit.test.mjs`：DO 桩**内嵌真实 `evaluateLoginAttempt`**（只复刻 `/precheck` `/record` 协议与 storage 写回语义），断言 429 形态 + Retry-After、锁内 `verifyAdminPassword` 与 `getSettings` 调用数为 0、成功清零、到期解锁。
+- `tests/queue/index.queue.test.mjs`：加载 `src/index.js` 的 patch 列表已含 `login-ratelimit` 真实源文件（依赖图陷阱，见信封 Scenario §6）。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：测试桩自己复刻判定逻辑（实现变更时假绿）
+const stubDo = { async fetch() { return json({ allowed: attempts >= 5 }); } }; // 自造阈值语义
+
+// Correct：桩 import 真实纯函数，只复刻协议层
+import { evaluateLoginAttempt } from './login-ratelimit.real.mjs';
+const stubDo = { async fetch(req) { /* storage 读写 + 委托 evaluateLoginAttempt */ } };
+```
+
+---
+
+## Convention: JWT 校验契约（09-12 收紧后）
+
+**What**：`verifyJWT` 固定 HMAC-SHA256 验签**之后**强校验 header `alg === 'HS256'`（拒绝 none / HS384 / 缺失——防未来算法混淆回归）与 `exp`（必须有限数值且 `exp > now`；缺失 / 非法 / `exp <= now` 即拒）。`createJWT` 是唯一签发方（恒 HS256 + `exp = iat + 24h` + jti），收紧不破坏存量登录态。
+
+**Why**：收紧前 `payload.exp &&` 短路使无 exp 的 token 永不过期；alg 不校验虽因固定 HMAC 当前不可利用，但属纵深防御缺口（2026-09-12 侦察确认）。
+
+**Tests**：`tests/auth/jwt.test.mjs` 直测（不经 router 桩替换）：alg 伪造三态、缺 / 非数值 exp、`exp == now` 与 `now-1` 边界、篡改 payload / 签名、setAuthCookie（Secure 双形态）属性串、setAdminPassword ↔ verifyAdminPassword 往返。node ≥ 18 原生 WebCrypto / btoa / atob，无 polyfill（`tests/auth/` 为新纯后端直测域，先例 `tests/vndb/`）。
+
+**Related**：本任务同时新增 `tests/auth/` 目录；`constantTimeEqual` 保持未导出，经 `verifyPassword` / `verifyJWT` 行为断言覆盖。

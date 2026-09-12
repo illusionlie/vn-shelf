@@ -20,7 +20,7 @@ VN Shelf - 视觉小说书架管理应用，部署于 Cloudflare Workers。项�
 
 ```text
 src/
-├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject
+├── index.js        # Worker 入口（fetch + queue）+ IndexStartLockDurableObject + LoginRateLimiterDurableObject
 ├── index-task.js   # 索引任务启动与状态查询
 ├── ulist-import.js # VNDB ulist 用户列表导入管线
 ├── router.js       # API 路由分发与处理
@@ -28,6 +28,7 @@ src/
 ├── repository.js   # D1 数据访问层
 ├── stats.js        # 统计聚合纯函数（computeStats，/api/stats 数据源）
 ├── auth.js         # JWT + 密码哈希认证
+├── login-ratelimit.js # 登录限流纯函数状态机（evaluateLoginAttempt）
 ├── vndb.js         # VNDB API 客户端与字段映射（含 ulist 状态映射常量）
 └── utils.js        # 通用工具函数
 
@@ -58,7 +59,7 @@ public/
         ├── loginPage.js     # 登录页
         └── statsPage.js     # 统计页
 
-tests/              # node --test，按域分目录：d1 / public / queue / router / stats / vndb
+tests/              # node --test，按域分目录：d1 / public / queue / router / stats / vndb / auth
 
 .github/workflows/
 ├── ci.yml          # lint + test + deploy dry-run
@@ -75,6 +76,9 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 - Durable Object：[`IndexStartLockDurableObject`](src/index.js)
   - 全局单例，提供索引启动的分布式互斥锁（`/acquire`、`/release`、`/status`）。
   - 基于 Durable Object 存储，支持 TTL 自动过期。
+- Durable Object：`LoginRateLimiterDurableObject`（[`src/index.js`](src/index.js)，绑定 `LOGIN_RATE_LOCK`）
+  - 每 IP 一实例的登录失败计数与锁定（`/precheck`、`/record`），判定逻辑在 [`src/login-ratelimit.js`](src/login-ratelimit.js) 纯函数。
+  - **可选绑定（fail-open）**：缺失或异常时 warn 后放行，登录退化为无限流（与 `INDEX_START_LOCK` 的 fail-closed 语义相反，契约详见 spec backend/conventions.md）。
 
 ## API 路由
 
@@ -84,7 +88,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 |------|------|------|------|
 | GET | `/api/auth/status` | 初始化 + 登录状态 | 公开 |
 | POST | `/api/auth/init` | 初始化管理员密码（可同时写入 `vndbApiToken`） | 仅未初始化 |
-| POST | `/api/auth/login` | 登录 | 公开 |
+| POST | `/api/auth/login` | 登录（按 IP 连续 5 次失败锁 10 分钟，锁内 429 + `Retry-After`） | 公开 |
 | POST | `/api/auth/logout` | 登出 | 公开 |
 | GET | `/api/auth/verify` | 验证 Token | 公开 |
 | GET | `/api/vn` | VN 列表（`sort` / `search` / `untiered`） | 公开 |
@@ -248,7 +252,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 3. **导入前全量校验**：`/api/import` 会先校验所有条目与 `tierList` 结构，再执行写入。
 4. **敏感信息管理**：VNDB Token、密码哈希、JWT Secret 存储于 D1 settings 表，不直接暴露给前端。
 5. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 D1 数据库与 Queue 后再运行 `npm run dev`。
-6. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500。
+6. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500；`LOGIN_RATE_LOCK` 为可选项（登录限流，fail-open：缺失时仅告警放行）。两份 wrangler 配置（example 与本地真实 toml）必须同步修改（双轨契约）。
 7. **CSS 分模块**：`public/css/` 下链接顺序固定为 base → forms → cards-detail → 页面文件；JS 注入的共享 DOM（壳层/页脚）样式进 `base.css`。
 <!-- TRELLIS:START -->
 # Trellis Instructions
