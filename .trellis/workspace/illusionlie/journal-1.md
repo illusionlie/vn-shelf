@@ -857,3 +857,24 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: 全站返回顶部 FAB：壳层注入 + IO 哨兵显隐 + 移动端适配
+
+**Date**: 2026-09-12
+**Task**: 全站返回顶部 FAB：壳层注入 + IO 哨兵显隐 + 移动端适配
+**Branch**: `master`
+
+### Summary
+
+任务 09-12-back-to-top-fab 完整交付：layout.js 壳层模板注入 FAB 与显隐哨兵（IO rootMargin 600px 反向信号，锚 ICB 绕开 body padding-top 偏移），base.css 玻璃拟态样式（480 断点 44px 触控、safe-area env() 兜底、body.modal-open/login-page 特异度压制隐藏）。点击 scrollTo 不带 behavior 复用 CSS scroll-behavior，reduced-motion 自动降级。Playwright 移动视口 390×844 实测阈值边界/弹窗隐藏/暗色/双语 aria/键盘可达全过；用户视觉反馈后返工 hover（实色 accent 边 + 3px --border-glow 光晕环）。lint 干净、test 197/197。spec 沉淀 IO 哨兵显隐契约至 frontend/quality-guidelines。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a3cc90c` | (see git log) |
+
+### Status
+
+[OK] **Completed**
