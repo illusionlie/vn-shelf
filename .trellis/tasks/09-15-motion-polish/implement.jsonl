@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端 spec 总入口：Pre-Development Checklist 与指南索引"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "含 09-12 统一详情弹窗 Scenario 与 withModalGuard 契约——modal 显隐机制改动必须遵守该生命周期契约（x-show/x-ref 依赖、焦点陷阱）"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "modal role/Esc 契约、busy 按钮 aria-disabled 保焦点、封面 z-index 阶梯——改 4 处 modal 模板与 toast Store 时不得违反"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "B5c：CSS 模块放置约定 + link-order 契约——新增钩子类 CSS 必须落在正确模块（modal/toast 进 base.css，下拉进 forms.css）"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "toast 属全局 Store（$store.app.toasts）——addToast/removeToast 改动需符合 Store 既有模式"}

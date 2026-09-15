@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "check 基准：modal role/Esc、a11y、code-review checklist；本任务改 4 处 modal 模板 + toast Store + CSS，需按此清单核查"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "核查 withModalGuard 契约与统一详情弹窗 Scenario 未被显隐机制改动破坏"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "核查新增 CSS 钩子类的模块归属与 link-order 未被破坏"}
