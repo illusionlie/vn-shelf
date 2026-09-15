@@ -26,8 +26,14 @@
  */
 
 const DETAIL_MODAL_TEMPLATE = `
-  <div class="modal-overlay" :class="{ active: showDetail }" @click.self="closeDetail()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeDetail()">
-    <div class="modal" x-ref="detailModal" x-show="showDetail" x-transition role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+  <div class="modal-overlay" x-show="showDetail" x-cloak
+       x-transition:enter="modal-fade-enter" x-transition:enter-start="modal-fade-enter-start" x-transition:enter-end="modal-fade-enter-end"
+       x-transition:leave="modal-fade-leave" x-transition:leave-start="modal-fade-leave-start" x-transition:leave-end="modal-fade-leave-end"
+       @click.self="closeDetail()" @keydown.escape.window="!$store.app._confirmDialog?.visible && closeDetail()">
+    <div class="modal" x-ref="detailModal" x-show="showDetail"
+         x-transition:enter="modal-scale-enter" x-transition:enter-start="modal-scale-enter-start" x-transition:enter-end="modal-scale-enter-end"
+         x-transition:leave="modal-scale-leave" x-transition:leave-start="modal-scale-leave-start" x-transition:leave-end="modal-scale-leave-end"
+         role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
       <template x-if="selectedVN">
         <div>
           <div class="modal-header">

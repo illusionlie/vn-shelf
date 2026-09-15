@@ -427,7 +427,10 @@ main.container {
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  /* 显式枚举（替代 all）：按 .btn-primary/-secondary/-danger 的 :hover 实际变化属性收口
+     —— background / transform / box-shadow（primary）、background / border-color / transform
+     （secondary）、background / transform（danger），color 兜底通用 */
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   border: none;
   position: relative;
   overflow: hidden;
@@ -501,7 +504,13 @@ main.container {
   background-color: var(--accent-color);
 }
 
-/* ===== Modal - Liquid Glass ===== */
+/* ===== Modal - Liquid Glass =====
+ * 显隐动画走 Alpine 类钩子（4 处弹窗模板在 x-show 上挂 x-transition:enter/leave
+ * 全套类，钩子类见下方 modal-fade-* / modal-scale-*）：Alpine 只切类并按 computed
+ * transition-duration 定时收尾（非 transitionend 事件），动画属性回归 CSS 单一
+ * 事实源管理，无内联 transform（reduced-motion 常规声明即可接管，见文件末尾）。
+ * 进显隐藏态由 x-cloak（Alpine 初始化前）+ x-show（运行期）承担，无 CSS 隐藏基础态。
+ * 基准 transitions.dev：open 250ms / close 150ms（开慢关快），easing 统一 smooth-out。 */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -516,16 +525,25 @@ main.container {
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.3s ease;
   overscroll-behavior: contain;
 }
 
-.modal-overlay.active {
-  opacity: 1;
-  visibility: visible;
+/* overlay 淡入淡出：enter-start 为隐藏态、enter-end 为可见态（与自然态一致），
+   leave 同理反向——start 类须等于自然可见态、end 类承载隐藏态，
+   缺 leave-end 会让退出阶段反向淡入 */
+.modal-fade-enter {
+  transition: opacity 250ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+.modal-fade-enter-start { opacity: 0; }
+.modal-fade-enter-end { opacity: 1; }
+
+.modal-fade-leave {
+  transition: opacity 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-fade-leave-start { opacity: 1; }
+.modal-fade-leave-end { opacity: 0; }
 
 .modal {
   background: var(--modal-bg-color);
@@ -536,8 +554,6 @@ main.container {
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  transform: scale(0.95);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-medium);
   backdrop-filter: blur(25px);
@@ -548,9 +564,21 @@ main.container {
   display: none;
 }
 
-.modal-overlay.active .modal {
-  transform: scale(1);
+/* 主体缩放：起止 scale(0.95) 沿用原 .modal 基础态数值（--scale-large 0.96 容差内），
+   时长与 overlay 的淡入淡出一致，保证开合同步结束 */
+.modal-scale-enter {
+  transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+.modal-scale-enter-start { transform: scale(0.95); }
+.modal-scale-enter-end { transform: scale(1); }
+
+.modal-scale-leave {
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-scale-leave-start { transform: scale(1); }
+.modal-scale-leave-end { transform: scale(0.95); }
 
 /* 确认对话框层级：高于内容模态(1000)、低于 toast(2000) */
 .modal-overlay.confirm-dialog-overlay {
@@ -585,7 +613,8 @@ main.container {
   padding: 8px;
   line-height: 1;
   border-radius: var(--border-radius-sm);
-  transition: all var(--transition-fast);
+  /* :hover 仅变 color / background-color */
+  transition: color var(--transition-fast), background-color var(--transition-fast);
   width: 36px;
   height: 36px;
   display: flex;
@@ -712,10 +741,17 @@ body.has-bg-image {
   display: flex;
   align-items: center;
   gap: 12px;
-  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 22-toast「慢进快出」：进入 300ms / 退出 350ms，easing 统一 smooth-out */
+  animation: slideIn 300ms cubic-bezier(0.22, 1, 0.36, 1);
   max-width: 380px;
   border: 1px solid var(--border-color);
   backdrop-filter: blur(10px);
+}
+
+/* 退出动画由 app.js removeToast 置 leaving 后 350ms 移出数组驱动；
+   forwards 防动画末帧回跳（正常路径元素随即被移除，无感知） */
+.toast.leaving {
+  animation: slideOut 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .toast-success { border-left: 4px solid var(--success-color); }
@@ -725,6 +761,11 @@ body.has-bg-image {
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
 }
 
 /* ===== Back-to-top FAB（layout.js 壳层注入，全站生效）===== */
@@ -911,14 +952,28 @@ body.login-page .back-to-top {
     animation: none;
   }
 
-  .toast {
+  /* toast 进/出动画一并停用（.toast.leaving 特异度高，须显式列出；
+     leaving 时瞬退，350ms 后由 removeToast 移出数组，符合规范） */
+  .toast,
+  .toast.leaving {
     animation: none;
   }
 
-  /* 弹入缩放取消：!important 用于压过 Alpine x-transition 过渡期写入的内联
-   * transform（内联样式高于普通声明），opacity 淡入不受影响 */
-  .modal {
-    transform: none !important;
+  /* modal 类钩子缩放停用（opacity 淡入淡出保留）：类钩子模式下 Alpine 不写
+   * 内联 transform，此处为文件末尾的同特异度常规声明即可接管，无需 !important；
+   * 退出收尾不受影响——Alpine 按 computed transition-duration 定时清理 */
+  .modal-scale-enter-start,
+  .modal-scale-enter-end,
+  .modal-scale-leave-start,
+  .modal-scale-leave-end {
+    transform: none;
+  }
+
+  /* more-menu 位移停用（同 modal 策略）：transition 列表收掉 transform、
+   * 闭合态 transform 归零；.open 的 translateY(0) 与 none 同视觉，无运动 */
+  .more-menu {
+    transition: opacity var(--transition-fast);
+    transform: none;
   }
 
   .banner-github-link:hover,

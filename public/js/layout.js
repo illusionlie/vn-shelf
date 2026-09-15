@@ -30,8 +30,14 @@ const SHELL_TEMPLATE = `
 
   <!-- 确认对话框（层级高于内容模态，但低于 toast 播报层） -->
   <div x-data="confirmDialog()" x-cloak>
-    <div class="modal-overlay confirm-dialog-overlay" :class="{ active: visible }" @click.self="thirdText ? third() : cancel()">
-      <div class="modal confirm-dialog" x-ref="dialog" x-show="visible" x-transition role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle" @keydown.escape.stop="thirdText ? third() : cancel()">
+    <div class="modal-overlay confirm-dialog-overlay" x-show="visible" x-cloak
+         x-transition:enter="modal-fade-enter" x-transition:enter-start="modal-fade-enter-start" x-transition:enter-end="modal-fade-enter-end"
+         x-transition:leave="modal-fade-leave" x-transition:leave-start="modal-fade-leave-start" x-transition:leave-end="modal-fade-leave-end"
+         @click.self="thirdText ? third() : cancel()">
+      <div class="modal confirm-dialog" x-ref="dialog" x-show="visible"
+           x-transition:enter="modal-scale-enter" x-transition:enter-start="modal-scale-enter-start" x-transition:enter-end="modal-scale-enter-end"
+           x-transition:leave="modal-scale-leave" x-transition:leave-start="modal-scale-leave-start" x-transition:leave-end="modal-scale-leave-end"
+           role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle" @keydown.escape.stop="thirdText ? third() : cancel()">
         <div class="modal-header">
           <h2 id="confirmDialogTitle" class="modal-title" x-text="title"></h2>
         </div>
@@ -56,7 +62,7 @@ const SHELL_TEMPLATE = `
   <!-- Toast通知 -->
   <div class="toast-container" role="status" aria-live="polite">
     <template x-for="toast in $store.app?.toasts || []" :key="toast.id">
-      <div class="toast" :class="'toast-' + toast.type">
+      <div class="toast" :class="['toast-' + toast.type, toast.leaving ? 'leaving' : '']">
         <span x-text="toast.message"></span>
       </div>
     </template>

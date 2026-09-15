@@ -166,12 +166,19 @@ document.addEventListener('alpine:init', () => {
 
     addToast(message, type = 'success') {
       const id = ++_toastSeq;
-      this.toasts.push({ id, message, type });
+      this.toasts.push({ id, message, type, leaving: false });
       setTimeout(() => this.removeToast(id), 3000);
     },
 
     removeToast(id) {
-      this.toasts = this.toasts.filter(t => t.id !== id);
+      const toast = this.toasts.find(t => t.id === id);
+      // 防重入：3s 定时与其它触发共用此入口，leaving 后不再二次调度
+      if (!toast || toast.leaving) return;
+      // 置 leaving 触发 .toast.leaving 退出动画；350ms 与 base.css slideOut 时长对齐
+      toast.leaving = true;
+      setTimeout(() => {
+        this.toasts = this.toasts.filter(t => t.id !== id);
+      }, 350);
     },
 
     /**

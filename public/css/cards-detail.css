@@ -20,7 +20,8 @@
   color: var(--primary-text-color);
   font-size: 1rem;
   outline: none;
-  transition: all var(--transition-fast);
+  /* :focus 仅变 background-color / border-color */
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .search-input:focus {
@@ -40,7 +41,8 @@
   color: var(--primary-text-color);
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  /* :focus 仅变 border-color；与 .search-input 保持同一枚举口径 */
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
   outline: none;
 }
 
@@ -83,7 +85,8 @@
   border-radius: var(--border-radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-light);
-  transition: transform var(--transition-medium), box-shadow var(--transition-medium);
+  /* hover-in ≤250ms 基准：lift 从 0.3s 降 --transition-fast（0.2s），保留 token 引用 */
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(10px);
@@ -207,7 +210,8 @@
   width: 100%;
   aspect-ratio: 7 / 10;
   object-fit: cover;
-  transition: transform 0.4s ease;
+  /* hover-in ≤250ms 基准：0.4s ease → 250ms + smooth-out（transitions.dev） */
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   background: var(--card-bg-color);
 }
 

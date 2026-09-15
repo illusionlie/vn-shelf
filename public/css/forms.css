@@ -19,7 +19,8 @@
   padding: 12px 16px;
   color: var(--primary-text-color);
   font-size: 0.95rem;
-  transition: all var(--transition-fast);
+  /* :focus 仅变 border-color / background / box-shadow */
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .form-input:focus {
@@ -100,7 +101,8 @@
   background: var(--tag-bg-color);
   border-radius: var(--border-radius-sm);
   border: 1px solid var(--border-color);
-  transition: all var(--transition-fast);
+  /* :hover 仅变 background / border-color */
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .radio-label:hover,
@@ -142,7 +144,27 @@
   box-shadow: var(--shadow-medium);
   /* 盖过模态内后续表单控件（同层静态兄弟 z-index 均为 auto） */
   z-index: 30;
+  /* 05-menu-dropdown：origin-aware 从输入框下沿生长 */
+  transform-origin: top;
 }
+
+/* 开合过渡走 Alpine 类钩子（index.html 的 x-show 上挂 enter/leave 全套类，
+   与 modal 类钩子同模式）：open 250ms / close 150ms（开慢关快），easing smooth-out，
+   起始 translateY(-6px) scale(0.97)（--scale-medium / --scale-tiny 量级）。
+   leave-start 等于自然可见态、leave-end 承载隐藏态（缺 leave-end 会反向淡入）。 */
+.dd-grow-enter {
+  transition: opacity 250ms cubic-bezier(0.22, 1, 0.36, 1), transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dd-grow-enter-start { opacity: 0; transform: translateY(-6px) scale(0.97); }
+.dd-grow-enter-end { opacity: 1; transform: translateY(0) scale(1); }
+
+.dd-grow-leave {
+  transition: opacity 150ms cubic-bezier(0.22, 1, 0.36, 1), transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dd-grow-leave-start { opacity: 1; transform: translateY(0) scale(1); }
+.dd-grow-leave-end { opacity: 0; transform: translateY(-6px) scale(0.97); }
 
 .vndb-search-state {
   padding: 14px 12px;
@@ -285,5 +307,15 @@
   .vndb-search-thumb {
     width: 34px;
     height: 48px;
+  }
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  /* 下拉直接显隐：0.01ms 而非 0/none——保留非零时长供 Alpine 按 computed
+   * transition-duration 定时收尾（display:none 切换不掉链） */
+  .dd-grow-enter,
+  .dd-grow-leave {
+    transition-duration: 0.01ms;
   }
 }
