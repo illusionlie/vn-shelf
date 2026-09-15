@@ -55,14 +55,14 @@
 - [x] AC3：`grep -n "transition: all" public/css/*.css` 零命中。
 - [x] AC4：系统开启「减少动态效果」后：modal 缩放、卡片 hover 位移、光扫、shimmer、toast 位移均停用；opacity/色彩过渡保留；more-menu 无位移过渡（本条含 R4 修复项）。—— 冒烟验证（reduce 模拟）：modal `transform: none` + 零过渡、toast leaving `animationName: none`、reduce 块五组规则齐全
 - [x] AC5：`npm run lint` 与 `npm run test` 通过。—— lint 零告警、test 248 pass / 0 fail
-- [x] AC6（R5）：添加条目弹窗内 VNDB 搜索下拉开合有生长/收束过渡，reduced-motion 下直接显隐。—— 静态面由 trellis-check 核验（六类钩子齐全、`transform-origin: top`、250/150、reduce `0.01ms`）；运行时观感需管理员登录，留部署前人工复核
+- [x] AC6（R5）：添加条目弹窗内 VNDB 搜索下拉开合有生长/收束过渡，reduced-motion 下直接显隐。—— 静态面由 trellis-check 核验（六类钩子齐全、`transform-origin: top`、250/150、reduce `0.01ms`）；运行时观感经用户管理员侧人工复核通过（2026-09-15）
 
 ## 验收记录（2026-09-15）
 
 - 实现：trellis-implement 一次通过，5 处有据偏离（详见 design 对比）：① leave 侧钩子类改 canonical 语义（leave-start=可见态/leave-end=隐藏态，六类全显式）——防退出阶段反向淡入，依据 vendored Alpine 3.17.2 源码（类钩子收尾靠 computed transition-duration 的 setTimeout）；② overlay 补 `x-cloak` 防初始化闪烁；③ reduce 块显式列 `.toast.leaving`（特异度 (0,2,0) 反超 `.toast` (0,1,0)）；④ 下拉过渡并入 opacity（纯 scale 0.97 近乎不可感知）；⑤ 以上机制性依据写入 CSS 注释。
 - 检查：trellis-check 零修复全过（8 文件、七项核查 + a11y 附带深查）。
 - 冒烟：本地 wrangler dev + Playwright，AC1/2/4 运行时验证通过（详见各 AC 标注）；AC6 运行时项留人工。
-- 遗留：AC6 管理员侧观感复核（部署前）；`.btn:disabled` opacity 切换不再过渡（原被 `transition: all` 搭便车，check 判定为有意取舍——状态反馈即时呈现更优）。
+- 遗留：无——AC6 管理员侧观感已由用户复核通过（2026-09-15）；`.btn:disabled` opacity 切换不再过渡（原被 `transition: all` 搭便车，check 判定为有意取舍——状态反馈即时呈现更优）。
 
 ## Out of Scope
 
