@@ -222,3 +222,40 @@ applyRefreshedEntry(entry) {
 - `trap(el)` 独立于 `open()`：必须在 Alpine `$nextTick` 回调内调用（utils.js 不依赖 Alpine，与旧代码时序逐字等价）。
 - confirmDialog 用 `{ lockScroll: false }`：它叠加于内容模态之上，自身不锁滚动（close 只释放 trap 不动计数），`_lastFocus` 双还原逻辑不变。
 - 备选形态（勿采用）：`open(getEl)` 单入口——需要把 `$nextTick` 时序拉进守卫内部，utils.js 将被迫依赖 Alpine。
+
+---
+
+## Convention: Alpine 类钩子显隐过渡（modal / 浮层动效单一事实源，09-15 motion-polish）
+
+**What**：弹窗与浮层的显隐动效统一走 Alpine **类钩子全套**（`x-transition:enter` / `enter-start` / `enter-end` / `leave` / `leave-start` / `leave-end`）+ CSS 钩子类。现有实现：4 处 modal（`detail-modal.js` / `layout.js` confirmDialog / `index.html` 编辑 / `tier.html` Tier 编辑）用 `modal-fade-*`（overlay 淡入淡出）+ `modal-scale-*`（主体缩放），`index.html` VNDB 搜索下拉用 `dd-grow-*`（origin-aware `transform-origin: top` 生长/收束）。
+
+**契约要点**：
+
+- **单轨**：overlay 与主体同走 `x-show` 轨，overlay 不再用 `:class="{active}"` 类切换驱动 CSS transition——双轨（类切换 overlay + x-transition 主体）曾导致两层速度脱节（300ms vs 150ms）且 reduce 需 `!important` 压内联样式（已退役）。
+- **六类齐全**：每个元素 6 个钩子属性缺一不可。canonical 语义：`enter-start` = 隐藏态、`enter-end` = 可见态；`leave-start` = 自然可见态、`leave-end` = 隐藏态。漏 `leave-end` → Alpine 单 rAF swap 后元素回到自然可见态，退出阶段反向淡入再 `display:none`。
+- **CSS 单一事实源**：时长/easing/位移全在钩子类里（open 250ms / close 150ms / `cubic-bezier(0.22,1,0.36,1)`，见 quality-guidelines motion scale）；Alpine 不写内联样式，收尾靠 computed `transition-duration` 的 setTimeout，reduce 由常规媒体查询接管。
+- **x-cloak 防初始化闪烁**：overlay 删掉 CSS 隐藏基础态后，HTML 解析到 Alpine 接管之间会闪现——overlay 必须带 `x-cloak`（`[x-cloak]` 全局规则兜底，主体作为后代无需重复标记）。
+- **与 withModalGuard 正交**：守卫只依赖 `x-show` / `x-ref` / `body.modal-open`，与显隐动效机制零耦合；改动动效不得触碰 `@click.self` / `@keydown.escape.window` / `x-ref` / `role="dialog"` / `aria-*`。
+- **新增浮层动效时**：复制 `dd-grow-*` 模式（命名 `<surface>-<verb>-<phase>`），钩子类落在该浮层样式所在的 CSS 模块（dropdown 类进 forms.css，modal/toast 类进 base.css），reduce 块同文件配对。
+
+**Wrong vs Correct**：
+
+```html
+<!-- Wrong：裸 x-transition 写内联样式，reduce 需 !important；且与 overlay 类切换双轨脱速 -->
+<div class="modal-overlay" :class="{ active: show }">
+  <div class="modal" x-show="show" x-transition>…</div>
+</div>
+
+<!-- Correct：单轨 x-show + 六类钩子，动效全在 CSS -->
+<div class="modal-overlay" x-show="show" x-cloak
+     x-transition:enter="modal-fade-enter" x-transition:enter-start="modal-fade-enter-start"
+     x-transition:enter-end="modal-fade-enter-end" x-transition:leave="modal-fade-leave"
+     x-transition:leave-start="modal-fade-leave-start" x-transition:leave-end="modal-fade-leave-end">
+  <div class="modal" x-show="show" x-ref="modal"
+       x-transition:enter="modal-scale-enter" x-transition:enter-start="modal-scale-enter-start"
+       x-transition:enter-end="modal-scale-enter-end" x-transition:leave="modal-scale-leave"
+       x-transition:leave-start="modal-scale-leave-start" x-transition:leave-end="modal-scale-leave-end">…</div>
+</div>
+```
+
+**Related**：quality-guidelines.md「reduced-motion counterpart」与「Motion timing scale」（09-15）；上方「弹窗生命周期守卫（withModalGuard，09-12）」。
