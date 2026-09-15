@@ -952,3 +952,27 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 [OK] **Completed** — 三连收官。遗留：书架页删除改就地 splice（微任务）、tier 页隐藏编辑钮方法引用（设计内安全）、焦点循环/en 文案日常观察。
 
 [OK] **Completed**
+
+
+## Session 22: 动效修复与打磨（toast 退出动画 / modal 类钩子单轨 / motion 基准对齐）
+
+**Date**: 2026-09-15
+**Task**: 动效修复与打磨（toast 退出动画 / modal 类钩子单轨 / motion 基准对齐）
+**Branch**: `master`
+
+### Summary
+
+按 transitions-dev/transitions-polish 审查结论完成全站动效打磨：R1 toast 补 leaving 态退出动画（slideOut 350ms）；R2 四处 modal 显隐收敛 Alpine 类钩子单轨（open 250/close 150，overlay+主体同步，reduce !important 补丁退役）；R3 transition:all 七处枚举化；R4 hover 数值对齐 + more-menu 补 reduce 缺口；R5 VNDB 搜索下拉 origin-aware 生长过渡。lint 零告警、248 测试全过、Playwright 冒烟 AC1/2/4 运行时验证、AC6 用户管理员侧复核通过。spec 沉淀：类钩子显隐 Convention（component-guidelines）+ motion timing scale 与 reduce 新 gotcha（quality-guidelines）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5c61c97` | (see git log) |
+| `056f877` | (see git log) |
+| `213a8c2` | (see git log) |
+| `72e4e96` | (see git log) |
+
+### Status
+
+[OK] **Completed**
