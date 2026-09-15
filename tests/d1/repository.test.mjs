@@ -1251,3 +1251,56 @@ test('importData：旧备份无 status 与含非法 status 均落 null，不拒�
     await cleanup();
   }
 });
+
+test('importData：appearance.ownerName trim 后写入 settings，防御性截断 30，缺省跳过', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+
+    // 合法值：trim 在 applyAppearanceToSettings 防御层完成
+    await repository.importData(env, {
+      entries: [createEntry('v1')],
+      appearance: { ownerName: '  小明  ' }
+    }, 'merge');
+    assert.equal((await repository.getSettings(env)).ownerName, '小明');
+
+    // 绕过 router 校验直接调用时的防御性截断（35 → 30）
+    await repository.importData(env, {
+      entries: [createEntry('v2')],
+      appearance: { ownerName: '名'.repeat(35) }
+    }, 'merge');
+    assert.equal((await repository.getSettings(env)).ownerName, '名'.repeat(30));
+
+    // appearance 缺省 / 无 ownerName 键：settings 保持不变
+    await repository.importData(env, { entries: [createEntry('v3')] }, 'merge');
+    await repository.importData(env, {
+      entries: [createEntry('v4')],
+      appearance: { backgroundUrl: '' }
+    }, 'merge');
+    assert.equal((await repository.getSettings(env)).ownerName, '名'.repeat(30));
+  } finally {
+    await cleanup();
+  }
+});
+
+test('exportData：appearance 携带 ownerName（未配置时空串）', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+
+    // 空库：getSettings 默认对象含 ownerName: ''
+    const empty = await repository.exportData(env);
+    assert.equal(empty.appearance.ownerName, '');
+
+    await repository.importData(env, {
+      entries: [createEntry('v1')],
+      appearance: { ownerName: '小明' }
+    }, 'merge');
+    const data = await repository.exportData(env);
+    assert.equal(data.appearance.ownerName, '小明');
+  } finally {
+    await cleanup();
+  }
+});

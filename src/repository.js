@@ -293,6 +293,7 @@ export async function getSettings(env) {
       tagsMode: 'vndb',
       translateTags: true,
       translationUrl: '',
+      ownerName: '',
       backgroundUrl: '',
       backgroundOverlay: 0.5,
       backgroundBlur: 4
@@ -857,6 +858,7 @@ export async function exportData(env) {
 
   const settings = await getSettings(env);
   const appearance = {
+    ownerName: settings.ownerName ?? '',
     backgroundUrl: settings.backgroundUrl ?? '',
     backgroundOverlay: settings.backgroundOverlay ?? 0.5,
     backgroundBlur: settings.backgroundBlur ?? 4
@@ -881,6 +883,8 @@ function chunkArray(array, size) {
 
 function applyAppearanceToSettings(settings, appearance) {
   const ap = appearance;
+  // ownerName：类型/长度校验已在 router 导入入口完成，此处仅防御性 trim + 截断
+  if (ap.ownerName !== undefined) settings.ownerName = String(ap.ownerName).trim().slice(0, 30);
   if (ap.backgroundUrl !== undefined) settings.backgroundUrl = String(ap.backgroundUrl);
   if (ap.backgroundOverlay !== undefined) {
     const overlay = Number(ap.backgroundOverlay);

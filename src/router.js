@@ -1376,6 +1376,8 @@ async function handleGetAppearance(request, env) {
   const settings = await getSettings(env);
 
   const response = successResponse({
+    // 站点主人名（非敏感外观配置，空串 = 未个性化，前端回退品牌名）
+    ownerName: settings.ownerName || '',
     backgroundUrl: settings.backgroundUrl || '',
     backgroundOverlay: settings.backgroundOverlay ?? 0.5,
     backgroundBlur: settings.backgroundBlur ?? 4,
@@ -1408,6 +1410,7 @@ async function handleGetConfig(request, env, auth) {
     translateTags: settings.translateTags !== false,
     translationUrl: settings.translationUrl || '',
     // 外观配置
+    ownerName: settings.ownerName || '',
     backgroundUrl: settings.backgroundUrl || '',
     backgroundOverlay: settings.backgroundOverlay ?? 0.5,
     backgroundBlur: settings.backgroundBlur ?? 4
@@ -1475,6 +1478,18 @@ async function handleUpdateConfig(request, env, auth) {
     if (Number.isFinite(blur)) {
       settings.backgroundBlur = Math.max(0, Math.min(20, blur));
     }
+  }
+
+  // 站点主人名：面向用户展示的文本，显式 400 早暴露（非静默 coerce/截断），
+  // 空串合法 = 清除个性化回退品牌名
+  if (body.ownerName !== undefined) {
+    if (typeof body.ownerName !== 'string') {
+      return errorResponse('ownerName 必须为字符串', 400);
+    }
+    if (body.ownerName.trim().length > 30) {
+      return errorResponse('ownerName 长度不能超过 30', 400);
+    }
+    settings.ownerName = body.ownerName.trim();
   }
 
   await saveSettings(env, settings);
@@ -1551,6 +1566,17 @@ async function handleImport(request, env, auth) {
       if (typeof appearance.backgroundBlur !== 'number' || !Number.isFinite(appearance.backgroundBlur)) {
         return errorResponse('appearance.backgroundBlur 必须为有限数字', 400);
       }
+    }
+    if (appearance.ownerName !== undefined && appearance.ownerName !== null) {
+      if (typeof appearance.ownerName !== 'string') {
+        return errorResponse('appearance.ownerName 必须为字符串', 400);
+      }
+      if (appearance.ownerName.trim().length > 30) {
+        return errorResponse('appearance.ownerName 长度不能超过 30', 400);
+      }
+    }
+    if (appearance.ownerName === null) {
+      appearance.ownerName = '';
     }
   }
 

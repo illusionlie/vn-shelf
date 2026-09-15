@@ -377,6 +377,107 @@ test('不修改密码时不会重置已有凭据', async () => {
   }
 });
 
+test('未认证 PUT /api/config 返回 401 且不落库', async () => {
+  const { routerModule, state, cleanup } = await loadRouterModule({ authenticated: false });
+
+  try {
+    const { response, payload } = await sendUpdateConfigRequest(routerModule, {
+      ownerName: '小明'
+    });
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(payload, { success: false, error: '未授权' });
+    assert.equal(state.saveSettingsCalls.length, 0);
+  } finally {
+    await cleanup();
+  }
+});
+
+test('PUT /api/config ownerName：合法输入 trim 后落库，空串清除个性化', async () => {
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    initialSettings: { ownerName: '旧主人' }
+  });
+
+  try {
+    const { response: trimResponse } = await sendUpdateConfigRequest(routerModule, {
+      ownerName: '  小明  '
+    });
+    assert.equal(trimResponse.status, 200);
+    assert.equal(state.settings.ownerName, '小明');
+
+    // 30 字符（trim 后）边界值通过
+    const boundaryName = '明'.repeat(30);
+    const { response: boundaryResponse } = await sendUpdateConfigRequest(routerModule, {
+      ownerName: boundaryName
+    });
+    assert.equal(boundaryResponse.status, 200);
+    assert.equal(state.settings.ownerName, boundaryName);
+
+    // 空串合法 = 清除个性化
+    const { response: clearResponse } = await sendUpdateConfigRequest(routerModule, {
+      ownerName: ''
+    });
+    assert.equal(clearResponse.status, 200);
+    assert.equal(state.settings.ownerName, '');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('PUT /api/config ownerName：非字符串与 trim 后超 30 字符均返回 400', async () => {
+  const { routerModule, state, cleanup } = await loadRouterModule({
+    initialSettings: { ownerName: '旧主人' }
+  });
+
+  try {
+    const { response, payload } = await sendUpdateConfigRequest(routerModule, {
+      ownerName: 123
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(payload, { success: false, error: 'ownerName 必须为字符串' });
+
+    const { response: longResponse, payload: longPayload } = await sendUpdateConfigRequest(routerModule, {
+      ownerName: '明'.repeat(31)
+    });
+    assert.equal(longResponse.status, 400);
+    assert.deepEqual(longPayload, { success: false, error: 'ownerName 长度不能超过 30' });
+
+    // 校验失败不落库
+    assert.equal(state.saveSettingsCalls.length, 0);
+    assert.equal(state.settings.ownerName, '旧主人');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('GET /api/config 返回 ownerName（未配置时为空串）', async () => {
+  const { routerModule, cleanup } = await loadRouterModule({
+    initialSettings: { ownerName: '小明' }
+  });
+
+  try {
+    const response = await sendRequest(routerModule, '/api/config');
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.data.ownerName, '小明');
+    assert.equal('vndbApiToken' in payload.data, false);
+  } finally {
+    await cleanup();
+  }
+
+  // 未配置（settings 无 ownerName 键）时空串
+  const fresh = await loadRouterModule({});
+  try {
+    const response = await sendRequest(fresh.routerModule, '/api/config');
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.data.ownerName, '');
+  } finally {
+    await fresh.cleanup();
+  }
+});
+
 test('匿名 GET /api/config/appearance 返回外观与公开 tags 配置默认值', async () => {
   // 覆盖为 undefined：getSettings stub 的 JSON 克隆会丢弃这些键，从而触发默认值规则
   const { routerModule, cleanup } = await loadRouterModule({
@@ -394,6 +495,7 @@ test('匿名 GET /api/config/appearance 返回外观与公开 tags 配置默认�
 
     assert.equal(response.status, 200);
     assert.equal(payload.success, true);
+    assert.equal(payload.data.ownerName, '');
     assert.equal(payload.data.backgroundUrl, '');
     assert.equal(payload.data.backgroundOverlay, 0.5);
     assert.equal(payload.data.backgroundBlur, 4);
@@ -415,6 +517,7 @@ test('匿名 GET /api/config/appearance 返回已配置的 tags 字段且不泄�
       tagsMode: 'manual',
       translateTags: false,
       translationUrl: 'https://example.com/tags.json',
+      ownerName: '小明',
       backgroundUrl: 'https://example.com/bg.webp',
       backgroundOverlay: 0.3,
       backgroundBlur: 8
@@ -430,6 +533,7 @@ test('匿名 GET /api/config/appearance 返回已配置的 tags 字段且不泄�
     assert.equal(payload.data.tagsMode, 'manual');
     assert.equal(payload.data.translateTags, false);
     assert.equal(payload.data.translationUrl, 'https://example.com/tags.json');
+    assert.equal(payload.data.ownerName, '小明');
     assert.equal(payload.data.backgroundUrl, 'https://example.com/bg.webp');
     assert.equal(payload.data.backgroundOverlay, 0.3);
     assert.equal(payload.data.backgroundBlur, 8);

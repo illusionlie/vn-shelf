@@ -277,6 +277,19 @@
       <h2 class="settings-section-title" data-i18n="settings.appearanceSectionTitle"></h2>
 
       <div class="form-group">
+        <label class="form-label" for="ownerNameInput" data-i18n="settings.ownerNameLabel"></label>
+        <input
+          type="text"
+          id="ownerNameInput"
+          class="form-input"
+          maxlength="30"
+          autocomplete="off"
+          x-model="config.ownerName"
+          data-i18n-placeholder="settings.ownerNamePlaceholder"
+        >
+      </div>
+
+      <div class="form-group">
         <label class="form-label" data-i18n="settings.backgroundUrlLabel"></label>
         <div style="display: flex; gap: 12px;">
           <input

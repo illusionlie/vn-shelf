@@ -13,6 +13,7 @@ import { vnShelf } from './components/vnShelf.js';
 import { injectDetailModal } from './detail-modal.js';
 import { applyI18nDom, initI18n, t } from './i18n.js';
 import { injectFooter, injectShell } from './layout.js';
+import { initSiteIdentity, reapplySiteIdentity } from './site-identity.js';
 import { initTheme, toggleTheme, initBackground } from './theme.js';
 import { initProgressBar, toggleMobileMenu } from './utils.js';
 
@@ -36,7 +37,12 @@ injectDetailModal();
 // 第二遍待词典就绪后重写（含模板源头 + documentElement.lang）——
 // en 用户首屏短暂中文闪现（本地静态 import，几十 ms 量级）为已知取舍（Q2 决策）。
 applyI18nDom();
-i18nReady.then(() => applyI18nDom());
+// 词典就绪后第二遍重写 <title>（meta.*Title），随后重放站点身份——
+// en 懒加载会覆盖已个性化的 title，需用缓存配置重算品牌段替换
+i18nReady.then(() => {
+  applyI18nDom();
+  reapplySiteIdentity();
+});
 
 // ============ 全局状态 ============
 
@@ -64,13 +70,16 @@ document.addEventListener('alpine:init', () => {
       this.checkAuth();
       initTheme();
       initBackground();
+      initSiteIdentity();
       initProgressBar();
     },
 
     /**
      * 加载外观配置（appearance）：Promise 去重 + sessionStorage 直读 + 后台静默刷新。
      *
-     * - `force=true`：清缓存与 in-flight promise，强制重新拉取（settings 保存后调用）。
+     * - `force=true`：清缓存与 in-flight promise，强制重新拉取（settings 保存后调用）；
+     *   网络请求带 cache:'no-store' 同步绕过浏览器 HTTP 缓存（appearance 端点
+     *   max-age=300，默认 fetch 在 300s 内会返回旧副本）。
      * - sessionStorage 命中：立即返回缓存值，并后台静默刷新（非阻塞），刷新成功后
      *   派发 'appearance-refreshed' 事件让 theme.js 重应用背景。
      * - 多处并发调用同一首屏：通过 `_appearancePromise` 去重，只发一次请求。
@@ -104,7 +113,7 @@ document.addEventListener('alpine:init', () => {
         }
 
         try {
-          const res = await configAPI.getAppearance();
+          const res = await configAPI.getAppearance(force ? { cache: 'no-store' } : {});
           const data = res.data || {};
           this.appearance = data;
           try {
@@ -136,7 +145,8 @@ document.addEventListener('alpine:init', () => {
      */
     async _refreshAppearanceBackground() {
       try {
-        const res = await configAPI.getAppearance();
+        // 后台静默刷新的目的就是拿最新值，恒带 no-store 绕过 HTTP 缓存
+        const res = await configAPI.getAppearance({ cache: 'no-store' });
         const data = res.data || {};
         this.appearance = data;
         try {

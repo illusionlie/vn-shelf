@@ -13,6 +13,7 @@
  * - theme.*      主题切换 aria-label
  * - markdown.*   Markdown 渲染安全降级文案
  * - nav.*        跨页导航链接（B6b，HTML data-i18n）
+ * - site.*       站点身份（ownerName 个性化 banner / title，site-identity.js）
  * - meta.*       页面 <title> / meta description（整串成键，不拼接）
  * - index.*      主页（书架/控制条/编辑弹窗）静态文案
  * - login.*      登录页静态文案
@@ -172,12 +173,16 @@ export default {
     login: '登录',
     githubRepo: '打开 VN Shelf GitHub 仓库'
   },
+  site: {
+    ownerTitle: '{name} 的 VN Shelf'
+  },
   meta: {
     indexTitle: 'VN Shelf - 视觉小说书架',
     indexDescription: '记录我玩过的视觉小说',
     loginTitle: '登录 - VN Shelf',
     statsTitle: '统计 - VN Shelf',
-    settingsTitle: '设置 - VN Shelf'
+    settingsTitle: '设置 - VN Shelf',
+    tierTitle: 'Tier List - VN Shelf'
   },
   index: {
     searchPlaceholder: '搜索视觉小说...',
@@ -285,6 +290,8 @@ export default {
     cachedCountSuffix: '条翻译',
     clearCache: '清除缓存',
     appearanceSectionTitle: '外观设置',
+    ownerNameLabel: '站点主人名',
+    ownerNamePlaceholder: '如：小明；留空显示「VN Shelf」',
     backgroundUrlLabel: '背景图片 URL',
     backgroundUrlPlaceholder: '输入背景图片链接，留空则不使用背景图',
     backgroundUrlHint: '支持任意图片直链，推荐使用高分辨率图片以获得最佳效果。',

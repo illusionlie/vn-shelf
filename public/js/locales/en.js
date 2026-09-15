@@ -155,12 +155,16 @@ export default {
     login: 'Log in',
     githubRepo: 'Open the VN Shelf GitHub repository'
   },
+  site: {
+    ownerTitle: "{name}'s VN Shelf"
+  },
   meta: {
     indexTitle: 'VN Shelf - Visual novel bookshelf',
     indexDescription: 'A record of the visual novels I have played',
     loginTitle: 'Log in - VN Shelf',
     statsTitle: 'Stats - VN Shelf',
-    settingsTitle: 'Settings - VN Shelf'
+    settingsTitle: 'Settings - VN Shelf',
+    tierTitle: 'Tier List - VN Shelf'
   },
   index: {
     searchPlaceholder: 'Search visual novels...',
@@ -268,6 +272,8 @@ export default {
     cachedCountSuffix: 'translations',
     clearCache: 'Clear cache',
     appearanceSectionTitle: 'Appearance',
+    ownerNameLabel: 'Owner name',
+    ownerNamePlaceholder: 'e.g. Alice; empty shows "VN Shelf"',
     backgroundUrlLabel: 'Background image URL',
     backgroundUrlPlaceholder: 'Enter a background image link, or leave empty for no background',
     backgroundUrlHint: 'Any direct image link works; a high-resolution image is recommended for the best result.',

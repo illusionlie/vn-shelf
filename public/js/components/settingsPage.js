@@ -4,6 +4,7 @@
 
 import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI, ulistAPI } from '../api.js';
 import { getLocale, getStoredLocale, setLocale, t } from '../i18n.js';
+import { applySiteIdentity } from '../site-identity.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
   initTranslations,
@@ -20,6 +21,7 @@ export function settingsPage() {
       tagsMode: 'vndb',
       translateTags: true,
       translationUrl: '',
+      ownerName: '',
       backgroundUrl: '',
       backgroundOverlay: 0.5,
       backgroundBlur: 4
@@ -69,6 +71,7 @@ export function settingsPage() {
           tagsMode: 'vndb',
           translateTags: true,
           translationUrl: '',
+          ownerName: '',
           backgroundUrl: '',
           backgroundOverlay: 0.5,
           backgroundBlur: 4
@@ -239,6 +242,8 @@ export function settingsPage() {
         if (data.appearance) {
           setBackgroundConfig(data.appearance);
           applyBackground(data.appearance);
+          // ownerName 随导入的 appearance 即时生效（与背景字段同管线）
+          applySiteIdentity(data.appearance);
         }
 
         const actionText = mode === 'merge' ? t('confirm.importMerge') : t('confirm.importReplace');
@@ -375,15 +380,17 @@ export function settingsPage() {
     async saveAppearanceConfig() {
       await withLoading(this, async () => {
         await configAPI.update({
+          ownerName: this.config.ownerName || '',
           backgroundUrl: this.config.backgroundUrl || '',
           backgroundOverlay: this.config.backgroundOverlay ?? 0.5,
           backgroundBlur: this.config.backgroundBlur ?? 4
         });
 
-        // 失效 appearance 缓存并用新数据即时应用背景
+        // 失效 appearance 缓存并用新数据即时应用背景与站点名
         const cfg = await this.$store.app.loadAppearance({ force: true });
         setBackgroundConfig(cfg);
         applyBackground(cfg);
+        applySiteIdentity(cfg);
       }, { successMsg: t('toast.appearanceSaved'), errorPrefix: t('prefix.saveFailed') });
     },
 

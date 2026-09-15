@@ -439,9 +439,12 @@ export const configAPI = {
 
   /**
    * 获取外观配置（公开接口，无需认证）
+   * @param {Object} [options] - apiRequest 选项（保存后 force 重取 / 后台静默刷新
+   *   传 { cache: 'no-store' }：端点响应 max-age=300，默认 fetch 会在 300s 内
+   *   命中浏览器 HTTP 缓存旧副本，使"当前页立即生效"静默失效）
    */
-  async getAppearance() {
-    return apiRequest('/config/appearance');
+  async getAppearance(options = {}) {
+    return apiRequest('/config/appearance', options);
   }
 };
 
