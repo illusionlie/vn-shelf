@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "backend spec 入口：路由/仓储层规范索引"}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "API 契约：errorResponse 风格、公开端点缓存、校验约定，ownerName 校验需对齐"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "frontend spec 入口"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "settingsPage 组件改动规范（Alpine 组件结构）"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "ownerName 为跨层字段（D1→API→前端注入），跨层一致性思考指引"}
