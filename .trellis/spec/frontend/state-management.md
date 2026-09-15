@@ -25,8 +25,9 @@ Promote a value to `Alpine.store('app')` when **multiple pages/components read i
 Pattern (from B2):
 - Store owns the loader (`loadAppearance({force})`) with **Promise dedupe** (`_appearancePromise`) so concurrent first-paint callers share one request.
 - **sessionStorage read-through** returns cached value immediately + fires a non-blocking background refresh.
-- Mutators (e.g. `saveAppearanceConfig`) call `loadAppearance({force:true})` to invalidate after a write.
-- Background refresh dispatches a `CustomEvent` so a stateless module (`theme.js`) can re-apply without holding the Store reference.
+- Mutators (e.g. `saveAppearanceConfig`) call `loadAppearance({force:true})` to invalidate after a write. The `force` network path passes `cache: 'no-store'` (09-15): the endpoint is `max-age=300`, and a plain fetch would replay the browser disk-cache copy captured at page load — silently defeating "apply immediately after save".
+- Background refresh (`_refreshAppearanceBackground`) always fetches with `cache: 'no-store'` for the same reason — its whole purpose is picking up the latest value.
+- Background refresh dispatches a `CustomEvent` (`appearance-refreshed`) so stateless modules (`theme.js` background, `site-identity.js` banner/title) can re-apply without holding the Store reference.
 
 ---
 
@@ -35,7 +36,7 @@ Pattern (from B2):
 Do not assume all `/api/config*` endpoints return the same fields. There are two distinct config endpoints (see `src/router.js`):
 
 - `GET /api/config` — **authenticated**. Returns full config incl. `hasVndbApiToken`, `hasPassword`, `lastIndexTime` plus tags/background fields. Used by `settingsPage.loadConfig` to render the VNDB-token indicator (`hasVndbApiToken ? '已配置'`) and other auth-sensitive UI.
-- `GET /api/config/appearance` — **public**. Returns ONLY `backgroundUrl`/`backgroundOverlay`/`backgroundBlur` + `tagsMode`/`translateTags`/`translationUrl`. Excludes all auth-only fields.
+- `GET /api/config/appearance` — **public**. Returns ONLY `backgroundUrl`/`backgroundOverlay`/`backgroundBlur`/`ownerName` + `tagsMode`/`translateTags`/`translationUrl`. Excludes all auth-only fields.
 
 The appearance Store (`Alpine.store('app').loadAppearance`) is backed by `/api/config/appearance` ONLY. Do NOT switch `settingsPage.loadConfig` to the appearance Store — that would make `config.hasVndbApiToken` always undefined and break the token indicator (B2 learned this the hard way).
 
@@ -49,3 +50,4 @@ IndexedDB / localStorage bridges:`vn-shelf-translations` (translations cache) ca
 - **Closing the IDB connection after each transaction.** If you cache a connection (`_db`), do NOT call `db.close()` on transaction completion — that fires `onclose`, clears the cache, and forces a reopen. Let the connection live for the page session; clear via `onclose`/`onversionchange` only.
 - **Stamping a throttle timestamp AFTER the fetch.** Set the last-check timestamp BEFORE the network call, otherwise a failed fetch retries every page load.
 - **Skipping Promise dedupe for first-paint concurrent loaders.** Two callers (`theme.initBackground` + `tagsView.loadConfig`) race to the same endpoint on every page nav — without an `_appearancePromise` guard you issue 2 requests.
+- **"Forcing" a refresh that still hits the HTTP cache.** `loadAppearance({force:true})` only bypasses sessionStorage and the in-flight promise; if the re-fetch is a default-cache-mode `fetch` against the `max-age=300` appearance endpoint, the browser replays the disk-cache copy from page load and the save never shows up on the current page. Any path whose purpose is "get the latest value" (post-save force reload, background silent refresh) must pass `cache: 'no-store'` (09-15 learned this — background had been silently affected too).

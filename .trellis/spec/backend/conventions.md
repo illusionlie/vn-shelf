@@ -614,7 +614,7 @@ invalidatePublicCacheAfterWrite(h)  // 写路由出口统一包裹：仅 2xx 才
 ### 6. Tests Required
 
 - `tests/router/http-cache.test.mjs`：真实 router + http-cache + db 链路，caches 经第 6 参注入桩——访客 miss/ETag/CORS/合成键、二次命中 handler 零执行、查询串变体不串味、管理员三不原则、304 空体三头、写后版本自增旧键失联、4xx 不 bump + bump 抛错不破写响应、appearance 不入缓存。
-- **patch 桩同步纪律**：router.js 新增 `./http-cache.js` import 时，六个 router 桩（envelope / config.update / vndb.search / login.ratelimit / index.start / vn.status）+ queue 加载器 + ulist 桩必须全员同步直通/计数桩（依赖图陷阱，见信封 Scenario §6）。
+- **patch 桩同步纪律**：router.js 新增 `./http-cache.js` import 时，七个 router 桩（envelope / config.update / vndb.search / login.ratelimit / index.start / vn.status / import.appearance）+ queue 加载器 + ulist 桩必须全员同步直通/计数桩（依赖图陷阱，见信封 Scenario §6）。
 - `tests/d1/migrations.test.mjs`：v3（idx_vn_entries_created）存量库应用用例；EXPLAIN QUERY PLAN 走索引（无 TEMP B-TREE）。
 
 ### 7. Wrong vs Correct
@@ -640,5 +640,71 @@ if (hasAuthCookie) {
   const res = await handler();
   res.headers.set('Cache-Control', 'no-store');
   return res;
+}
+```
+
+---
+
+## Scenario: 外观字段扩展契约（以 ownerName 为例，09-15）
+
+### 1. Scope / Trigger
+
+- Trigger：向外观管线（settings blob → `GET /api/config/appearance` / `GET+PUT /api/config` / 导出导入）新增一个**非敏感展示型文本字段**时的七处贯通与校验契约。
+- 先例字段：`backgroundUrl` / `backgroundOverlay` / `backgroundBlur` / `ownerName`。
+
+### 2. Signatures
+
+```js
+// settings blob（config:settings JSON，无 schema 迁移）
+ownerName: string   // trim 后 ≤ 30 字符；'' = 未设置（前端回退品牌名「VN Shelf」）
+
+// 七处贯通点（漏一处即字段半残）：
+// repository.js: getSettings 默认值 / applyAppearanceToSettings（防御 trim+slice）/ exportData appearance
+// router.js:     handleGetAppearance / handleGetConfig / handleUpdateConfig / handleImport 校验段
+```
+
+### 3. Contracts
+
+- 公开侧 `GET /api/config/appearance` 与管理侧 `GET /api/config` 均返回（未配置输出 `''`）；字段属公开可读外观数据，与背景同级。
+- **校验风格分野**：展示型文本字段用**显式 400**（非 string / trim 后超长），不做静默 coerce——与 import 校验对齐；数值型外观字段（overlay/blur）保留 clamp 静默风格。空串合法 = 清除设置。
+- `null` 归一不对称：PUT 拒绝 `null`（400），import 将 `null → ''`——与 backgroundUrl 先例一致。
+- 导入缺省（旧备份无该字段）跳过不动，行为向后兼容。
+- 前端写入仅 `textContent` / `document.title`（无 HTML sink），后端 trim + 限长兜底。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|---|---|
+| PUT `ownerName` 非 string | 400 `ownerName 必须为字符串`，不落库 |
+| PUT `ownerName` trim 后 > 30 | 400 `ownerName 长度不能超过 30`，不落库 |
+| PUT `ownerName` 空串/纯空白 | 合法，落库 `''`（清除个性化） |
+| import `appearance.ownerName` 非法 | 400（与 PUT 同规则），不触达 importData |
+| import `appearance.ownerName === null` | 归一 `''` 后应用 |
+| import 无 `ownerName` 键 | 跳过，存量值不动 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：新外观字段按七处清单贯通 + 两端测试（router 校验矩阵 + repository 读写）同步落地。
+- Base：字段未配置时全链路输出与既有行为逐字节一致（空串走回退分支）。
+- Bad：只加 GET 不加 PUT 校验；展示文本走数值 clamp 静默风格；字段写入 innerHTML。
+
+### 6. Tests Required
+
+- `tests/router/config.update.test.mjs`：PUT 合法（trim/边界 30/空串清除）+ 400 两态且断言不落库 + 两个 GET 返回字段（含未配置 `''`）+ 未认证 401 不落库。
+- `tests/router/import.appearance.test.mjs`：import 校验矩阵（400 不触达 importData / null 归一 / 缺省跳过）。
+- `tests/d1/repository.test.mjs`：importData 写 settings（防御截断）+ exportData 携带字段。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：展示型文本静默 coerce（超长悄悄截断，用户以为存上了全名）
+if (body.ownerName !== undefined) settings.ownerName = String(body.ownerName).slice(0, 30);
+
+// Correct：显式 400，错误早暴露
+if (body.ownerName !== undefined) {
+  if (typeof body.ownerName !== 'string') return errorResponse('ownerName 必须为字符串', 400);
+  const name = body.ownerName.trim();
+  if (name.length > 30) return errorResponse('ownerName 长度不能超过 30', 400);
+  settings.ownerName = name;
 }
 ```

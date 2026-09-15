@@ -47,6 +47,7 @@ public/
     ├── constants.js      # 前端共享常量
     ├── utils.js          # 工具函数
     ├── theme.js          # 主题切换 + 自定义背景
+    ├── site-identity.js  # ownerName 站点名注入（banner / <title> / 登录页标题）
     ├── markdown.js       # Markdown 渲染
     ├── translations.js   # Tags 翻译与 IndexedDB 缓存
     ├── tier-diff.js      # Tier 拖拽 diff 纯函数

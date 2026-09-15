@@ -31,9 +31,11 @@ public/
     ├── api.js             # apiRequest + API namespace wrappers
     ├── i18n.js            # UI i18n: t()/setLocale()/getLocale()/initI18n()
     ├── locales/           # UI dictionaries as JS modules (zh-CN.js full, en.js placeholder)
-    ├── utils.js / theme.js / markdown.js / translations.js
+    ├── utils.js / theme.js / site-identity.js / markdown.js / translations.js
     │                      # NOTE: translations.js = VNDB tags domain translation (IndexedDB + remote dict),
     │                      #       a SEPARATE system from i18n.js — never merge them
+    │                      # NOTE: site-identity.js = ownerName banner/title injection (09-15) — textContent
+    │                      #       only, re-applied on i18n-ready + appearance-refreshed (module-level _lastConfig)
     ├── components/        # per-page Alpine.data components
     └── vendor/            # self-hosted runtime deps (committed)
         ├── alpine.min.js
