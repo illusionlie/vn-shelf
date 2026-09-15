@@ -976,3 +976,25 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 ### Status
 
 [OK] **Completed**
+
+## Session 23: 站点主人名个性化（ownerName 注入 banner/标题/登录页）
+
+**Date**: 2026-09-15
+**Task**: 09-15-site-owner-name（已归档）
+**Branch**: `master`
+
+### Summary
+
+复用外观管线新增 ownerName 字段（settings blob 七处贯通：GET/PUT /api/config、公开 GET /api/config/appearance、导出导入，展示型文本显式 400 校验风格）。前端新模块 site-identity.js：「XX 的 VN Shelf」（zh）/「{name}'s VN Shelf」（en）注入四页 banner、登录页大标题、五页 <title>（品牌段替换，meta.*Title data-i18n 路径保留）；模块级 _lastConfig 支撑 i18n 词典就绪重放，不依赖 Alpine store 时序。设置页外观区块新增输入，保存即时生效。检查代理揪出 P1：loadAppearance force 重取命中浏览器 max-age=300 磁盘缓存使「即时生效」静默失效——force 路径与后台静默刷新收紧 cache:'no-store'（背景管线同样受益）。顺带对齐 tier.html 标题 i18n。lint 零告警、262 测试全过、AC1-8 全过（AC1/2/7 用户人工复核）。spec 沉淀：外观字段扩展契约 Scenario（backend conventions，含校验矩阵与 Wrong/Correct）+ appearance no-store 缓存纪律（state-management）+ router 桩名册六→七 + 目录规范与 AGENTS.md 同步。遗留起草两任务：09-15-config-put-validate-first（newPassword 先落库半提交）、09-15-appearance-cache-freshness（冷启动 5 分钟陈旧收紧评估）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ee991f6` | feat(personalize): 站点主人名个性化 |
+| `0e707f6` | docs(spec): 外观字段扩展契约 + no-store 缓存纪律 |
+| `4d6961d` | chore(task): archive 09-15-site-owner-name |
+
+### Status
+
+[OK] **Completed**
