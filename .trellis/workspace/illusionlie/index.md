@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 22
-- **Last Active**: 2026-09-15
+- **Total Sessions**: 23
+- **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~978 | Active |
+| `journal-1.md` | ~1023 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 23 | 2026-09-19 | PUT /api/config 校验前置：newPassword 半提交修复 | `5df4545`, `825f078`, `6104140` | `master` |
 | 22 | 2026-09-15 | 动效修复与打磨（toast 退出动画 / modal 类钩子单轨 / motion 基准对齐） | `5c61c97`, `056f877`, `213a8c2`, `72e4e96` | `master` |
 | 21 | 2026-09-12 | 全站返回顶部 FAB：壳层注入 + IO 哨兵显隐 + 移动端适配 | `a3cc90c` | `master` |
 | 20 | 2026-09-11 | vn-refresh-button: admin single-entry VNDB refresh (card icon + detail footer, in-place update) | `ca49323`, `267e17f`, `20e02e4` | `master` |

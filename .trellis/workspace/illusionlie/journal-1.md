@@ -998,3 +998,26 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 ### Status
 
 [OK] **Completed**
+
+
+## Session 23: PUT /api/config 校验前置：newPassword 半提交修复
+
+**Date**: 2026-09-19
+**Task**: PUT /api/config 校验前置：newPassword 半提交修复
+**Branch**: `master`
+
+### Summary
+
+处理 ownerName 遗留双任务中的校验前置项（另一 appearance 缓存收紧仍留 planning）。实施：handleUpdateConfig 全部 400 校验（newPassword 长度、ownerName 类型/trim 限长）前置到任何持久化之前，ownerName 校验段一次性 trim 存局部变量复用，setAdminPassword 挪至校验后（getSettings 重载与 token 重签发逻辑保持），coerce 字段零改动——任一校验失败时凭据与 settings blob 零变更。测试：桩扩展 createJWT/setAuthCookie 镜像真实行为并记录调用，新增 3 用例（合法密码+非法 ownerName 零写入、过短密码+合法 ownerName 零写入并首次钉住短密码 400、合法混合成功且 token 基于轮换后 jwtSecret 签发）。检查代理终检六项全过零修复：穷举 6 条 return 路径确认零写入、成功路径逐段 diff 等价、非同义反复验证。spec 沉淀：外观契约补跨字段校验前置不变量（§3 契约、§4 矩阵混合请求行、§6 双桩计数断言、§7 Wrong/Correct 更新为校验前置形态含半提交陷阱）+ 目录补条目。265 测试全绿、lint 零告警。遗留观察（范围外未动）：newPassword 为 truthy 非字符串时被 length<6 放行，重构前行为逐字节相同，加固需另开任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5df4545` | (see git log) |
+| `825f078` | (see git log) |
+| `6104140` | (see git log) |
+
+### Status
+
+[OK] **Completed**
