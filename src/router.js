@@ -59,6 +59,37 @@ function isPublicCorsPath(path) {
   return PUBLIC_CORS_PATH_PATTERNS.some(pattern => pattern.test(path));
 }
 
+// Turnstile 遥测信标（/cdn-cgi/challenge-platform/*）：生产经 CF 边缘该路径被边缘吸收，
+// 永远到不了 Worker；本地 wrangler dev 无边缘会落到这里——404 无 CORS 头使 widget 的
+// 跨域预检挂起至超时，而 Turnstile 在遥测定型前不派发 token（真 key 本地登录被
+// 「请完成人机验证」卡住的根因）。故对此前缀快速 204 + 定向 CORS，让遥测即刻成功。
+const CHALLENGE_PLATFORM_PREFIX = '/cdn-cgi/challenge-platform/';
+const CHALLENGE_PLATFORM_ALLOW_ORIGIN = 'https://challenges.cloudflare.com';
+
+/**
+ * 构造 Turnstile 遥测信标的快速应答（纯函数，直测覆盖）
+ * @param {string} method - 请求方法
+ * @param {Headers|null} requestHeaders - 原请求头（OPTIONS 时反射 Access-Control-Request-Headers）
+ * @returns {Response|null} OPTIONS/POST → 204 + 定向 CORS；其余方法 → null（维持自然 404，无 CORS 头）
+ */
+export function challengePlatformBeaconResponse(method, requestHeaders = null) {
+  if (method !== 'OPTIONS' && method !== 'POST') {
+    return null;
+  }
+  const headers = {
+    'Access-Control-Allow-Origin': CHALLENGE_PLATFORM_ALLOW_ORIGIN
+  };
+  if (method === 'OPTIONS') {
+    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+    const requested = requestHeaders?.get('access-control-request-headers');
+    if (requested) {
+      headers['Access-Control-Allow-Headers'] = requested;
+    }
+    headers['Access-Control-Max-Age'] = '86400';
+  }
+  return new Response(null, { status: 204, headers });
+}
+
 // 访客缓存路径集合 = PUBLIC_CORS_PATH_PATTERNS 去掉 /api/config/appearance：
 // 该端点维持既有 max-age=300 简单缓存，不引入 ETag / 版本键机制
 const PUBLIC_CACHE_PATH_PATTERNS = [
@@ -147,6 +178,15 @@ export async function handleRequest(request, env, ctx) {
         'Access-Control-Max-Age': '86400'
       }
     });
+  }
+
+  // Turnstile 遥测信标快速应答（见 challengePlatformBeaconResponse 头注）；
+  // 非 OPTIONS/POST 的方法返回 null 落入下方自然 404
+  if (path.startsWith(CHALLENGE_PLATFORM_PREFIX)) {
+    const beaconResponse = challengePlatformBeaconResponse(method, request.headers);
+    if (beaconResponse) {
+      return beaconResponse;
+    }
   }
 
   // API路由

@@ -88,7 +88,15 @@
 
           <p class="form-error" x-text="error" x-show="error"></p>
 
-          <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">
+          <!-- aria-disabled 门控（非原生 disabled，09-09 契约：保焦点）：Turnstile 已启用
+               且 token 未签发时置灰；提交校验兜底保留（token 过期竞态点击仍有反馈） -->
+          <button
+            type="submit"
+            class="btn btn-primary"
+            style="width: 100%"
+            :disabled="isLoading"
+            :aria-disabled="turnstileSiteKey && !turnstileToken ? 'true' : 'false'"
+          >
             <span x-show="isLoading" data-i18n="login.loggingIn"></span>
             <span x-show="!isLoading" data-i18n="login.submit"></span>
           </button>

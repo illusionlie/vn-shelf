@@ -760,6 +760,8 @@ POST /api/config/turnstile/test { siteKey, secretKey, token } → data { ok: tru
 - 测试端点用**请求体输入值**而非已存 settings 值打 siteverify——支撑设置页「先测试后保存」，消除误配锁死（本功能最大风险；最终退路 = `wrangler d1 execute` 清两键恢复登录）。
 - remoteip 传真实 `CF-Connecting-IP`，头缺失不传（不是限流的 `'local'` 占位——那是 DO 实例键，不是 IP）。
 - 前端契约（细节见 frontend quality-guidelines「Turnstile 懒加载例外」）：脚本仅 siteKey 非空时经 `public/js/turnstile.js` 懒加载单例注入；token 单次消费 → 每次登录尝试后 `turnstile.reset()`；theme 按站点主题显式传（auto 跟系统不跟手动主题）。
+- **遥测信标快速应答**（09-19 turnstile-local-ux）：`/cdn-cgi/challenge-platform/*` 前缀的 OPTIONS/POST 在 `handleRequest` 早段快速 204 + 定向 CORS（ACAO 仅 `https://challenges.cloudflare.com`，OPTIONS 反射 `Access-Control-Request-Headers`）；其他方法维持自然 404。Why：Turnstile 在遥测定型前不派发 token，本地 wrangler dev 无 CF 边缘时信标落到 Worker 404 无 CORS 头 → 预检失败+重试序列拖慢 token 派发（真 key 才有完整遥测流，dummy keys 测不出）。生产该路径被 CF 边缘吸收、处理器不可达（双保险无害）。响应构造导出为纯函数 `challengePlatformBeaconResponse(method, requestHeaders)` 直测，**不新增 import**（零桩同步成本）。
+- **登录按钮门控**：Turnstile 已启用且 token 未签发期间按钮 `aria-disabled="true"` 置灰（09-09 契约：禁原生 disabled——Chrome 夺焦点），**保留**提交时「请完成人机验证」校验兜底（token 过期竞态点击仍有反馈）。未配置时行为与现状一致。
 
 ### 4. Validation & Error Matrix
 
@@ -788,6 +790,7 @@ POST /api/config/turnstile/test { siteKey, secretKey, token } → data { ok: tru
 - `tests/router/login.turnstile.test.mjs`：未配置 / 半配放行、400 / 403 双零断言（verifyAdminPassword 桩 + 限流 DO storage）、pass 全通、fail-open、429 先于 siteverify、**半配 status 输出 `''`**。
 - `tests/router/config.turnstile.test.mjs`：401 / 缺参 400 / **输入值与已存值分离断言**（STORED-*/INPUT-* 双桩）/ ok 三态。
 - `tests/router/config.update.test.mjs`：两键校验矩阵 + 混合请求零持久化双计数。
+- `tests/router/challenge-platform.test.mjs`（09-19 turnstile-local-ux）：信标纯函数方法矩阵 + `handleRequest` 早段接线（信封路径不触碰 env，可空 env 直调）。
 - 桩纪律：router.js 的 `./turnstile.js` import → 八个 copy 型 router 桩全员同步（见 http-cache Scenario §6 的 09-19 修正）。
 
 ### 7. Wrong vs Correct
