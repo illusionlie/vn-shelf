@@ -168,7 +168,64 @@ renderer.html = function html({ text }) {
     .replace(/>/g, '&gt;');
 };
 
-marked.use({ renderer, breaks: true, gfm: true });
+// 三标记 inline extensions（==高亮== / ^上标^ / ~下标~，09-19 恢复迁移前自实现
+// parseInline 的三标记支持）。tokenizer 正则锚定输入起点（marked 在每个 token
+// 边界喂入剩余文本），与原版逐条对齐：mark 惰性 + 内容 >=1 字符、sup/sub 字符类
+// 排他；sub 的 `[^~]+` 使 `~~删除线~~` 首字符后即失配落回 GFM del，尾守卫
+// `(?!~)` 拒绝 `~a~~`。内容经 token 树递归解析（`==**b**==` 嵌套成立，优于
+// 原版字符串顺序替换），输出复用 cards-detail.css 既有 md-* 类名，样式零新增。
+const INLINE_SYNTAX_EXTENSIONS = [
+  {
+    name: 'mdMark',
+    level: 'inline',
+    start(src) {
+      return src.indexOf('==');
+    },
+    tokenizer(src) {
+      const match = /^==(.+?)==/.exec(src);
+      if (match) {
+        return { type: 'mdMark', raw: match[0], tokens: this.lexer.inlineTokens(match[1]) };
+      }
+    },
+    renderer(token) {
+      return `<mark class="md-mark">${this.parser.parseInline(token.tokens)}</mark>`;
+    }
+  },
+  {
+    name: 'mdSup',
+    level: 'inline',
+    start(src) {
+      return src.indexOf('^');
+    },
+    tokenizer(src) {
+      const match = /^\^([^^]+)\^/.exec(src);
+      if (match) {
+        return { type: 'mdSup', raw: match[0], tokens: this.lexer.inlineTokens(match[1]) };
+      }
+    },
+    renderer(token) {
+      return `<sup class="md-sup">${this.parser.parseInline(token.tokens)}</sup>`;
+    }
+  },
+  {
+    name: 'mdSub',
+    level: 'inline',
+    start(src) {
+      return src.indexOf('~');
+    },
+    tokenizer(src) {
+      const match = /^~([^~]+)~(?!~)/.exec(src);
+      if (match) {
+        return { type: 'mdSub', raw: match[0], tokens: this.lexer.inlineTokens(match[1]) };
+      }
+    },
+    renderer(token) {
+      return `<sub class="md-sub">${this.parser.parseInline(token.tokens)}</sub>`;
+    }
+  }
+];
+
+marked.use({ renderer, breaks: true, gfm: true, extensions: INLINE_SYNTAX_EXTENSIONS });
 
 /**
  * 渲染 Markdown 文本为 HTML 字符串。

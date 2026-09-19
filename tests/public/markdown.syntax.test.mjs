@@ -131,3 +131,77 @@ test('普通段落被 <p class="md-paragraph"> 包裹', async () => {
   const html = renderMarkdown('a plain paragraph');
   assert.match(html, /<p class="md-paragraph">a plain paragraph<\/p>/);
 });
+
+// ============ 三标记（==高亮== / ^上标^ / ~下标~，09-19 恢复） ============
+
+test('==高亮== 渲染为 <mark class="md-mark">', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('==highlight==');
+  assert.match(html, /<mark class="md-mark">highlight<\/mark>/);
+});
+
+test('^上标^ 渲染为 <sup class="md-sup">', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('x^2^');
+  assert.match(html, /<sup class="md-sup">2<\/sup>/);
+});
+
+test('~下标~ 渲染为 <sub class="md-sub">', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('H~2~O');
+  assert.match(html, /<sub class="md-sub">2<\/sub>/);
+});
+
+test('==a=b==：内容含单个 = 仍完整捕获', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('==a=b==');
+  assert.match(html, /<mark class="md-mark">a=b<\/mark>/);
+});
+
+test('~~删除线~~ 与 ~下标~ 同段共存互不劫持', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('~~del~~ and ~sub~');
+  assert.match(html, /<del class="md-del">del<\/del>/);
+  assert.match(html, /<sub class="md-sub">sub<\/sub>/);
+});
+
+test('==== / ^^ / ~~~ 不产出三标记', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  for (const input of ['====', '^^', '~~~']) {
+    const html = renderMarkdown(input);
+    assert.doesNotMatch(html, /md-mark|md-sup|md-sub/, `input: ${input}`);
+  }
+});
+
+test('==**b**== 嵌套内联正常递归解析', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('==**b**==');
+  assert.match(html, /<mark class="md-mark"><strong class="md-strong">b<\/strong><\/mark>/);
+});
+
+test('~a~~ 不产出 sub（尾守卫拒绝）', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+  const html = renderMarkdown('~a~~');
+  assert.doesNotMatch(html, /md-sub/);
+  assert.doesNotMatch(html, /<sub/);
+});
+
+test('三标记内容夹恶意载荷不被放大（renderer 转义 + 链接白名单）', async () => {
+  const { renderMarkdown } = await loadMarkdownModule();
+
+  // mark 内容夹裸 <img>：经 inlineTokens 递归后由 renderer.html 转义为文本
+  const mark = renderMarkdown('==<img src=x onerror=1>==');
+  assert.match(mark, /<mark class="md-mark">&lt;img src=x onerror=1&gt;<\/mark>/);
+  assert.doesNotMatch(mark, /<img[ >]/i);
+
+  // sup 内容夹事件属性 HTML：同上转义，不产生活标签
+  const sup = renderMarkdown('^<b onclick="alert(1)">evil</b>^');
+  assert.match(sup, /&lt;b onclick=/);
+  assert.doesNotMatch(sup, /<b[ >]/i);
+
+  // sub 内容夹 javascript: 链接：URL 白名单降级为 md-link-unsafe 占位
+  const sub = renderMarkdown('~[x](javascript:alert(1))~');
+  assert.match(sub, /<sub class="md-sub"><span class="md-link-unsafe"/);
+  assert.doesNotMatch(sub, /javascript:/i);
+});
+
