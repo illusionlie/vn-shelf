@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范总索引——动 public/js 前的层内约定入口"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "卡片内嵌控件 .stop 双事件先例（.vn-card-refresh-btn）、:focus-visible 焦点环、tier 卡键盘拖拽流程——D3 直接套用"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine 组件与 x-data 作用域约定——tier overlay 出嵌需把 x-data 上移到 wrap"}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "auth 端点契约：verify 保留不改、status 公开语义；确认不触碰缓存/no-store 契约"}
