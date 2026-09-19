@@ -1,1 +1,2 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "appearance Store 全套契约（loadAppearance/force/Promise dedupe/sessionStorage read-through/no-store 教训 B2+09-15）——本任务改动的正是该契约的冷路径分支，且 :27-29、:52-53 为 AC2 待修订条目，改前须按原文对齐、改后须同步"}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "公开缓存 Scenario（版本键/ETag/管理员三不原则/七桩同步纪律）——本任务服务端零变更但触碰该 Scenario 的 appearance 条目（AC2 待修订），实现时不得扰动四端点既有契约；写路径 bump 接入清单说明 PUT /api/config 不 bump 的现状语义"}
