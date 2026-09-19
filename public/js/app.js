@@ -77,9 +77,11 @@ document.addEventListener('alpine:init', () => {
     /**
      * 加载外观配置（appearance）：Promise 去重 + sessionStorage 直读 + 后台静默刷新。
      *
-     * - `force=true`：清缓存与 in-flight promise，强制重新拉取（settings 保存后调用）；
-     *   网络请求带 cache:'no-store' 同步绕过浏览器 HTTP 缓存（appearance 端点
-     *   max-age=300，默认 fetch 在 300s 内会返回旧副本）。
+     * 统一模型（09-19）：sessionStorage 只管即时首绘，新鲜度永远来自当次加载的
+     * no-store 源站请求——所有网络路径（冷路径 / force / 后台刷新）恒
+     * cache:'no-store'（appearance 端点 max-age=300，默认 fetch 在 300s 内会命中
+     * 浏览器 HTTP 缓存旧副本，冷启动首屏最长 5 分钟陈旧）。
+     * - `force=true`：清缓存与 in-flight promise，强制重新拉取（settings 保存后调用）。
      * - sessionStorage 命中：立即返回缓存值，并后台静默刷新（非阻塞），刷新成功后
      *   派发 'appearance-refreshed' 事件让 theme.js 重应用背景。
      * - 多处并发调用同一首屏：通过 `_appearancePromise` 去重，只发一次请求。
@@ -97,7 +99,7 @@ document.addEventListener('alpine:init', () => {
       if (this._appearancePromise) return this._appearancePromise;
 
       const doLoad = (async () => {
-        // sessionStorage 直读（跨页冷启动先返回，后台静默刷新）
+        // sessionStorage 直读：只管即时首绘，新鲜度由后台 no-store 静默刷新补齐
         if (!force) {
           const cachedRaw = sessionStorage.getItem('vn-shelf:appearance:v1');
           if (cachedRaw) {
@@ -113,7 +115,9 @@ document.addEventListener('alpine:init', () => {
         }
 
         try {
-          const res = await configAPI.getAppearance(force ? { cache: 'no-store' } : {});
+          // 网络路径恒 no-store（冷路径 sessionStorage 未命中与 force 绕过均走此处）：
+          // 直查源站，不经浏览器 HTTP 缓存（冷启动陈旧上界 0s）
+          const res = await configAPI.getAppearance({ cache: 'no-store' });
           const data = res.data || {};
           this.appearance = data;
           try {
