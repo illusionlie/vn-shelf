@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "check 阶段逐条对照：登录顺序契约、信封形态、前置校验零持久化、七桩+queue+ulist 桩同步纪律、settings 复用"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端检查清单：i18n 双语 parity、a11y、vendor 例外条款、友好错误分层"}
+{"file": ".trellis/tasks/09-19-login-turnstile/research/turnstile.md", "reason": "核对实现与 Turnstile 官方契约一致（error-codes 键名、token 单次消费与 reset、超时处理）"}

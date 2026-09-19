@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/conventions.md", "reason": "直接约束本次改动：handleLogin 插入顺序契约（09-12 限流 Scenario）、API 响应信封无 code、settings 单请求复用、config 前置校验不变量（09-15）、patch 桩依赖图陷阱（B6c）"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "vendor 自托管规则（Turnstile 脚本例外落点）、i18n t() 契约与 backend-message 边界、friendlyError 分层"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "locales/、css/、新增前端模块的落位约定"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Alpine 组件模式与 mixin 组合——loginPage/settingsPage 扩展需遵循"}
+{"file": ".trellis/tasks/09-19-login-turnstile/research/turnstile.md", "reason": "siteverify 协议、widget JS API、dummy keys、token 单次消费——实现对外契约的速查（带 ❓ 项需按官方文档核对）"}
