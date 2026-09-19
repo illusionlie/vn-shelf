@@ -578,7 +578,7 @@ servePublicCached(request, env, ctx, path, handler, cachesImpl = globalThis.cach
                         // cachesImpl 参数注入是可测性契约，测试传桩断言 match/put
 
 // src/router.js
-PUBLIC_CACHE_PATH_PATTERNS          // 4 端点：/api/vn、/api/vn/v\d+、/api/stats、/api/tier（appearance 除外，维持 max-age=300 现状）
+PUBLIC_CACHE_PATH_PATTERNS          // 4 端点：/api/vn、/api/vn/v\d+、/api/stats、/api/tier（appearance 除外：前端恒 no-store 直查，无需版本键机制）
 invalidatePublicCacheAfterWrite(h)  // 写路由出口统一包裹：仅 2xx 才 ctx.waitUntil(bump)，bump 失败仅告警
 ```
 
@@ -603,7 +603,7 @@ invalidatePublicCacheAfterWrite(h)  // 写路由出口统一包裹：仅 2xx 才
 | 写路由 4xx（校验失败） | 不 bump |
 | bump 落库抛错 | `console.warn`，写响应不受影响 |
 | 带 auth_token Cookie（任意值） | 200 直查 + `no-store`，INM 也不 304 |
-| appearance 端点 | 维持 `max-age=300`、无 ETag（零变化） |
+| appearance 端点 | 响应头仍 `max-age=300`、无 ETag（服务端零变化）；前端契约恒 `no-store` 直查（2026-09-19），头仅服务外部 API 消费者。ETag 不适用于冷启动收紧：max-age 窗口内浏览器不发再验证请求，bump/换 ETag 无法推送失效仍新鲜的浏览器副本 |
 
 ### 5. Good/Base/Bad Cases
 
