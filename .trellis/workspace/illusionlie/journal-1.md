@@ -1021,3 +1021,26 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 ### Status
 
 [OK] **Completed**
+
+
+## Session 24: appearance 冷启动缓存收紧：前端恒 no-store（选型 c）
+
+**Date**: 2026-09-19
+**Task**: appearance 冷启动缓存收紧：前端恒 no-store（选型 c）
+**Branch**: `master`
+
+### Summary
+
+任务 09-15-appearance-cache-freshness 全程：规划期调研纠正 PRD 候选 b 前提（max-age 窗口内浏览器不发再验证，ETag/版本键 bump 无法推送失效仍新鲜的副本，故 ETag 不适用冷启动收紧），量化对比（本站量级三方案负载差异≈0，决策看陈旧上界与复杂度）后用户选型 c。实现：app.js 冷路径恒 cache no-store，冷启动首屏陈旧上界 300s→0s，sessionStorage 仍供暖路径即时首绘，force/Promise dedupe 语义零改动，服务端 src/ 零变更（max-age=300 头保留仅服务外部消费者）；新增 tests/public/appearance-freshness.test.mjs 静态机制测试 3 例（检查代理变异验证确认卡点有效）。spec 沉淀：backend/conventions.md 缓存 Scenario appearance 行 + PUBLIC_CACHE_PATH_PATTERNS 注释、frontend/state-management.md no-store 契约扩展至全部网络路径、两处 index 标注同步。lint 零告警、268 测试全绿。遗留：AC1 人工复核（改 ownerName 后无痕标签页首屏即时生效）不阻塞，可与 ownerName 三项手工复核合并执行。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a6527e4` | (see git log) |
+| `14833ad` | (see git log) |
+| `4708961` | (see git log) |
+
+### Status
+
+[OK] **Completed**

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 23
+- **Total Sessions**: 24
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1023 | Active |
+| `journal-1.md` | ~1046 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 24 | 2026-09-19 | appearance 冷启动缓存收紧：前端恒 no-store（选型 c） | `a6527e4`, `14833ad`, `4708961` | `master` |
 | 23 | 2026-09-19 | PUT /api/config 校验前置：newPassword 半提交修复 | `5df4545`, `825f078`, `6104140` | `master` |
 | 22 | 2026-09-15 | 动效修复与打磨（toast 退出动画 / modal 类钩子单轨 / motion 基准对齐） | `5c61c97`, `056f877`, `213a8c2`, `72e4e96` | `master` |
 | 21 | 2026-09-12 | 全站返回顶部 FAB：壳层注入 + IO 哨兵显隐 + 移动端适配 | `a3cc90c` | `master` |
