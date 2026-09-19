@@ -153,6 +153,65 @@
       </button>
     </section>
 
+    <!-- 登录人机验证（Cloudflare Turnstile） -->
+    <section class="settings-section">
+      <h2 class="settings-section-title" data-i18n="settings.turnstileSectionTitle"></h2>
+
+      <div class="form-group">
+        <label class="form-label" for="turnstileSiteKeyInput" data-i18n="settings.turnstileSiteKeyLabel"></label>
+        <input
+          type="text"
+          id="turnstileSiteKeyInput"
+          class="form-input"
+          maxlength="200"
+          autocomplete="off"
+          spellcheck="false"
+          x-model="turnstileSiteKey"
+          data-i18n-placeholder="settings.turnstileSiteKeyPlaceholder"
+        >
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="turnstileSecretInput" data-i18n="settings.turnstileSecretLabel"></label>
+        <input
+          type="password"
+          id="turnstileSecretInput"
+          class="form-input"
+          maxlength="200"
+          autocomplete="new-password"
+          x-model="turnstileSecretKey"
+          data-i18n-placeholder="settings.turnstileSecretPlaceholder"
+        >
+        <!-- 配置状态行：两键齐 = 已启用；半配 = 未启用；全空 = 未配置 -->
+        <p class="form-hint">
+          <span
+            x-text="turnstileStatusKey === 'enabled'
+              ? $t('settings.turnstileStatusEnabled')
+              : (turnstileStatusKey === 'half' ? $t('settings.turnstileStatusHalf') : $t('settings.notConfigured'))"
+          ></span>
+        </p>
+      </div>
+
+      <!-- 临时测试 widget 容器（测试进行时可见，用完由 turnstile.remove 清理） -->
+      <div class="turnstile-box" x-ref="turnstileTestBox" x-show="isTestingTurnstile"></div>
+
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button
+          class="btn btn-secondary"
+          @click="testTurnstile()"
+          :disabled="isTestingTurnstile || isLoading"
+          data-i18n="settings.turnstileTestButton"
+        >
+        </button>
+        <button class="btn btn-primary" @click="saveTurnstile()" :disabled="isLoading" data-i18n="common.save">
+        </button>
+      </div>
+
+      <p class="form-hint mt-4" data-i18n="settings.turnstileHintKeys"></p>
+      <p class="form-hint" data-i18n="settings.turnstileHintDomain"></p>
+      <p class="form-hint" data-i18n="settings.turnstileHintSave"></p>
+    </section>
+
     <!-- 索引管理 -->
     <section class="settings-section">
       <h2 class="settings-section-title" data-i18n="settings.indexSectionTitle"></h2>

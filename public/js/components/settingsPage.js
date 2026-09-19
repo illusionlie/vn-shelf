@@ -12,6 +12,7 @@ import {
   clearTranslationsCache,
   DEFAULT_TRANSLATION_URL
 } from '../translations.js';
+import { loadTurnstileScript, turnstileTheme } from '../turnstile.js';
 import { withLoading } from '../utils.js';
 
 export function settingsPage() {
@@ -29,6 +30,13 @@ export function settingsPage() {
     vndbApiToken: '',
     newPassword: '',
     confirmPassword: '',
+    // Cloudflare Turnstile（09-19）：siteKey 预填已存值；secret 只写不读
+    // （GET 只回布尔），保存语义 = 两框都提交、secret 留空 = 清除（禁用）
+    turnstileSiteKey: '',
+    turnstileSecretKey: '',
+    turnstileTestOutcome: null,
+    isTestingTurnstile: false,
+    _turnstileTestWidgetId: null,
     locale: getStoredLocale(),
     indexStatus: null,
     translationCacheStatus: null,
@@ -76,6 +84,8 @@ export function settingsPage() {
           backgroundOverlay: 0.5,
           backgroundBlur: 4
         };
+        // Turnstile siteKey 预填明文；secret 不可读回，输入框恒空起步
+        this.turnstileSiteKey = this.config.turnstileSiteKey || '';
       } catch (error) {
         this.$store.app.addToast(friendlyErrorMessage(error, t('prefix.loadConfigFailed')), 'error');
       }
@@ -154,6 +164,96 @@ export function settingsPage() {
         this.newPassword = '';
         this.confirmPassword = '';
       }, { successMsg: t('toast.passwordUpdated'), errorPrefix: t('prefix.updateFailed') });
+    },
+
+    /**
+     * Turnstile 配置状态行：输入 siteKey 与（输入或已存）secret 的组合反馈。
+     * 两键齐 = 启用态；半配 = 未启用（提示补齐）；全空 = 未配置。
+     */
+    get turnstileStatusKey() {
+      const siteKeySet = !!(this.turnstileSiteKey || '').trim();
+      const secretSet = !!(this.turnstileSecretKey || '').trim() || !!this.config?.hasTurnstileSecret;
+      if (siteKeySet && secretSet) return 'enabled';
+      if (!siteKeySet && !secretSet) return 'none';
+      return 'half';
+    },
+
+    async saveTurnstile() {
+      // 保存语义：两框都提交（siteKey 预填已存值，secret 留空 = 清除即禁用）
+      await withLoading(this, async () => {
+        await configAPI.update({
+          turnstileSiteKey: this.turnstileSiteKey || '',
+          turnstileSecretKey: this.turnstileSecretKey || ''
+        });
+        this.turnstileSecretKey = '';
+        this.turnstileTestOutcome = null;
+        await this.loadConfig();
+      }, { successMsg: t('toast.turnstileSaved'), errorPrefix: t('prefix.saveFailed') });
+    },
+
+    /**
+     * 用输入框当前值测试配置：动态渲染临时 widget（当前输入 siteKey）→ 拿 token →
+     * 调测试端点。临时 widget 用完 turnstile.remove() 防叠加。
+     */
+    async testTurnstile() {
+      if (this.isTestingTurnstile) return;
+
+      const siteKey = (this.turnstileSiteKey || '').trim();
+      const secretKey = (this.turnstileSecretKey || '').trim();
+      if (!siteKey || !secretKey) {
+        this.$store.app.addToast(t('settings.turnstileTestInputRequired'), 'error');
+        return;
+      }
+
+      this.isTestingTurnstile = true;
+      this.turnstileTestOutcome = null;
+      try {
+        // 等待 x-show 容器先变为可见再渲染临时 widget（避免向 display:none 容器 render）
+        await this.$nextTick();
+        const token = await new Promise((resolve, reject) => {
+          loadTurnstileScript()
+            .then(() => {
+              const box = this.$refs.turnstileTestBox;
+              if (!box) {
+                reject(new Error('turnstile test container missing'));
+                return;
+              }
+              this._turnstileTestWidgetId = window.turnstile.render(box, {
+                sitekey: siteKey,
+                theme: turnstileTheme(),
+                callback: widgetToken => resolve(widgetToken),
+                'expired-callback': () => reject(new Error('turnstile token expired')),
+                'error-callback': () => reject(new Error('turnstile widget error'))
+              });
+            })
+            .catch(reject);
+        });
+
+        const res = await configAPI.testTurnstile({ siteKey, secretKey, token });
+        this.turnstileTestOutcome = res.data.ok
+          ? { ok: true }
+          : { ok: false, errorCodes: res.data.errorCodes || [] };
+        this.$store.app.addToast(
+          res.data.ok ? t('settings.turnstileTestOk') : t('settings.turnstileTestFail'),
+          res.data.ok ? 'success' : 'error'
+        );
+      } catch (error) {
+        // 服务端错误（含 503）带已著文案原样展示；本地失败（脚本/widget/过期）给通用文案
+        const serverMessage = error?.payload?.error;
+        this.$store.app.addToast(serverMessage || t('settings.turnstileTestFail'), 'error');
+      } finally {
+        if (this._turnstileTestWidgetId !== null && window.turnstile) {
+          try {
+            window.turnstile.remove(this._turnstileTestWidgetId);
+          } catch (removeError) {
+            console.warn('[settings] turnstile test widget remove failed', {
+              error: removeError?.message || String(removeError)
+            });
+          }
+          this._turnstileTestWidgetId = null;
+        }
+        this.isTestingTurnstile = false;
+      }
     },
 
     async startIndex() {

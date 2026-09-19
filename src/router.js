@@ -32,6 +32,7 @@ import {
   releaseIndexStartLock,
   VN_STATUS_VALUES
 } from './repository.js';
+import { verifyTurnstileToken } from './turnstile.js';
 import { startUListImport } from './ulist-import.js';
 import { errorResponse, successResponse, isValidVNDBId, parseRequestBody } from './utils.js';
 import { fetchVNDB, VNDBClient } from './vndb.js';
@@ -271,6 +272,10 @@ async function handleAPI(request, env, path, method, ctx) {
     return handleUpdateConfig(request, env, auth);
   }
 
+  if (path === '/api/config/turnstile/test' && method === 'POST') {
+    return handleTestTurnstile(request, env, auth);
+  }
+
   if (path === '/api/tier' && method === 'POST') {
     return invalidatePublicCacheAfterWrite(env, ctx, () => handleCreateTier(request, env, auth));
   }
@@ -389,12 +394,19 @@ async function recordLoginResult(env, ip, success) {
 }
 
 async function handleAuthStatus(request, env) {
-  const initialized = await isInitialized(env);
+  // 单次 getSettings 同时供 initialized 判定（内联，替代 isInitialized 的内部查询）
+  // 与 turnstileSiteKey 输出——本端点 settings 查询次数不因新增字段而增加
+  const settings = await getSettings(env);
   const auth = await authMiddleware(request, env);
 
   return successResponse({
-    initialized,
-    authenticated: auth.authenticated
+    initialized: !!(settings.adminPasswordHash && settings.jwtSecret),
+    authenticated: auth.authenticated,
+    // siteKey 本就要嵌入公开登录页源码，公开无泄露面；输出走双钥匙门（对齐登录启用条件）：
+    // widget 可见 ⟺ 后端强制校验，半配（仅 siteKey）不向前端暴露半成品配置
+    turnstileSiteKey: settings.turnstileSiteKey && settings.turnstileSecretKey
+      ? settings.turnstileSiteKey
+      : ''
   });
 }
 
@@ -434,7 +446,7 @@ async function handleLogin(request, env) {
   } catch (response) {
     return response;
   }
-  const { password } = body;
+  const { password, turnstileToken } = body;
 
   if (!password) {
     return errorResponse('请输入密码', 400);
@@ -450,8 +462,39 @@ async function handleLogin(request, env) {
     return response;
   }
 
-  // 单次加载 settings：密码校验与 JWT 签发复用同一对象，避免重复查询
+  // 单次加载 settings：Turnstile 校验 / 密码校验 / JWT 签发复用同一对象，避免重复查询
   const settings = await getSettings(env);
+
+  // Turnstile 人机校验（双钥匙启用门：两键齐备才生效，半配 = 完全跳过保持现状行为）。
+  // 插于密码校验之前：尽早拒绝自动化流量，省一次 PBKDF2；
+  // 被 Turnstile 拒绝的请求不计入限流计数（限流语义 = 密码尝试次数，此时密码未校验）
+  const turnstileEnabled = !!(settings.turnstileSiteKey && settings.turnstileSecretKey);
+  if (turnstileEnabled) {
+    if (!turnstileToken) {
+      return errorResponse('请完成人机验证', 400);
+    }
+
+    const turnstile = await verifyTurnstileToken({
+      secretKey: settings.turnstileSecretKey,
+      token: turnstileToken,
+      // 真实边缘 IP 改善评分；缺失（本地 dev）不传 remoteip，不用 'local' 占位
+      remoteIp: request.headers.get('CF-Connecting-IP') || ''
+    });
+
+    if (turnstile.outcome === 'invalid') {
+      // errorCodes 仅进服务端日志排障，不回前端（信封契约：错误只带中文文案）
+      console.warn('[auth][turnstile] verification rejected', {
+        errorCodes: turnstile.errorCodes
+      });
+      return errorResponse('人机验证失败，请重试', 403);
+    }
+
+    if (turnstile.outcome === 'error') {
+      // siteverify 服务异常 fail-open 放行：与 LOGIN_RATE_LOCK 同语义（守可用性），
+      // 与测试端点 /api/config/turnstile/test 的 fail-closed 有意相反
+      console.warn('[auth][turnstile] siteverify failed, fail-open');
+    }
+  }
 
   const valid = await verifyAdminPassword(settings, password);
 
@@ -1413,7 +1456,11 @@ async function handleGetConfig(request, env, auth) {
     ownerName: settings.ownerName || '',
     backgroundUrl: settings.backgroundUrl || '',
     backgroundOverlay: settings.backgroundOverlay ?? 0.5,
-    backgroundBlur: settings.backgroundBlur ?? 4
+    backgroundBlur: settings.backgroundBlur ?? 4,
+    // Cloudflare Turnstile：siteKey 明文（管理员需看到当前键，且本就嵌入公开登录页），
+    // secret 仅暴露存在性布尔（脱敏对齐 hasVndbApiToken 先例）
+    turnstileSiteKey: settings.turnstileSiteKey || '',
+    hasTurnstileSecret: !!settings.turnstileSecretKey
   });
 }
 
@@ -1445,6 +1492,30 @@ async function handleUpdateConfig(request, env, auth) {
     ownerName = body.ownerName.trim();
     if (ownerName.length > 30) {
       return errorResponse('ownerName 长度不能超过 30', 400);
+    }
+  }
+
+  // Cloudflare Turnstile 两键：独立校验、独立赋值（半配状态合法落库，启用门在登录侧）；
+  // 空串合法 = 清除（清空 secret 即禁用功能）。校验前置，赋值段无 return
+  let turnstileSiteKey;
+  if (body.turnstileSiteKey !== undefined) {
+    if (typeof body.turnstileSiteKey !== 'string') {
+      return errorResponse('turnstileSiteKey 必须为字符串', 400);
+    }
+    turnstileSiteKey = body.turnstileSiteKey.trim();
+    if (turnstileSiteKey.length > 200) {
+      return errorResponse('turnstileSiteKey 长度不能超过 200', 400);
+    }
+  }
+
+  let turnstileSecretKey;
+  if (body.turnstileSecretKey !== undefined) {
+    if (typeof body.turnstileSecretKey !== 'string') {
+      return errorResponse('turnstileSecretKey 必须为字符串', 400);
+    }
+    turnstileSecretKey = body.turnstileSecretKey.trim();
+    if (turnstileSecretKey.length > 200) {
+      return errorResponse('turnstileSecretKey 长度不能超过 200', 400);
     }
   }
 
@@ -1502,6 +1573,15 @@ async function handleUpdateConfig(request, env, auth) {
     settings.ownerName = ownerName;
   }
 
+  // Turnstile 两键同样在前置校验段完成 400 判定，此处只赋值
+  if (turnstileSiteKey !== undefined) {
+    settings.turnstileSiteKey = turnstileSiteKey;
+  }
+
+  if (turnstileSecretKey !== undefined) {
+    settings.turnstileSecretKey = turnstileSecretKey;
+  }
+
   await saveSettings(env, settings);
 
   const response = successResponse(null, '设置已更新');
@@ -1512,6 +1592,53 @@ async function handleUpdateConfig(request, env, auth) {
   }
 
   return response;
+}
+
+/**
+ * Turnstile 配置测试端点：用请求体输入值（而非已存 settings 值）调 siteverify，
+ * 支撑设置页「先测试后保存」，消除误配锁死。
+ *
+ * siteverify 异常时 fail-closed（503）——与登录侧的 fail-open 有意相反：
+ * 测试目的就是验证真实可用性，异常放行会给误配发假绿，正好废掉本端点存在的意义。
+ */
+async function handleTestTurnstile(request, env, auth) {
+  if (!auth.authenticated) {
+    return errorResponse('未授权', 401);
+  }
+
+  let body;
+  try {
+    body = await parseJsonBodyOr400(request);
+  } catch (response) {
+    return response;
+  }
+
+  const { siteKey, secretKey, token } = body || {};
+  if (
+    typeof siteKey !== 'string' || !siteKey.trim() ||
+    typeof secretKey !== 'string' || !secretKey.trim() ||
+    typeof token !== 'string' || !token || token.length > 2048
+  ) {
+    return errorResponse('siteKey、secretKey 与 token 均必须为非空字符串', 400);
+  }
+
+  const result = await verifyTurnstileToken({
+    // 用输入值（trim 后与保存语义一致），未保存的候选配置可先被验证
+    secretKey: secretKey.trim(),
+    token,
+    remoteIp: request.headers.get('CF-Connecting-IP') || ''
+  });
+
+  if (result.outcome === 'pass') {
+    return successResponse({ ok: true });
+  }
+
+  if (result.outcome === 'invalid') {
+    // 测试失败是有效结果而非协议错误 → 200 + ok:false（区别于信封错误）
+    return successResponse({ ok: false, errorCodes: result.errorCodes || [] });
+  }
+
+  return errorResponse('人机验证服务暂时不可用，请稍后重试', 503);
 }
 
 // ============ 导入导出接口 ============

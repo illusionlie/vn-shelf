@@ -268,7 +268,8 @@ export function servePublicCached(request, env, ctx, path, handler) {
     .replace(/from '\.\/repository\.js';/, "from './repository.stub.mjs';")
     .replace(/from '\.\/ulist-import\.js';/, "from './ulist-import.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.real.mjs';")
-    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';");
+    .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
+    .replace(/from '\.\/turnstile\.js';/, "from './turnstile.stub.mjs';");
 
   // 真实 http-cache.js + 真实 db.js（无外部依赖，复制后仅改相对导入名）
   const patchedHttpCacheSource = httpCacheSourceCode
@@ -281,6 +282,11 @@ export function servePublicCached(request, env, ctx, path, handler) {
   await fs.writeFile(path.join(tempDir, 'ulist-import.stub.mjs'), 'export async function startUListImport() { return { ok: true, taskId: "ulist_stub" }; }\n', 'utf8');
   await fs.writeFile(path.join(tempDir, 'utils.real.mjs'), utilsSourceCode, 'utf8');
   await fs.writeFile(path.join(tempDir, 'vndb.stub.mjs'), vndbStubCode, 'utf8');
+  await fs.writeFile(
+    path.join(tempDir, 'turnstile.stub.mjs'),
+    "export async function verifyTurnstileToken() { return { outcome: 'pass' }; }\n",
+    'utf8'
+  );
   await fs.writeFile(path.join(tempDir, 'http-cache.testable.mjs'), httpCacheTestableCode, 'utf8');
   await fs.writeFile(path.join(tempDir, 'http-cache.real.mjs'), patchedHttpCacheSource, 'utf8');
   await fs.writeFile(path.join(tempDir, 'db.real.mjs'), dbSourceCode, 'utf8');

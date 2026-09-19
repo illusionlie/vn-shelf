@@ -101,7 +101,8 @@ export default {
     tierUpdated: 'Tier 已更新',
     tierDeleted: 'Tier 已删除',
     tierOrderUpdated: 'Tier 顺序更新成功',
-    tierPageLoadFailed: '加载 Tier 页面数据失败，请稍后重试'
+    tierPageLoadFailed: '加载 Tier 页面数据失败，请稍后重试',
+    turnstileSaved: 'Turnstile 配置已保存'
   },
   prefix: {
     operationFailed: '操作失败',
@@ -243,7 +244,9 @@ export default {
     initAndLogin: '初始化并登录',
     loggingIn: '登录中...',
     submit: '登录',
-    backToHome: '返回首页'
+    backToHome: '返回首页',
+    turnstileRequired: '请完成人机验证',
+    turnstileLoadFailed: '人机验证组件加载失败，请检查网络后刷新重试'
   },
   settings: {
     pageTitle: '⚙️ 设置',
@@ -264,6 +267,20 @@ export default {
     confirmPasswordLabel: '确认密码',
     confirmPasswordPlaceholder: '再次输入密码',
     changePassword: '修改密码',
+    turnstileSectionTitle: '登录人机验证（Turnstile）',
+    turnstileSiteKeyLabel: 'Site Key',
+    turnstileSiteKeyPlaceholder: '0x 开头的站点密钥',
+    turnstileSecretLabel: 'Secret Key',
+    turnstileSecretPlaceholder: '输入新值更换；保存时留空 = 清除（禁用）',
+    turnstileStatusEnabled: '已启用',
+    turnstileStatusHalf: '未启用（两把密钥需齐全）',
+    turnstileTestButton: '测试配置',
+    turnstileTestOk: '人机验证测试通过',
+    turnstileTestFail: '人机验证测试未通过',
+    turnstileTestInputRequired: '测试前请先填写 Site Key 与 Secret Key',
+    turnstileHintKeys: '在 Cloudflare 控制台的 Turnstile 页面添加站点后获取两把密钥；官方 dummy keys 可用于无账号测试。',
+    turnstileHintDomain: '站点域名（本地开发含 localhost）需加入 Turnstile 站点的域名列表，否则组件无法渲染。',
+    turnstileHintSave: '两把密钥齐全后登录页才会启用验证；清空 Secret 并保存 = 禁用。建议先「测试配置」再保存。',
     indexSectionTitle: '数据索引',
     statusLabel: '状态:',
     progressLabel: '- 进度:',

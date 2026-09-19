@@ -182,7 +182,8 @@ export class VNDBClient {
     .replace(/from '\.\/ulist-import\.js';/, "from './ulist-import.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.real.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
-    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';");
+    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';")
+    .replace(/from '\.\/turnstile\.js';/, "from './turnstile.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
@@ -191,6 +192,11 @@ export class VNDBClient {
   await fs.writeFile(utilsRealPath, utilsSourceCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(path.join(tempDir, 'http-cache.stub.mjs'), HTTP_CACHE_STUB_CODE, 'utf8');
+  await fs.writeFile(
+    path.join(tempDir, 'turnstile.stub.mjs'),
+    "export async function verifyTurnstileToken() { return { outcome: 'pass' }; }\n",
+    'utf8'
+  );
   await fs.writeFile(routerPath, patchedSource, 'utf8');
 
   const moduleUrl = `${pathToFileURL(routerPath).href}?test=${encodeURIComponent(testId)}`;

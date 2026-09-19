@@ -507,7 +507,7 @@ POST /record  { success } → 推进状态机并持久化（storage 键 'login:r
 
 ### 3. Contracts
 
-- handleLogin 插入顺序：password 非空校验 → precheck（锁定即 429 + `Retry-After` 秒头，**先于 getSettings / PBKDF2**）→ verifyAdminPassword → **同步 `await record`**（非 waitUntil——保证第 5 次失败后的下一次请求立即被锁）→ 签发 JWT。
+- handleLogin 插入顺序：password 非空校验 → precheck（锁定即 429 + `Retry-After` 秒头，**先于 getSettings / PBKDF2**）→ getSettings → Turnstile 校验（09-19 起插入，双钥匙门内，见「登录 Turnstile 校验」Scenario；Turnstile 拒绝不进本限流计数）→ verifyAdminPassword → **同步 `await record`**（非 waitUntil——保证第 5 次失败后的下一次请求立即被锁）→ 签发 JWT。
 - IP 来源 `CF-Connecting-IP`，缺失（本地 dev）回退占位键 `'local'`。
 - **fail-open 降级**：`env.LOGIN_RATE_LOCK` 绑定缺失或 DO 请求失败 → `console.warn` + 放行。与 `INDEX_START_LOCK` 的 fail-closed（缺失 500）**语义相反且有理由**：索引锁守护数据正确性（宁可拒绝服务），限流锁守护的是可用性增强（漏配绑定不应弄挂登录）。
 - 新增 DO 类必须追加**新 migration tag**（本次 `tag = "v2"` + `new_sqlite_classes`），既有 tag 不可变；DO 部署期自动创建，deploy.yml 不加预检（见部署 Scenario Base case）。
@@ -614,7 +614,7 @@ invalidatePublicCacheAfterWrite(h)  // 写路由出口统一包裹：仅 2xx 才
 ### 6. Tests Required
 
 - `tests/router/http-cache.test.mjs`：真实 router + http-cache + db 链路，caches 经第 6 参注入桩——访客 miss/ETag/CORS/合成键、二次命中 handler 零执行、查询串变体不串味、管理员三不原则、304 空体三头、写后版本自增旧键失联、4xx 不 bump + bump 抛错不破写响应、appearance 不入缓存。
-- **patch 桩同步纪律**：router.js 新增 `./http-cache.js` import 时，七个 router 桩（envelope / config.update / vndb.search / login.ratelimit / index.start / vn.status / import.appearance）+ queue 加载器 + ulist 桩必须全员同步直通/计数桩（依赖图陷阱，见信封 Scenario §6）。
+- **patch 桩同步纪律**：router.js 新增 `./http-cache.js` import 时，八个 copy 型 router 桩（envelope / config.update / vndb.search / vn.status / index.start / import.appearance / login.ratelimit / http-cache——**含本 Scenario 自己测试文件的加载器**；09-19 修正：原记七个漏了 http-cache.test.mjs 自身，login-turnstile 任务实际同步 8 个）+ queue 加载器 + ulist 桩必须全员同步直通/计数桩（依赖图陷阱，见信封 Scenario §6）。
 - `tests/d1/migrations.test.mjs`：v3（idx_vn_entries_created）存量库应用用例；EXPLAIN QUERY PLAN 走索引（无 TEMP B-TREE）。
 
 ### 7. Wrong vs Correct
@@ -723,4 +723,89 @@ if (body.ownerName !== undefined) {
 // ——校验全部通过，以下才允许持久化；赋值段无 return，直落 saveSettings——
 if (body.newPassword) await setAdminPassword(env, body.newPassword);
 if (body.ownerName !== undefined) settings.ownerName = ownerName;
+```
+
+---
+
+## Scenario: 登录 Turnstile 校验（09-19 起）
+
+### 1. Scope / Trigger
+
+- Trigger：改动 `POST /api/auth/login` 校验链、`src/turnstile.js`、`POST /api/config/turnstile/test`、settings 两键（`turnstileSiteKey` / `turnstileSecretKey`）或登录页 widget 装载逻辑的变更。
+- 来源：任务 `09-19-login-turnstile`。与登录限流（09-12）组成纵深：限流卡频率、Turnstile 卡自动化。**未配置（两键任一空）时全链路与现状逐字节一致**——零感知升级是前提，不是可选项。
+
+### 2. Signatures
+
+```js
+// src/turnstile.js（网络胶水：永不抛出、无 import 依赖、fetchImpl/timeoutMs 注入直测）
+verifyTurnstileToken({ secretKey, token, remoteIp, fetchImpl = fetch, timeoutMs = 10_000 })
+// → { outcome: 'pass' | 'invalid' | 'error', errorCodes?: string[] }
+//   'invalid' 含 token 非法形态（非 string / > 2048）——不发网络请求
+//   'error' = throw / 非 2xx / 坏 JSON / 超时（AbortSignal.timeout）——降级方向由调用方决定
+
+// settings blob 新键（config:settings，无 schema 迁移；导出/导入不携带，对齐 vndbApiToken）
+turnstileSiteKey: string    // 公开级：/api/auth/status 双门输出 + GET /api/config 明文
+turnstileSecretKey: string  // 敏感：仅服务端持有；GET /api/config 只回 hasTurnstileSecret 布尔
+
+// 新端点（认证，不入 CORS 公开集合）
+POST /api/config/turnstile/test { siteKey, secretKey, token } → data { ok: true } | { ok: false, errorCodes } | 503
+```
+
+### 3. Contracts
+
+- **handleLogin 插入顺序**（09-12 契约扩展）：password 非空校验 → 限流 precheck（429 先于一切）→ getSettings → 双钥匙门（`siteKey && secretKey` 均非空才校验）→ verifyAdminPassword → record → JWT。
+- **双钥匙门是全局不变量**：登录启用条件与 `/api/auth/status` 的 `turnstileSiteKey` 输出门同构——「widget 可见 ⟺ 后端强制校验」。半配（仅 siteKey）时 status 必须输出 `''`，否则前端会索要一个后端并不校验的 token（09-19 check 阶段抓获的 P2，已修）。
+- **Turnstile 拒绝不计限流**：400（缺 token）/ 403（invalid）两分支在 `verifyAdminPassword` 与 `recordLoginResult` 之前 return——限流计数 = 密码尝试次数；Turnstile 拒绝时密码未校验、PBKDF2 未消耗。
+- **fail 语义分野（同一次 siteverify、两种降级方向）**：登录侧 outcome `'error'` → `console.warn('[auth][turnstile] …')` + 放行（fail-open 守可用性，对齐 LOGIN_RATE_LOCK）；测试端点 `'error'` → 503（fail-closed 守真实性——fail-open 会让误配拿假绿，废掉该端点的存在意义）。
+- 测试端点用**请求体输入值**而非已存 settings 值打 siteverify——支撑设置页「先测试后保存」，消除误配锁死（本功能最大风险；最终退路 = `wrangler d1 execute` 清两键恢复登录）。
+- remoteip 传真实 `CF-Connecting-IP`，头缺失不传（不是限流的 `'local'` 占位——那是 DO 实例键，不是 IP）。
+- 前端契约（细节见 frontend quality-guidelines「Turnstile 懒加载例外」）：脚本仅 siteKey 非空时经 `public/js/turnstile.js` 懒加载单例注入；token 单次消费 → 每次登录尝试后 `turnstile.reset()`；theme 按站点主题显式传（auto 跟系统不跟手动主题）。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 两键任一空（未配置 / 半配） | 跳过校验，行为与现状一致；status 输出 `''` |
+| 已启用 + 无 turnstileToken | 400「请完成人机验证」，不 record、不跑 PBKDF2 |
+| 已启用 + siteverify invalid | 403「人机验证失败，请重试」，不 record（errorCodes 仅进 warn 日志，不回前端） |
+| 已启用 + siteverify pass | 到密码层，后续与现状一致 |
+| siteverify 异常（登录侧） | warn + 放行（fail-open） |
+| siteverify 异常（测试端点） | 503「人机验证服务暂时不可用，请稍后重试」 |
+| PUT 两键非 string / trim > 200 | 400，且任何持久化零调用（09-15 前置校验不变量） |
+| PUT 空串 | 合法 = 清除该键 |
+| 测试端点缺参 / token > 2048 | 400 |
+| 测试端点 siteverify invalid | **200** + `{ ok: false, errorCodes }`（测试失败是有效结果，非协议错误） |
+
+### 5. Good/Base/Bad Cases
+
+- Good：同类「外部服务校验」功能复用本形态：永不抛出的胶水模块（outcome 三态）+ fail 语义按守护对象选择（可用性 fail-open / 真实性 fail-closed）+ 配置类功能提供「用输入值试运行」端点。
+- Base：不配置两键 = 什么都不发生。
+- Bad（禁止）：status 输出走单门（`siteKey || ''`）；Turnstile 拒绝路径调 record（污染密码尝试计数）；测试端点 fail-open；脚本写死进 html 或无条件加载。
+
+### 6. Tests Required
+
+- `tests/auth/turnstile.test.mjs`：outcome 三态 + token 非法形态零网络调用 + form body 三字段 / remoteip 省略 + 超时。
+- `tests/router/login.turnstile.test.mjs`：未配置 / 半配放行、400 / 403 双零断言（verifyAdminPassword 桩 + 限流 DO storage）、pass 全通、fail-open、429 先于 siteverify、**半配 status 输出 `''`**。
+- `tests/router/config.turnstile.test.mjs`：401 / 缺参 400 / **输入值与已存值分离断言**（STORED-*/INPUT-* 双桩）/ ok 三态。
+- `tests/router/config.update.test.mjs`：两键校验矩阵 + 混合请求零持久化双计数。
+- 桩纪律：router.js 的 `./turnstile.js` import → 八个 copy 型 router 桩全员同步（见 http-cache Scenario §6 的 09-19 修正）。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong：status 单门输出（半配时前端索要一个后端不校验的 token）
+turnstileSiteKey: settings.turnstileSiteKey || ''
+
+// Correct：双门同构——widget 可见 ⟺ 后端强制校验
+turnstileSiteKey: settings.turnstileSiteKey && settings.turnstileSecretKey
+  ? settings.turnstileSiteKey
+  : ''
+```
+
+```js
+// Wrong：测试端点 fail-open（误配拿假绿，防锁死机制失效）
+if (outcome === 'error') return successResponse({ ok: true });
+
+// Correct：登录 fail-open 守可用性、测试端点 fail-closed 守真实性
+if (outcome === 'error') return errorResponse('人机验证服务暂时不可用，请稍后重试', 503);
 ```

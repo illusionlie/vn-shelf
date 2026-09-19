@@ -296,7 +296,11 @@ export async function getSettings(env) {
       ownerName: '',
       backgroundUrl: '',
       backgroundOverlay: 0.5,
-      backgroundBlur: 4
+      backgroundBlur: 4,
+      // Cloudflare Turnstile（09-19）：两键齐备登录侧才启用；存量行缺键时
+      // 走 router 层 `|| ''` 兜底，无需迁移
+      turnstileSiteKey: '',
+      turnstileSecretKey: ''
     };
   }
 

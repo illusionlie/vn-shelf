@@ -1304,3 +1304,40 @@ test('exportData：appearance 携带 ownerName（未配置时空串）', async (
     await cleanup();
   }
 });
+
+test('Turnstile 两键不进导出，导入 payload 含两键时被忽略且不报错（AC10）', async () => {
+  const { repository, cleanup } = await loadModules();
+
+  try {
+    const env = { DB: new FakeD1Database() };
+
+    // 已配置两键的 settings：导出数据不得携带（对齐 vndbApiToken：安全配置不进备份）
+    const saved = await repository.getSettings(env);
+    saved.turnstileSiteKey = '0x-site';
+    saved.turnstileSecretKey = '0x-secret';
+    await repository.saveSettings(env, saved);
+
+    const exported = await repository.exportData(env);
+    assert.equal('turnstileSiteKey' in exported.appearance, false);
+    assert.equal('turnstileSecretKey' in exported.appearance, false);
+    assert.equal('turnstileSiteKey' in exported, false);
+    assert.equal('turnstileSecretKey' in exported, false);
+
+    // 导入 payload 夹带两键：被静默忽略、不报错，已存值不动
+    await repository.importData(env, {
+      entries: [createEntry('v1')],
+      appearance: {
+        ownerName: '小明',
+        turnstileSiteKey: '0x-evil-site',
+        turnstileSecretKey: '0x-evil-secret'
+      }
+    }, 'merge');
+
+    const after = await repository.getSettings(env);
+    assert.equal(after.turnstileSiteKey, '0x-site', '导入不得改写已存 turnstile 配置');
+    assert.equal(after.turnstileSecretKey, '0x-secret');
+    assert.equal(after.ownerName, '小明');
+  } finally {
+    await cleanup();
+  }
+});

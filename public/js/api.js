@@ -179,11 +179,13 @@ export const authAPI = {
   /**
    * 登录
    * @param {string} password - 密码
+   * @param {string} [turnstileToken] - Turnstile token（后端启用时必填；
+   *   未启用时空串字段被后端忽略，行为与旧版一致）
    */
-  async login(password) {
+  async login(password, turnstileToken = '') {
     return apiRequest('/auth/login', {
       method: 'POST',
-      body: { password }
+      body: { password, turnstileToken }
     });
   },
 
@@ -427,6 +429,19 @@ export const configAPI = {
     return apiRequest('/config', {
       method: 'PUT',
       body: data
+    });
+  },
+
+  /**
+   * 测试 Turnstile 配置（认证接口）：用输入框当前值而非已存值调 siteverify，
+   * 支撑「先测试后保存」。pass → data.ok:true；invalid → 200 + data.ok:false +
+   * data.errorCodes；服务异常 → 503
+   * @param {{siteKey: string, secretKey: string, token: string}} params
+   */
+  async testTurnstile({ siteKey, secretKey, token }) {
+    return apiRequest('/config/turnstile/test', {
+      method: 'POST',
+      body: { siteKey, secretKey, token }
     });
   },
 

@@ -83,7 +83,8 @@ export default {
     tierUpdated: 'Tier updated',
     tierDeleted: 'Tier deleted',
     tierOrderUpdated: 'Tier order updated',
-    tierPageLoadFailed: 'Failed to load tier list page data, please try again later'
+    tierPageLoadFailed: 'Failed to load tier list page data, please try again later',
+    turnstileSaved: 'Turnstile settings saved'
   },
   prefix: {
     operationFailed: 'Operation failed',
@@ -225,7 +226,9 @@ export default {
     initAndLogin: 'Initialize and log in',
     loggingIn: 'Logging in...',
     submit: 'Log in',
-    backToHome: 'Back to home'
+    backToHome: 'Back to home',
+    turnstileRequired: 'Please complete the human verification',
+    turnstileLoadFailed: 'Failed to load the human verification widget, please refresh and try again'
   },
   settings: {
     pageTitle: '⚙️ Settings',
@@ -246,6 +249,20 @@ export default {
     confirmPasswordLabel: 'Confirm password',
     confirmPasswordPlaceholder: 'Enter the password again',
     changePassword: 'Change password',
+    turnstileSectionTitle: 'Login CAPTCHA (Turnstile)',
+    turnstileSiteKeyLabel: 'Site Key',
+    turnstileSiteKeyPlaceholder: 'Site key starting with 0x',
+    turnstileSecretLabel: 'Secret Key',
+    turnstileSecretPlaceholder: 'Enter a new value to replace; saving empty clears it (disables)',
+    turnstileStatusEnabled: 'Enabled',
+    turnstileStatusHalf: 'Not active (both keys required)',
+    turnstileTestButton: 'Test configuration',
+    turnstileTestOk: 'Turnstile test passed',
+    turnstileTestFail: 'Turnstile test failed',
+    turnstileTestInputRequired: 'Fill in both Site Key and Secret Key before testing',
+    turnstileHintKeys: 'Add a site in the Cloudflare dashboard (Turnstile) to get both keys; official dummy keys work without an account.',
+    turnstileHintDomain: "The site's hostname (including localhost for local dev) must be in the Turnstile site's domain list, or the widget will fail to render.",
+    turnstileHintSave: 'Verification only activates when both keys are present; saving an empty Secret disables it. Test before saving.',
     indexSectionTitle: 'Data index',
     statusLabel: 'Status:',
     progressLabel: '- Progress:',

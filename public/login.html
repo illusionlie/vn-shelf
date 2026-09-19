@@ -82,6 +82,10 @@
             >
           </div>
 
+          <!-- Turnstile 人机验证容器：后端启用（turnstileSiteKey 非空）才可见；
+               脚本由 loginPage.js 检测到 siteKey 后动态注入，不写死在 HTML -->
+          <div class="turnstile-box" x-ref="turnstileBox" x-show="turnstileSiteKey"></div>
+
           <p class="form-error" x-text="error" x-show="error"></p>
 
           <button type="submit" class="btn btn-primary" style="width: 100%" :disabled="isLoading">

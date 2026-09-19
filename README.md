@@ -125,6 +125,37 @@ npm run tail      # 查看 Worker 实时日志
 npm run deploy    # 部署到 Cloudflare Workers
 ```
 
+## 登录人机验证（Cloudflare Turnstile，可选）
+
+为公开登录端点增加 Cloudflare Turnstile 人机校验，与内置 IP 限流（连续 5 次失败锁 10 分钟）组成纵深防御。**未配置时零行为变化**——登录页不加载任何第三方脚本。
+
+### 开启步骤
+
+1. 登录 [Cloudflare 控制台](https://dash.cloudflare.com/) → Turnstile → Add site：域名填站点实际域名（本地开发需额外加入 `localhost`），Widget Mode 按需选择（Managed 推荐）。
+2. 拿到 Site Key 与 Secret Key。
+3. 进入本站「设置 → 登录人机验证（Turnstile）」，填入两把密钥，先点「测试」验证可用（测试用**输入框当前值**直接调用 Cloudflare 校验服务，未保存也能测），绿灯后再「保存」。
+4. **两把密钥都保存后才会启用**；只配一把 = 不生效（状态行会提示）。清空 Secret 保存 = 关闭该功能。
+
+### 锁死恢复
+
+若误配导致无法登录（如 Site Key 域名不符），直接改库清除两键即可恢复无验证登录：
+
+```bash
+# 本地
+npx wrangler d1 execute vn-shelf-db --local --command "SELECT value FROM settings WHERE key='config:settings'"
+# 把该 JSON 里 turnstileSiteKey/turnstileSecretKey 改为 "" 后 UPDATE 回去；线上用 --remote
+```
+
+### 本地测试用 dummy keys（无需账号，[官方 Testing 页](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)）
+
+| 用途 | 值 |
+|------|-----|
+| Site Key 恒通过（可见） | `1x00000000000000000000AA` |
+| Secret Key 恒通过 | `1x0000000000000000000000000000000AA` |
+| Secret Key 恒失败 | `2x0000000000000000000000000000000AA` |
+
+技术契约（双钥匙启用门 / 校验服务异常时登录 fail-open、测试端点 fail-closed / 限流计数不混入 Turnstile 拒绝）见 [AGENTS.md](./AGENTS.md) 与 `.trellis/spec/backend/conventions.md`。
+
 ## API 说明
 
 所有接口均在 `/api/*` 前缀下，返回 JSON。列表/详情读取、统计与外观配置为公开接口；其余（全部写操作及部分管理用查询）需管理员登录（JWT + HttpOnly Cookie）。
@@ -138,7 +169,7 @@ npm run deploy    # 部署到 Cloudflare Workers
 | 统计 | `GET /api/stats` | 概览、状态计数、评分直方图、完成时间线、Top 榜 |
 | 索引与导入 | `POST /api/index/start`、`GET /api/index/status`、`POST /api/ulist/import` | 批量索引与 VNDB ulist 用户列表导入 |
 | VNDB 搜索 | `GET /api/vndb/search` | 添加条目弹窗的候选搜索 |
-| 配置 | `GET` / `PUT /api/config`、`GET /api/config/appearance` | Token / 密码 / tags / 外观；`appearance` 为公开只读 |
+| 配置 | `GET` / `PUT /api/config`、`GET /api/config/appearance`、`POST /api/config/turnstile/test` | Token / 密码 / tags / 外观；`appearance` 为公开只读；`turnstile/test` 用输入值预验 Turnstile 密钥对 |
 | 备份 | `GET /api/export`、`POST /api/import` | 导出 / 导入库数据（含 Tier 列表，支持 `merge` / `replace`） |
 
 请求参数、数据结构与内部实现等技术详情见 [AGENTS.md](./AGENTS.md)。

@@ -37,6 +37,13 @@ const HTTP_CACHE_STUB_CODE = `export async function servePublicCached(request, e
 export async function bumpCacheVersion() {}
 `;
 
+// turnstile 桩：本套件不触达 siteverify 行为（语义由 login.turnstile /
+// config.turnstile 套件覆盖），直通 pass 即可
+const TURNSTILE_STUB_CODE = `export async function verifyTurnstileToken() {
+  return { outcome: 'pass' };
+}
+`;
+
 
 async function loadRouterModule({ initialSettings = {}, authenticated = true } = {}) {
   const sourceCode = await fs.readFile(sourcePath, 'utf8');
@@ -240,7 +247,8 @@ export async function getIndexTaskStatus() {
     .replace(/from '\.\/ulist-import\.js';/, "from './ulist-import.stub.mjs';")
     .replace(/from '\.\/utils\.js';/, "from './utils.stub.mjs';")
     .replace(/from '\.\/vndb\.js';/, "from './vndb.stub.mjs';")
-    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';");
+    .replace(/from '\.\/http-cache\.js';/, "from './http-cache.stub.mjs';")
+    .replace(/from '\.\/turnstile\.js';/, "from './turnstile.stub.mjs';");
 
   await fs.writeFile(authStubPath, authStubCode, 'utf8');
   await fs.writeFile(repositoryStubPath, repositoryStubCode, 'utf8');
@@ -249,6 +257,7 @@ export async function getIndexTaskStatus() {
   await fs.writeFile(utilsStubPath, utilsStubCode, 'utf8');
   await fs.writeFile(vndbStubPath, vndbStubCode, 'utf8');
   await fs.writeFile(path.join(tempDir, 'http-cache.stub.mjs'), HTTP_CACHE_STUB_CODE, 'utf8');
+  await fs.writeFile(path.join(tempDir, 'turnstile.stub.mjs'), TURNSTILE_STUB_CODE, 'utf8');
   await fs.writeFile(routerPath, patchedSource, 'utf8');
 
   const moduleUrl = `${pathToFileURL(routerPath).href}?test=${encodeURIComponent(testId)}`;
@@ -689,6 +698,136 @@ test('公开只读端点 GET 响应带 CORS 头且 OPTIONS 预检返回 204', as
   }
 });
 
+test('PUT /api/config Turnstile 两键：合法输入 trim 后落库，空串清除，半配独立可存（AC7）', async () => {
+  const initialSettings = createDefaultSettings({
+    adminPasswordHash: 'salt-old:hash-old',
+    jwtSecret: 'jwt-secret-old'
+  });
+  const { routerModule, state, cleanup } = await loadRouterModule({ initialSettings });
+
+  try {
+    // trim 后落库；200 字符边界值（trim 后）通过
+    const siteKeyBoundary = '0x' + 'a'.repeat(198);
+    const { response } = await sendUpdateConfigRequest(routerModule, {
+      turnstileSiteKey: `  ${siteKeyBoundary}  `,
+      turnstileSecretKey: '  0x-secret-key  '
+    });
+    assert.equal(response.status, 200);
+    assert.equal(state.settings.turnstileSiteKey, siteKeyBoundary);
+    assert.equal(state.settings.turnstileSecretKey, '0x-secret-key');
+
+    // 独立可存：只提交 siteKey，secret 保持不动（半配状态合法落库）
+    const { response: halfResponse } = await sendUpdateConfigRequest(routerModule, {
+      turnstileSiteKey: '0x-new-site-key'
+    });
+    assert.equal(halfResponse.status, 200);
+    assert.equal(state.settings.turnstileSiteKey, '0x-new-site-key');
+    assert.equal(state.settings.turnstileSecretKey, '0x-secret-key');
+
+    // 空串合法 = 清除两键
+    const { response: clearResponse } = await sendUpdateConfigRequest(routerModule, {
+      turnstileSiteKey: '',
+      turnstileSecretKey: ''
+    });
+    assert.equal(clearResponse.status, 200);
+    assert.equal(state.settings.turnstileSiteKey, '');
+    assert.equal(state.settings.turnstileSecretKey, '');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('PUT /api/config Turnstile 两键：非字符串与 trim 后超 200 均返回 400 且零持久化（AC7）', async () => {
+  const initialSettings = createDefaultSettings({
+    adminPasswordHash: 'salt-old:hash-old',
+    jwtSecret: 'jwt-secret-old',
+    turnstileSiteKey: '0x-kept-site',
+    turnstileSecretKey: '0x-kept-secret'
+  });
+  const { routerModule, state, cleanup } = await loadRouterModule({ initialSettings });
+
+  try {
+    const cases = [
+      [{ turnstileSiteKey: 123 }, 'turnstileSiteKey 必须为字符串'],
+      [{ turnstileSiteKey: 'x'.repeat(201) }, 'turnstileSiteKey 长度不能超过 200'],
+      [{ turnstileSecretKey: [] }, 'turnstileSecretKey 必须为字符串'],
+      [{ turnstileSecretKey: `  ${'x'.repeat(201)}  ` }, 'turnstileSecretKey 长度不能超过 200']
+    ];
+
+    for (const [body, expectedError] of cases) {
+      const { response, payload } = await sendUpdateConfigRequest(routerModule, body);
+      assert.equal(response.status, 400, `${JSON.stringify(body)} 应 400`);
+      assert.deepEqual(payload, { success: false, error: expectedError });
+    }
+
+    // 校验失败不落库，存量键保持不变
+    assert.equal(state.saveSettingsCalls.length, 0);
+    assert.equal(state.setAdminPasswordCalls.length, 0);
+    assert.equal(state.settings.turnstileSiteKey, '0x-kept-site');
+    assert.equal(state.settings.turnstileSecretKey, '0x-kept-secret');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('混合请求（合法 newPassword + 非法 turnstileSecretKey）返回 400 且双持久化零调用（AC7）', async () => {
+  // 09-15 前置校验不变量：任何 400 之前 setAdminPassword / saveSettings 零调用
+  const initialSettings = createDefaultSettings({
+    adminPasswordHash: 'salt-old:hash-old',
+    jwtSecret: 'jwt-secret-old'
+  });
+  const { routerModule, state, cleanup } = await loadRouterModule({ initialSettings });
+
+  try {
+    const { response, payload } = await sendUpdateConfigRequest(routerModule, {
+      newPassword: 'new-password-123',
+      turnstileSecretKey: 42
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(payload, { success: false, error: 'turnstileSecretKey 必须为字符串' });
+
+    assert.equal(state.setAdminPasswordCalls.length, 0, '400 时不得调用 setAdminPassword');
+    assert.equal(state.saveSettingsCalls.length, 0, '400 时不得调用 saveSettings');
+    assert.equal(state.createJWTCalls.length, 0);
+    assert.equal(state.setAuthCookieCalls.length, 0);
+    assert.equal(state.settings.adminPasswordHash, 'salt-old:hash-old');
+    assert.equal(state.settings.jwtSecret, 'jwt-secret-old');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('GET /api/config 返回明文 turnstileSiteKey 与 hasTurnstileSecret 布尔（AC7）', async () => {
+  // 未配置：siteKey 空串 + hasTurnstileSecret false
+  const { routerModule, cleanup } = await loadRouterModule({});
+  try {
+    const response = await sendRequest(routerModule, '/api/config');
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.data.turnstileSiteKey, '');
+    assert.equal(payload.data.hasTurnstileSecret, false);
+  } finally {
+    await cleanup();
+  }
+
+  // 已配置：明文 siteKey + true，且不回显 secret 本体
+  const configured = await loadRouterModule({
+    initialSettings: {
+      turnstileSiteKey: '0x-site-key',
+      turnstileSecretKey: '0x-secret-key'
+    }
+  });
+  try {
+    const response = await sendRequest(configured.routerModule, '/api/config');
+    const payload = await response.json();
+    assert.equal(payload.data.turnstileSiteKey, '0x-site-key');
+    assert.equal(payload.data.hasTurnstileSecret, true);
+    assert.equal('turnstileSecretKey' in payload.data, false, 'secret 不得明文回显');
+  } finally {
+    await configured.cleanup();
+  }
+});
+
 test('认证端点响应不带 CORS 头且 OPTIONS 不提供预检', async () => {
   const { routerModule, cleanup } = await loadRouterModule({ authenticated: true });
 
@@ -704,6 +843,11 @@ test('认证端点响应不带 CORS 头且 OPTIONS 不提供预检', async () =>
     const optionsExportResponse = await sendRequest(routerModule, '/api/export', 'OPTIONS');
     assert.equal(optionsExportResponse.status, 404);
     assert.equal(optionsExportResponse.headers.get('Access-Control-Allow-Origin'), null);
+
+    // Turnstile 测试端点为认证写端点：同样不带 CORS 头、OPTIONS 404
+    const optionsTurnstileResponse = await sendRequest(routerModule, '/api/config/turnstile/test', 'OPTIONS');
+    assert.equal(optionsTurnstileResponse.status, 404);
+    assert.equal(optionsTurnstileResponse.headers.get('Access-Control-Allow-Origin'), null);
   } finally {
     await cleanup();
   }

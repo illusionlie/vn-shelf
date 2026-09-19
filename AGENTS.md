@@ -89,9 +89,9 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/api/auth/status` | 初始化 + 登录状态 | 公开 |
+| GET | `/api/auth/status` | 初始化 + 登录状态（含 `turnstileSiteKey`，双钥匙门后输出） | 公开 |
 | POST | `/api/auth/init` | 初始化管理员密码（可同时写入 `vndbApiToken`） | 仅未初始化 |
-| POST | `/api/auth/login` | 登录（按 IP 连续 5 次失败锁 10 分钟，锁内 429 + `Retry-After`） | 公开 |
+| POST | `/api/auth/login` | 登录（按 IP 连续 5 次失败锁 10 分钟，锁内 429 + `Retry-After`；Turnstile 两键齐备时需 `turnstileToken`——拒绝不计限流，siteverify 异常 fail-open，契约详见 spec backend/conventions.md「登录 Turnstile 校验」） | 公开 |
 | POST | `/api/auth/logout` | 登出 | 公开 |
 | GET | `/api/auth/verify` | 验证 Token | 公开 |
 | GET | `/api/vn` | VN 列表（`sort` / `search` / `untiered`） | 公开 |
@@ -111,8 +111,9 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 | GET | `/api/index/status` | 索引/导入任务状态（含 `type`/`skipped`） | 需认证 |
 | POST | `/api/ulist/import` | 启动 VNDB ulist 导入 | 需认证 |
 | GET | `/api/vndb/search` | VNDB 模糊搜索（`q` trim 后必填、超 100 字符截断；`limit` clamp 1..20 默认 10） | 需认证 |
-| GET | `/api/config` | 获取配置（脱敏） | 需认证 |
-| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags / 外观） | 需认证 |
+| GET | `/api/config` | 获取配置（脱敏；Turnstile 返回明文 siteKey + `hasTurnstileSecret` 布尔） | 需认证 |
+| PUT | `/api/config` | 更新配置（`vndbApiToken` / `newPassword` / tags / 外观 / Turnstile 两键） | 需认证 |
+| POST | `/api/config/turnstile/test` | 用请求体输入值（非已存值）预验 Turnstile 密钥对（invalid → 200 `ok:false`；siteverify 异常 → 503 fail-closed） | 需认证 |
 | GET | `/api/config/appearance` | 外观与公开 tags 配置 | 公开 |
 | GET | `/api/export` | 导出数据（`entries` + `tierList`） | 需认证 |
 | POST | `/api/import` | 导入数据（`merge`/`replace`，支持 `tierList`） | 需认证 |
@@ -232,7 +233,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 - i18n：HTML 静态文案走 `data-i18n*` 标记由 `applyI18nDom()` 应用，JS 动态文案走 `t()`，Alpine 内联表达式走 `$t` magic；新增 key 必须同步 `zh-CN.js` 与 `en.js`（`tests/public/i18n.keys.test.mjs` 双向 parity 强制）
 - 公共壳层/页脚：[`public/js/layout.js`](public/js/layout.js)（纯 DOM 注入，无 Alpine 依赖）
 - 前后端同值常量在 [`public/js/constants.js`](public/js/constants.js)（如批量 Tier 上限 200），修改一端必须同步另一端
-- 第三方依赖 vendor 自托管（版本锁定在 `package.json`，`npm run fetch:vendor` 拉取），禁止运行时 CDN
+- 第三方依赖 vendor 自托管（版本锁定在 `package.json`，`npm run fetch:vendor` 拉取），禁止运行时 CDN；**唯一例外**：Turnstile 挑战脚本（无法自托管，仅 siteKey 非空时经 `public/js/turnstile.js` 懒加载注入，契约见 spec frontend/quality-guidelines.md）
 
 ### 页面组件（`public/js/components/`）
 
@@ -259,6 +260,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 5. **本地配置**：使用 `wrangler.toml.example` 生成实际 `wrangler.toml`，绑定 D1 数据库与 Queue 后再运行 `npm run dev`。
 6. **Durable Object 绑定**：`INDEX_START_LOCK` Durable Object 绑定为必选项（提供索引启动互斥锁），缺失时 `/api/index/start` 会返回 500；`LOGIN_RATE_LOCK` 为可选项（登录限流，fail-open：缺失时仅告警放行）。两份 wrangler 配置（example 与本地真实 toml）必须同步修改（双轨契约）。
 7. **CSS 分模块**：`public/css/` 下链接顺序固定为 base → forms → cards-detail → 页面文件；JS 注入的共享 DOM（壳层/页脚）样式进 `base.css`。
+8. **Turnstile 双钥匙门**：`turnstileSiteKey` + `turnstileSecretKey` 均 non-empty 才启用登录校验与 `auth/status` 的 siteKey 输出（widget 可见 ⟺ 后端强制校验）；两键存 D1 settings（同 `vndbApiToken`），不进导出/导入；被 Turnstile 拒绝的请求不计入登录限流。
 <!-- TRELLIS:START -->
 # Trellis Instructions
 

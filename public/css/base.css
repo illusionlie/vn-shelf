@@ -682,6 +682,16 @@ body.has-bg-image {
   border-radius: 2px;
 }
 
+/* ===== Turnstile widget 容器（登录页 + 设置页临时测试共用；09-19）=====
+   标准组件 300x65：容器居中 + 上下间距，min-height 预留避免渲染时跳动；
+   dark 模式由 JS 传 theme:'dark'，无需 CSS 处理 */
+.turnstile-box {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+  margin: 16px 0;
+}
+
 /* ===== Empty State ===== */
 .empty-state {
   text-align: center;
