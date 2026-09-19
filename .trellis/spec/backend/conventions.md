@@ -667,6 +667,7 @@ ownerName: string   // trim 后 ≤ 30 字符；'' = 未设置（前端回退品
 
 - 公开侧 `GET /api/config/appearance` 与管理侧 `GET /api/config` 均返回（未配置输出 `''`）；字段属公开可读外观数据，与背景同级。
 - **校验风格分野**：展示型文本字段用**显式 400**（非 string / trim 后超长），不做静默 coerce——与 import 校验对齐；数值型外观字段（overlay/blur）保留 clamp 静默风格。空串合法 = 清除设置。
+- **跨字段校验前置不变量**（09-15-config-put-validate-first 确立）：`handleUpdateConfig` 的全部 400 校验必须在任何持久化（`setAdminPassword` 直写凭据 / `saveSettings`）之前执行——任一字段校验失败时，密码哈希、jwtSecret 与 settings blob 均零变更。新增会 400 的字段时加进前置校验段，不得在赋值段内联 return 400（赋值段应无 return，直落到 `saveSettings`）。
 - `null` 归一不对称：PUT 拒绝 `null`（400），import 将 `null → ''`——与 backgroundUrl 先例一致。
 - 导入缺省（旧备份无该字段）跳过不动，行为向后兼容。
 - 前端写入仅 `textContent` / `document.title`（无 HTML sink），后端 trim + 限长兜底。
@@ -678,6 +679,7 @@ ownerName: string   // trim 后 ≤ 30 字符；'' = 未设置（前端回退品
 | PUT `ownerName` 非 string | 400 `ownerName 必须为字符串`，不落库 |
 | PUT `ownerName` trim 后 > 30 | 400 `ownerName 长度不能超过 30`，不落库 |
 | PUT `ownerName` 空串/纯空白 | 合法，落库 `''`（清除个性化） |
+| PUT 混合请求：合法 `newPassword` + 非法 `ownerName`（或反序） | 400（前置校验任一失败），`setAdminPassword` / `saveSettings` 零调用，凭据与配置零变更 |
 | import `appearance.ownerName` 非法 | 400（与 PUT 同规则），不触达 importData |
 | import `appearance.ownerName === null` | 归一 `''` 后应用 |
 | import 无 `ownerName` 键 | 跳过，存量值不动 |
@@ -691,20 +693,34 @@ ownerName: string   // trim 后 ≤ 30 字符；'' = 未设置（前端回退品
 ### 6. Tests Required
 
 - `tests/router/config.update.test.mjs`：PUT 合法（trim/边界 30/空串清除）+ 400 两态且断言不落库 + 两个 GET 返回字段（含未配置 `''`）+ 未认证 401 不落库。
+- 混合请求零持久化断言：400 路径断言 `setAdminPasswordCalls.length === 0` **且** `saveSettingsCalls.length === 0`（`setAdminPassword` 不走 `saveSettings`，两个桩都要计数）；成功路径断言 `createJWTCalls[0].secret === setAdminPasswordCalls[0].jwtSecret`（token 基于轮换后密钥签发）。
 - `tests/router/import.appearance.test.mjs`：import 校验矩阵（400 不触达 importData / null 归一 / 缺省跳过）。
 - `tests/d1/repository.test.mjs`：importData 写 settings（防御截断）+ exportData 携带字段。
 
 ### 7. Wrong vs Correct
 
 ```js
-// Wrong：展示型文本静默 coerce（超长悄悄截断，用户以为存上了全名）
+// Wrong ①：展示型文本静默 coerce（超长悄悄截断，用户以为存上了全名）
 if (body.ownerName !== undefined) settings.ownerName = String(body.ownerName).slice(0, 30);
 
-// Correct：显式 400，错误早暴露
+// Wrong ②：校验留在赋值段，而更早的分支已持久化（半提交：响应 400，但密码已改、旧 token 已失效）
+if (body.newPassword) {
+  await setAdminPassword(env, body.newPassword);   // ← 先落库轮换 jwtSecret
+}
+// ...中间若干字段...
+if (body.ownerName !== undefined && typeof body.ownerName !== 'string') {
+  return errorResponse('ownerName 必须为字符串', 400);  // ← 迟到的 400
+}
+
+// Correct：全部 400 校验前置到任何 await 写入之前；校验与赋值共用同一 trim 变量，不留缝隙
+if (body.newPassword && body.newPassword.length < 6) return errorResponse('密码长度至少6位', 400);
+let ownerName;
 if (body.ownerName !== undefined) {
   if (typeof body.ownerName !== 'string') return errorResponse('ownerName 必须为字符串', 400);
-  const name = body.ownerName.trim();
-  if (name.length > 30) return errorResponse('ownerName 长度不能超过 30', 400);
-  settings.ownerName = name;
+  ownerName = body.ownerName.trim();
+  if (ownerName.length > 30) return errorResponse('ownerName 长度不能超过 30', 400);
 }
+// ——校验全部通过，以下才允许持久化；赋值段无 return，直落 saveSettings——
+if (body.newPassword) await setAdminPassword(env, body.newPassword);
+if (body.ownerName !== undefined) settings.ownerName = ownerName;
 ```
