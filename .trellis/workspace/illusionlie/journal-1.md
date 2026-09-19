@@ -1044,3 +1044,27 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 ### Status
 
 [OK] **Completed**
+
+
+## Session 25: 三项遗留修复：auth 探测 401 / markdown 三标记 / NSFW 键盘可达
+
+**Date**: 2026-09-19
+**Task**: 三项遗留修复：auth 探测 401 / markdown 三标记 / NSFW 键盘可达
+**Branch**: `master`
+
+### Summary
+
+三项遗留一次收清:(D1)全局 checkAuth 切 /api/auth/status 消除匿名首访 verify 401, authAPI.verify 死代码移除(后端端点契约不变, src/ 零改动);(D2)marked inline 扩展恢复 ==高亮==/^上标^/~下标~, 正则语义按迁移前 parser 考据冻结(~~del~~ 互斥/~a~~ 拒绝/恶意载荷转义全测锁定), token 树嵌套较旧字符串替换为有意改进, 测试 +9(268→277);(D3)四处 NSFW 遮罩键盘可达(role=button+Enter/Space+revealNsfwCover 双语 key), tier 真 button 禁嵌 interactive——overlay 出嵌 .tier-vn-card-wrap 且拖拽源(draggable/dragstart/data-vn-id)同步上移(实施代理抓到的设计缺口, check 代理 18 处引用逐一核对链路等价), :hover 兄弟断裂以 wrap:hover 恢复并显式进 reduce 块。lint 零告警 277/277, AC1-7 达成(浏览器侧 4 项留手工清单: 无痕 Network/四处 Tab 揭示/tier 双模拖拽/三标记渲染)。spec 沉淀 3 处: 内嵌控件契约升级(禁嵌+wrap 出嵌+拖拽源/:hover gotcha)/markdown 三标记 extension 契约/auth 探测恒走 status。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a5c7709` | (see git log) |
+| `26ebfea` | (see git log) |
+| `4c6f264` | (see git log) |
+| `dde9760` | (see git log) |
+
+### Status
+
+[OK] **Completed**
