@@ -3,7 +3,7 @@
   "name": "config-put-validate-first",
   "title": "PUT /api/config 校验前置：newPassword 先落库与后续字段校验失败的半提交问题",
   "description": "存量缺陷：handleUpdateConfig 先执行 newPassword 落库（轮换 jwtSecret），后续字段校验 400 时凭据已变更但响应报错——需全部校验前置后统一落库",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

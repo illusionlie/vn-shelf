@@ -1,1 +1,3 @@
 {"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "核对校验失败路径响应语义（400 + 中文 message 信封）与「失败 = 零持久化」不变量是否破坏既有契约"}
+{"file": ".trellis/spec/guides/index.md", "reason": "AI 审查误报模式核对（设计注释即意图：passwordChanged 重载 settings、token 重签发为设计内行为，勿误报）"}

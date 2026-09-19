@@ -1,1 +1,2 @@
 {"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/conventions.md", "reason": "PUT /api/config 外观字段扩展契约（校验矩阵 + 显式 400 风格）、auth.settings 复用契约、API 响应信封——重排校验顺序时必须保持的既有契约"}
