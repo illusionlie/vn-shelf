@@ -55,7 +55,9 @@ async function loadRouterModule({ initialSettings = {}, authenticated = true } =
     settings: createDefaultSettings(initialSettings),
     authenticated,
     setAdminPasswordCalls: [],
-    saveSettingsCalls: []
+    saveSettingsCalls: [],
+    createJWTCalls: [],
+    setAuthCookieCalls: []
   };
   globalThis.__routerConfigTestRegistry.set(testId, state);
 
@@ -68,11 +70,24 @@ export async function authMiddleware() {
   return { authenticated: !!state.authenticated, settings: clone(state.settings) };
 }
 
-export async function createJWT() {
+export async function createJWT(secret, payload) {
+  state.createJWTCalls.push({ secret, payload: clone(payload) });
   return 'stub.jwt.token';
 }
 
-export function setAuthCookie() {}
+// 与真实实现（src/auth.js）镜像：在响应头附加 auth_token Cookie，供密码重签发路径断言
+export function setAuthCookie(response, token, secure = true) {
+  state.setAuthCookieCalls.push({ token, secure });
+  const cookieValue = [
+    \`auth_token=\${token}\`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+    secure ? 'Secure' : '',
+    \`Max-Age=\${24 * 60 * 60}\`
+  ].filter(Boolean).join('; ');
+  response.headers.set('Set-Cookie', cookieValue);
+}
 export function clearAuthCookie() {}
 export async function verifyAdminPassword() { return true; }
 
@@ -445,6 +460,108 @@ test('PUT /api/config ownerName：非字符串与 trim 后超 30 字符均返回
     // 校验失败不落库
     assert.equal(state.saveSettingsCalls.length, 0);
     assert.equal(state.settings.ownerName, '旧主人');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('混合请求（合法 newPassword + 非法 ownerName）返回 400 且凭据与配置零变更', async () => {
+  // 先校验、后写入的核心场景：密码合法但 ownerName 非法时，
+  // 不得发生 setAdminPassword（半提交窗口：密码已改写 + jwtSecret 已轮换但响应报 400）
+  const initialSettings = createDefaultSettings({
+    adminPasswordHash: 'salt-old:hash-old',
+    jwtSecret: 'jwt-secret-old',
+    ownerName: '旧主人'
+  });
+  const { routerModule, state, cleanup } = await loadRouterModule({ initialSettings });
+
+  try {
+    const { response, payload } = await sendUpdateConfigRequest(routerModule, {
+      newPassword: 'new-password-789',
+      ownerName: 123
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(payload, { success: false, error: 'ownerName 必须为字符串' });
+
+    const { response: longResponse, payload: longPayload } = await sendUpdateConfigRequest(routerModule, {
+      newPassword: 'new-password-789',
+      ownerName: '明'.repeat(31)
+    });
+    assert.equal(longResponse.status, 400);
+    assert.deepEqual(longPayload, { success: false, error: 'ownerName 长度不能超过 30' });
+
+    // 凭据零变更：密码哈希与 jwtSecret 未被改写，settings blob 未落库，无 token 重签发
+    assert.equal(state.setAdminPasswordCalls.length, 0);
+    assert.equal(state.saveSettingsCalls.length, 0);
+    assert.equal(state.createJWTCalls.length, 0);
+    assert.equal(state.setAuthCookieCalls.length, 0);
+    assert.equal(state.settings.adminPasswordHash, 'salt-old:hash-old');
+    assert.equal(state.settings.jwtSecret, 'jwt-secret-old');
+    assert.equal(state.settings.ownerName, '旧主人');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('混合请求（过短 newPassword + 合法 ownerName）返回 400 且零写入', async () => {
+  const initialSettings = createDefaultSettings({
+    adminPasswordHash: 'salt-old:hash-old',
+    jwtSecret: 'jwt-secret-old',
+    ownerName: '旧主人'
+  });
+  const { routerModule, state, cleanup } = await loadRouterModule({ initialSettings });
+
+  try {
+    const { response, payload } = await sendUpdateConfigRequest(routerModule, {
+      newPassword: '12345',
+      ownerName: '小明'
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(payload, { success: false, error: '密码长度至少6位' });
+
+    assert.equal(state.setAdminPasswordCalls.length, 0);
+    assert.equal(state.saveSettingsCalls.length, 0);
+    assert.equal(state.createJWTCalls.length, 0);
+    assert.equal(state.setAuthCookieCalls.length, 0);
+    assert.equal(state.settings.adminPasswordHash, 'salt-old:hash-old');
+    assert.equal(state.settings.jwtSecret, 'jwt-secret-old');
+    assert.equal(state.settings.ownerName, '旧主人');
+  } finally {
+    await cleanup();
+  }
+});
+
+test('混合请求（合法 newPassword + 合法 ownerName）成功：密码生效、ownerName 落库、响应携新 token', async () => {
+  const initialSettings = createDefaultSettings({
+    adminPasswordHash: 'salt-old:hash-old',
+    jwtSecret: 'jwt-secret-old',
+    ownerName: '旧主人'
+  });
+  const { routerModule, state, cleanup } = await loadRouterModule({ initialSettings });
+
+  try {
+    const { response, payload } = await sendUpdateConfigRequest(routerModule, {
+      newPassword: 'new-password-789',
+      ownerName: '  小明  '
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload, { success: true, message: '设置已更新', data: null });
+
+    // 密码生效：哈希与 jwtSecret 均切换为 setAdminPassword 写入的新值
+    assert.equal(state.setAdminPasswordCalls.length, 1);
+    assert.equal(state.settings.adminPasswordHash, state.setAdminPasswordCalls[0].adminPasswordHash);
+    assert.equal(state.settings.jwtSecret, state.setAdminPasswordCalls[0].jwtSecret);
+
+    // ownerName trim 后落库（校验与赋值共用同一 trim 结果）
+    assert.equal(state.settings.ownerName, '小明');
+
+    // token 基于轮换后的 jwtSecret 重签发，响应携新 token Cookie
+    assert.equal(state.createJWTCalls.length, 1);
+    assert.equal(state.createJWTCalls[0].secret, state.setAdminPasswordCalls[0].jwtSecret);
+    assert.deepEqual(state.createJWTCalls[0].payload, { sub: 'admin' });
+    assert.deepEqual(state.setAuthCookieCalls, [{ token: 'stub.jwt.token', secure: true }]);
+    assert.match(response.headers.get('Set-Cookie'), /^auth_token=stub\.jwt\.token;/);
   } finally {
     await cleanup();
   }

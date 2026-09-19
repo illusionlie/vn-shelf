@@ -1428,14 +1428,31 @@ async function handleUpdateConfig(request, env, auth) {
   } catch (response) {
     return response;
   }
+  // 先校验、后写入：任一字段校验失败（400）时不得发生任何持久化变更——
+  // setAdminPassword 直写密码哈希并轮换 jwtSecret（不经 saveSettings），
+  // 必须等全部校验通过后才执行，消除"响应报错但凭据已改写"的半提交窗口
+  if (body.newPassword && body.newPassword.length < 6) {
+    return errorResponse('密码长度至少6位', 400);
+  }
+
+  // 站点主人名：面向用户展示的文本，显式 400 早暴露（非静默 coerce/截断），
+  // 空串合法 = 清除个性化回退品牌名；校验与赋值共用同一 trim 结果，不留缝隙
+  let ownerName;
+  if (body.ownerName !== undefined) {
+    if (typeof body.ownerName !== 'string') {
+      return errorResponse('ownerName 必须为字符串', 400);
+    }
+    ownerName = body.ownerName.trim();
+    if (ownerName.length > 30) {
+      return errorResponse('ownerName 长度不能超过 30', 400);
+    }
+  }
+
   // authMiddleware 认证成功时必然已加载 settings，直接复用避免单请求内重复查询
   let settings = auth.settings;
   let passwordChanged = false;
 
   if (body.newPassword) {
-    if (body.newPassword.length < 6) {
-      return errorResponse('密码长度至少6位', 400);
-    }
     await setAdminPassword(env, body.newPassword);
     // 密码哈希与 jwtSecret 刚被改写，必须重新加载
     settings = await getSettings(env);
@@ -1480,16 +1497,9 @@ async function handleUpdateConfig(request, env, auth) {
     }
   }
 
-  // 站点主人名：面向用户展示的文本，显式 400 早暴露（非静默 coerce/截断），
-  // 空串合法 = 清除个性化回退品牌名
-  if (body.ownerName !== undefined) {
-    if (typeof body.ownerName !== 'string') {
-      return errorResponse('ownerName 必须为字符串', 400);
-    }
-    if (body.ownerName.trim().length > 30) {
-      return errorResponse('ownerName 长度不能超过 30', 400);
-    }
-    settings.ownerName = body.ownerName.trim();
+  // ownerName 已在函数开头前置校验（非 string / trim 后超 30 → 400），此处只赋值
+  if (ownerName !== undefined) {
+    settings.ownerName = ownerName;
   }
 
   await saveSettings(env, settings);
