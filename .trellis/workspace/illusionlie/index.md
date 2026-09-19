@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 25
+- **Total Sessions**: 26
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1070 | Active |
+| `journal-1.md` | ~1092 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 26 | 2026-09-19 | 登录页 Cloudflare Turnstile 集成 + 真 key 本地体验修复 | `f3edcd5`, `7f7990a` | `master` |
 | 25 | 2026-09-19 | 三项遗留修复：auth 探测 401 / markdown 三标记 / NSFW 键盘可达 | `a5c7709`, `26ebfea`, `4c6f264`, `dde9760` | `master` |
 | 24 | 2026-09-19 | appearance 冷启动缓存收紧：前端恒 no-store（选型 c） | `a6527e4`, `14833ad`, `4708961` | `master` |
 | 23 | 2026-09-19 | PUT /api/config 校验前置：newPassword 半提交修复 | `5df4545`, `825f078`, `6104140` | `master` |

@@ -1068,3 +1068,25 @@ Trellis task 09-09-vn-refresh-button: admin-only per-entry VNDB refresh on the h
 ### Status
 
 [OK] **Completed**
+
+
+## Session 26: 登录页 Cloudflare Turnstile 集成 + 真 key 本地体验修复
+
+**Date**: 2026-09-19
+**Task**: 登录页 Cloudflare Turnstile 集成 + 真 key 本地体验修复
+**Branch**: `master`
+
+### Summary
+
+完整交付 Turnstile 人机校验：双钥匙门（widget 可见⟺后端强制校验，半配不暴露）、handleLogin 插入（拒绝不计限流/不跑 PBKDF2）、fail 语义分野（登录 fail-open / 测试端点 fail-closed）、POST /api/config/turnstile/test 输入值预验防误配锁死、前端懒加载单例+单次消费 reset+theme 显式传；+32 用例 309 全绿，dummy keys 浏览器手测全过。用户真 key 实测反馈两问题后修复：/cdn-cgi/challenge-platform 遥测信标快速 204+定向 CORS（Turnstile 遥测定型前不派发 token，本地无 CF 边缘致预检拖慢；生产被边缘吸收不可达）+ 登录按钮 aria-disabled 门控（09-09 契约）+5 用例 314 全绿。排障发现：本机系统代理劫持 localhost URL（curl 403 假象，须 --noproxy）。spec 沉淀：backend Turnstile Scenario、八桩清单修正、frontend vendor 懒加载例外。遗留人工：真实域名正向登录复测（用户侧）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f3edcd5` | (see git log) |
+| `7f7990a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
