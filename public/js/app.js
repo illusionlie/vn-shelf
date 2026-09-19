@@ -168,10 +168,12 @@ document.addEventListener('alpine:init', () => {
 
     async checkAuth() {
       try {
-        const res = await authAPI.verify();
-        this.isAdmin = res.success;
+        // 走公开状态端点（匿名也 200 + authenticated:false），避免匿名首访
+        // 打 /api/auth/verify 吃 401 控制台噪音；后端 verify 端点保留作公开契约
+        const res = await authAPI.status();
+        this.isAdmin = !!res.data?.authenticated;
       } catch (error) {
-        console.warn('[app] auth verify failed', {
+        console.warn('[app] auth status failed', {
           error: error?.message || String(error)
         });
         this.isAdmin = false;

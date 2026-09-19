@@ -197,13 +197,6 @@ export const authAPI = {
   },
 
   /**
-   * 验证Token
-   */
-  async verify() {
-    return apiRequest('/auth/verify');
-  },
-
-  /**
    * 获取认证状态
    */
   async status() {
