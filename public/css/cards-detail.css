@@ -614,12 +614,12 @@
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
 }
 
-/* Tier page NSFW adjustments */
-.tier-vn-card .nsfw-overlay {
+/* Tier page NSFW adjustments（遮罩已出嵌为 .tier-vn-card-wrap 的子节点，随选择器迁移） */
+.tier-vn-card-wrap .nsfw-overlay {
   border-radius: 6px;
 }
 
-.tier-vn-card .nsfw-overlay svg {
+.tier-vn-card-wrap .nsfw-overlay svg {
   width: 22px;
   height: 22px;
 }

@@ -150,7 +150,9 @@
               :class="{ 'nsfw-blur': vn.imageNsfw && !showNsfw }"
               @error="$event.target.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23334155%22 width=%22200%22 height=%22200%22/%3E%3C/svg%3E'"
             >
-            <div class="nsfw-overlay" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" data-i18n-title="common.clickToShow">
+            <!-- NSFW 遮罩键盘可达：role=button + tabindex + Enter/Space 揭示（.stop 阻断整卡 openDetail），
+                 焦点环走 base.css :focus-visible 全局规则；aria-label 用 $t 绑定（与 detail-modal 注入 DOM 统一） -->
+            <div class="nsfw-overlay" role="button" tabindex="0" :aria-label="$t('common.revealNsfwCover')" x-show="vn.imageNsfw && !showNsfw" @click.stop="showNsfw = true" @keydown.enter.space.stop.prevent="showNsfw = true" data-i18n-title="common.clickToShow">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
             </div>
             <span class="all-age-badge" x-show="vn.allAge" data-i18n-title="common.allAgeTitle" data-i18n="common.allAge"></span>

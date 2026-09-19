@@ -25,6 +25,7 @@ export default {
     details: 'Details',
     clear: 'Clear',
     clickToShow: 'Click to show',
+    revealNsfwCover: 'Reveal NSFW cover',
     allAge: 'All ages',
     allAgeTitle: 'All-ages title',
     vndbRating: 'VNDB rating',

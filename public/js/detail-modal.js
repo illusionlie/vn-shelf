@@ -54,8 +54,12 @@ const DETAIL_MODAL_TEMPLATE = `
                 >
                 <div
                   class="nsfw-overlay"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="$t('common.revealNsfwCover')"
                   x-show="selectedVN.vndb?.imageNsfw && !showNsfw"
                   @click.stop="showNsfw = true"
+                  @keydown.enter.space.stop.prevent="showNsfw = true"
                   style="border-radius:var(--border-radius-md);"
                   data-i18n-title="common.clickToShow"
                 >

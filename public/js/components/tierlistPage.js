@@ -499,9 +499,10 @@ export function tierlistPage() {
       const draggedIndex = originalItems.findIndex(item => item.id === draggedId);
 
       let insertIndex = itemsWithoutDragged.length;
-      const targetCard = event.target?.closest?.('.tier-vn-card');
-      // 命中子元素或卡片未注 data-vn-id 时 targetId 为 null → 兑底到当前 tier 末尾
-      // （下方 insertIndex 未被覆盖即保持 itemsWithoutDragged.length）。
+      // 定位锚是 wrap（09-19 遮罩出嵌后 data-vn-id 与拖拽源都在 wrap 上）：
+      // 命中 wrap 或其后代（button/overlay）均能取到 vnId，未注时 targetId 为 null
+      // → 兑底到当前 tier 末尾（下方 insertIndex 未被覆盖即保持 itemsWithoutDragged.length）。
+      const targetCard = event.target?.closest?.('.tier-vn-card-wrap');
       const targetId = targetCard?.dataset?.vnId || null;
 
       if (targetId) {

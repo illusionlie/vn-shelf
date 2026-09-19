@@ -43,6 +43,7 @@ export default {
     details: '详情',
     clear: '清除',
     clickToShow: '点击显示',
+    revealNsfwCover: '显示 NSFW 封面',
     allAge: '全年龄',
     allAgeTitle: '全年龄作品',
     vndbRating: 'VNDB评分',

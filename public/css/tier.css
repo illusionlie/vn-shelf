@@ -101,6 +101,13 @@
   align-self: center;
 }
 
+/* 卡片包裹层：NSFW 遮罩出嵌为 button 兄弟后承载定位锚点（overlay inset:0 参照），
+   border-radius 与卡片一致供遮罩圆角覆盖（cards-detail.css）；尺寸收缩跟随内部定宽高 button */
+.tier-vn-card-wrap {
+  position: relative;
+  border-radius: 6px;
+}
+
 .tier-vn-card {
   width: 80px;
   height: 110px;
@@ -115,6 +122,13 @@
 }
 
 .tier-vn-card:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-medium);
+}
+
+/* 遮罩出嵌为 button 兄弟后，指针悬停在遮罩上不再触发 button:hover（非其后代），
+   经 wrap:hover 补回卡片浮起，保持遮罩态悬停观感与出嵌前一致 */
+.tier-vn-card-wrap:hover .tier-vn-card {
   transform: scale(1.05);
   box-shadow: var(--shadow-medium);
 }
@@ -265,7 +279,8 @@
 
 /* ===== Reduced Motion ===== */
 @media (prefers-reduced-motion: reduce) {
-  .tier-vn-card:hover {
+  .tier-vn-card:hover,
+  .tier-vn-card-wrap:hover .tier-vn-card {
     transform: none;
   }
 }
