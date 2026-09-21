@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://deepwiki.com/illusionlie/vn-shelf"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
   <a href="https://vn.illusionlie.com/"><img src="https://img.shields.io/badge/Deploy-Cloudflare_Workers-F38020?style=flat-square&logo=cloudflare" alt="Deploy to Cloudflare Workers" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/illusionlie/vn-shelf?style=flat-square" alt="License" /></a>
 </p>
