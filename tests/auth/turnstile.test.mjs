@@ -154,12 +154,22 @@ test('超时中止 → error', async () => {
     init.signal.addEventListener('abort', () => reject(new Error('The operation was aborted')));
   });
 
-  const result = await verifyTurnstileToken({
-    secretKey: 's',
-    token: 't',
-    timeoutMs: 20,
-    fetchImpl
-  });
+  // AbortSignal.timeout 的内部定时器是 unref 的，不维持事件循环：干净环境（CI Linux
+  // runner）下进程会在 20ms 定时器触发前排空，node:test 报 event loop already
+  // resolved 并 cancel 本用例。挂一个 ref'd 定时器把 loop 撑到 abort 之后，finally
+  // 清理，正常路径不拖慢用例。
+  const keepAlive = setTimeout(() => {}, 5000);
 
-  assert.deepEqual(result, { outcome: 'error' });
+  try {
+    const result = await verifyTurnstileToken({
+      secretKey: 's',
+      token: 't',
+      timeoutMs: 20,
+      fetchImpl
+    });
+
+    assert.deepEqual(result, { outcome: 'error' });
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
