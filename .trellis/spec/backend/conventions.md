@@ -812,3 +812,70 @@ if (outcome === 'error') return successResponse({ ok: true });
 // Correct：登录 fail-open 守可用性、测试端点 fail-closed 守真实性
 if (outcome === 'error') return errorResponse('人机验证服务暂时不可用，请稍后重试', 503);
 ```
+
+---
+
+## Scenario: 全年龄判定（allAge，09-28）
+
+### 1. Scope / Trigger
+
+- Trigger：改动 `src/vndb.js` 中 `mapVnObjectToVndbData()` 的 `allAge` 判定、`VN_FIELDS` 标签字段集、或 `ALL_AGE_TAG_RATING` 阈值的变更。
+- 背景：VNDB `/vn` 无分级字段（`content_rating` 实测不存在），`allAge` 只能由 tags 推导。旧规则仅认 g235 "No Sexual Content"，而 VNDB 2025 起不再对新作打该标签（2025-01 抽样 20 部仅 3 部带），新全年龄条目系统性漏判。release 级 `has_ero` 的版本级精度在 per-VN 布尔模型下无法兑现，不引入额外请求。
+
+### 2. Signatures
+
+```js
+// src/vndb.js（模块级）
+const ALL_AGE_TAG_RATING = 0.5; // 标签置信度阈值，三层判定共用
+
+// mapVnObjectToVndbData 内：
+const isReliable = t => !t.lie && t.rating >= ALL_AGE_TAG_RATING;
+hasSexualContent = tags.some(t => t.id === 'g23' && isReliable(t));       // 层1：否决
+hasValidG235     = tags.some(t => t.id === 'g235' && isReliable(t));      // 层2：放行
+hasEroTag        = tags.some(t => t.category === 'ero' && isReliable(t)); // 层3：兜底
+allAge = !hasSexualContent && (hasValidG235 || (tags.length > 0 && !hasEroTag));
+```
+
+### 3. Contracts
+
+- **判定优先级**：g23 本体有效 → 否决；g235 有效 → 全年龄；否则无有效 ero 类目标签 → 全年龄；tags 为空（新条目票未积累）→ 保守 false。
+- **g23 否决层针对混录条目**（18+ 原版与全年龄移植共用条目，g23∧g235 共存实测 100+ 条）：g23 仅被直接投票时才出现在 tags 数组（父标签不随子标签返回），软性作品（Ever17/Higurashi 类 off-screen 性暗示）不会被直接投 g23，天然不受否决影响——共存 100 条抽样中否决层仅命中 2 条 g23/g235 双强争议条目。
+- **g235 必须先于 ero 类目判定**：g235 与软性 ero 标签共存是常态（g235 最新/最老各 100 条抽样中 5~9 条，几乎全是 Ever17/Higurashi/Himawari 类全年龄名作，软性标签为 g3247 "Off Screen Sex Only"、g1280/g3616 "Text-only" 等）——纯 ero 过滤会误杀它们。
+- **spoiler 不参与**：剧透等级不改变内容存在与否；`lie` 标签一律无效；阈值 0.5 防单票噪声（API 返回标签 rating 实测低至 0.07）。
+- **零额外请求**：判定所需字段全在 `VN_FIELDS`（`tags.id/name/rating/category/spoiler/lie`）；判定只允许写在 `mapVnObjectToVndbData`——getVN 与 ulist 导入共用（违反即破坏共享映射契约）。
+
+### 4. Validation & Error Matrix
+
+| 输入画像 | allAge |
+|------|------|
+| g23 有效（含与 g235 共存的混录条目） | false |
+| g235 有效 + 仅软性 ero（g3247 等，Ever17 画像） | true |
+| g23 弱票/lie + g235 有效（Higurashi 画像） | true |
+| 无 g235、无有效 ero、tags 非空（2025+ 新作主场景） | true |
+| 无 g235、存在有效 ero | false |
+| tags 为空 | false |
+| 任意标签 rating < 0.5 或 lie | 该标签不参与任何一层判定 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：调阈值只改 `ALL_AGE_TAG_RATING` 并同步用例边界值（0.5 / 0.49）。
+- Base：新增 VN 元数据字段不触碰三层顺序与共用的 `isReliable`。
+- Bad（禁止）：用 `image.sexual` 推 allAge（只评封面图，职责是 `imageNsfw` 模糊）；判定中过滤 spoiler；g235 不经 g23 否决直接放行（混录条目误盖全年龄章）。
+
+### 6. Tests Required
+
+- `tests/vndb/all-age.test.mjs`：三层优先级 + 四类画像（2025 新作 / Ever17 / Higurashi / 混录）+ lie/弱票/阈值边界（恰 0.5 与 0.49）/ spoiler 不参与 / 空 tags 全覆盖。
+- 存量条目落库值不回填：改判定后需 refreshVN / 重索引才更新（旧规则错判方向是漏章而非错章，不刷也不产生错误徽标）。
+
+### 7. Wrong vs Correct
+
+```js
+// Wrong ①：g235 一票通过（混录条目 18+ 原版被误盖全年龄章）
+const allAge = hasValidG235 || (tags.length > 0 && !hasEroTag);
+
+// Wrong ②：ero 类目优先于 g235（Ever17/Higurashi 的 off-screen 软标签导致误杀）
+const allAge = !hasEroTag || hasValidG235;
+
+// Correct：g23 否决 → g235 放行 → ero 兜底，顺序不可换
+const allAge = !hasSexualContent && (hasValidG235 || (tags.length > 0 && !hasEroTag));
+```

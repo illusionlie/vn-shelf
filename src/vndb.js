@@ -9,12 +9,16 @@ const VNDB_API_URL = 'https://api.vndb.org/kana';
 const UserAgent = 'vn-shelf/2.1.0 (+https://github.com/illusionlie/vn-shelf)';
 
 // VN 元数据字段选择：getVN 与 ulist 的 vn.* 嵌套共用，保证两条路径拉取字段一致
-const VN_FIELDS = 'title, titles.lang, titles.title, titles.main, titles.official, image.url, image.sexual, image.violence, rating, length_minutes, developers.name, tags.id, tags.name, tags.rating, tags.category, tags.spoiler';
+const VN_FIELDS = 'title, titles.lang, titles.title, titles.main, titles.official, image.url, image.sexual, image.violence, rating, length_minutes, developers.name, tags.id, tags.name, tags.rating, tags.category, tags.spoiler, tags.lie';
 
 // ulist label id → 本地状态枚举映射（07-11 固化，见 backend/conventions.md「条目游玩状态枚举」）
 const ULIST_LABEL_TO_STATUS = { 1: 'playing', 2: 'finished', 3: 'stalled', 4: 'dropped', 5: 'wishlist' };
 // 多 label 单值化：终态优先 2(finished) > 4(dropped) > 3(stalled) > 1(playing)
 const STATUS_PRIORITY = ['finished', 'dropped', 'stalled', 'playing'];
+
+// 全年龄判定标签置信度阈值（ero 类目 / g23 / g235 共用）：VNDB 单票低分标签也会返回
+// （实测低至 0.07），低于该值视为噪声票；契约详见 spec backend/conventions.md「全年龄判定」
+const ALL_AGE_TAG_RATING = 0.5;
 
 /**
  * 从标题列表中提取各种语言的标题
@@ -64,8 +68,20 @@ export function mapVnObjectToVndbData(vn) {
   // 提取各种语言的标题
   const titles = extractTitles(source.titles || []);
 
-  // 检查是否有 "No Sexual Content" 标签 (g235)
-  const hasAllAgeTag = (source.tags || []).some(t => t.id === 'g235');
+  // 全年龄判定（契约详见 spec backend/conventions.md「全年龄判定」）：
+  // 1) g23 "Sexual Content" 本体被有效投票 → 一票否决。混录条目（18+ 原版与全年龄移植
+  //    共用条目）g23 与 g235 会共存；g23 仅被直接投票时才出现在 tags 里，软性内容作品
+  //    （Ever17/Higurashi 类 off-screen 性暗示）不会被直接投 g23，不受否决影响。
+  // 2) g235 "No Sexual Content" 有效 → 全年龄。存量权威信号（VNDB 2025 起停发新作），
+  //    且必须先于 ero 类目判定：软性 ero 标签（g3247 "Off Screen Sex Only" 等）属实
+  //    但不构成"非全年龄"。
+  // 3) 否则无任何有效 ero 类目标签 → 全年龄；tags 为空（新条目票未积累）保守判否。
+  //    spoiler 不参与：剧透等级不改变内容存在与否。
+  const tags = source.tags || [];
+  const isReliable = t => !t.lie && t.rating >= ALL_AGE_TAG_RATING;
+  const hasSexualContent = tags.some(t => t.id === 'g23' && isReliable(t));
+  const hasValidG235 = tags.some(t => t.id === 'g235' && isReliable(t));
+  const hasEroTag = tags.some(t => t.category === 'ero' && isReliable(t));
 
   return {
     title: source.title || '', // 英文标题（VNDB主标题）
@@ -77,12 +93,12 @@ export function mapVnObjectToVndbData(vn) {
     length: formatLengthFromMinutes(source.length_minutes),
     lengthMinutes: source.length_minutes || 0,
     developers: (source.developers || []).map(d => d.name),
-    tags: (source.tags || [])
+    tags: tags
       .filter(t => t.rating > 1 && t.category === 'cont' && (!t.spoiler || t.spoiler === 0)) // 只保留评分大于1、内容标签、无剧透的标签
       .sort((a, b) => b.rating - a.rating)
       .slice(0, 10) // 只保留前10个标签
       .map(t => t.name),
-    allAge: hasAllAgeTag // 标记为全年龄作品
+    allAge: !hasSexualContent && (hasValidG235 || (tags.length > 0 && !hasEroTag)) // 标记为全年龄作品
   };
 }
 

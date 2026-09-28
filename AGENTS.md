@@ -30,7 +30,7 @@ src/
 ├── stats.js        # 统计聚合纯函数（computeStats，/api/stats 数据源）
 ├── auth.js         # JWT + 密码哈希认证
 ├── login-ratelimit.js # 登录限流纯函数状态机（evaluateLoginAttempt）
-├── vndb.js         # VNDB API 客户端与字段映射（含 ulist 状态映射常量）
+├── vndb.js         # VNDB API 客户端与字段映射（含 ulist 状态映射常量与全年龄判定）
 └── utils.js        # 通用工具函数
 
 public/
@@ -143,6 +143,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 - 主要方法：`getVN()`、`searchVN()`（search filter + `sort: 'searchrank'`，`GET /api/vndb/search` 数据源）、`getAuthInfo()`（GET `/authinfo`，校验 `listread` 权限）、`fetchUList()`（POST `/ulist` 分页拉取用户列表）
 - 请求方法：`request(endpoint, body, method='POST')`，GET 不带 body（`/authinfo` 用 GET；`/vn`、`/ulist` 默认 POST）
 - 共享映射：`mapVnObjectToVndbData(vn)` 将 VNDB vn 对象转本地格式，`getVN` 与 ulist 导入共用（回归保护）
+- 全年龄判定：`mapVnObjectToVndbData` 内三层规则——g23 "Sexual Content" 本体有效则否决（混录条目）→ g235 "No Sexual Content" 有效则放行（存量信号，VNDB 2025 起停发新作）→ 无有效 ero 类目标签兜底；契约详见 spec backend/conventions.md「全年龄判定」
 - 统一入口：`fetchVNDB()`，默认 3 次重试 + 指数退避
 - 配置来源：`config:settings/vndbApiToken`
 
@@ -173,7 +174,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
     lengthMinutes: 3600,
     developers: ["Key"],
     tags: ["Drama", "Romance"],
-    allAge: false
+    allAge: false // 全年龄判定：三层规则（g23 否决/g235 放行/ero 兜底），见 spec backend/conventions.md「全年龄判定」
   },
   user: {
     titleCn: "自定义中文名",
