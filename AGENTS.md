@@ -62,6 +62,8 @@ public/
         ├── loginPage.js     # 登录页
         └── statsPage.js     # 统计页
 
+docs/               # 用户文档：deployment.md（部署 + Turnstile 可选配置）/ development.md（本地开发）
+
 tests/              # node --test，按域分目录：d1 / public / queue / router / stats / vndb / auth
 
 .github/workflows/
@@ -250,7 +252,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 
 - 测试：`npm run test`（node --test），文件布局见架构树 `tests/`
 - CI（[`ci.yml`](.github/workflows/ci.yml)）：ESLint → Node 测试 → Wrangler deploy dry-run（基于 `wrangler.toml.example` 生成临时配置）
-- 手动部署（[`deploy.yml`](.github/workflows/deploy.yml)，`workflow_dispatch`）：部署前幂等预检/创建 D1 `vn-shelf-db` 与 Queue `vn-index-queue`；所需 Secrets 与配置步骤见 README
+- 手动部署（[`deploy.yml`](.github/workflows/deploy.yml)，`workflow_dispatch`）：部署前幂等预检/创建 D1 `vn-shelf-db` 与 Queue `vn-index-queue`；所需 Secrets 与配置步骤见 [`docs/deployment.md`](docs/deployment.md)，本地开发见 [`docs/development.md`](docs/development.md)
 
 ## 开发注意事项
 
