@@ -436,7 +436,8 @@ await client.request('/vn', { filters: ['search', '=', q], fields, sort: 'search
 
 ### 3. Contracts
 
-- Secrets：`WORKER_NAME`、`CF_API_TOKEN` 必填；`CF_D1_DATABASE_ID` **可选覆盖**；`CF_ACCOUNT_ID`、`CUSTOM_DOMAIN` 可选。
+- Secrets：`CF_API_TOKEN` 必填；`WORKER_NAME`、`CF_D1_DATABASE_ID` **可选覆盖**；`CF_ACCOUNT_ID`、`CUSTOM_DOMAIN` 可选。
+- Worker 名缺省链：`Generate wrangler.toml` 步骤 env `WORKER_NAME=${{ secrets.WORKER_NAME }}`，run 内 `${WORKER_NAME:-vn-shelf}` 兜底后注入模板（默认 `vn-shelf`，与 D1 的「可选覆盖」语义对齐）。
 - Token 权限：Workers 编辑模板 + **D1 Edit** + **Queues Edit**（创建资源必需）。
 - Step env：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`WRANGLER_HIDE_BANNER="true"`、`WRANGLER_SEND_METRICS="false"`、`D1_NAME=vn-shelf-db`、`QUEUE_NAME=vn-index-queue`、`PROVIDED_D1_ID=${{ secrets.CF_D1_DATABASE_ID }}`。
 - `D1_NAME` / `QUEUE_NAME` 与 `wrangler.toml.example` 的 `database_name` / `queue` **同值约定**，改一处必改另一处。

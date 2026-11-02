@@ -21,9 +21,10 @@ jobs:
       - name: Validate Secrets
         run: |
           echo "Validating secrets..."
-          if [ -z "${{ secrets.WORKER_NAME }}" ]; then
-            echo "::error::Secret WORKER_NAME is not set. Please add it to your repository secrets."
-            exit 1
+          if [ -n "${{ secrets.WORKER_NAME }}" ]; then
+            echo "WORKER_NAME is set: will deploy the provided worker name."
+          else
+            echo "WORKER_NAME is not set: will use the default worker name 'vn-shelf'."
           fi
           if [ -z "${{ secrets.CF_API_TOKEN }}" ]; then
             echo "::error::Secret CF_API_TOKEN is not set. Please add it to your repository secrets."
@@ -125,8 +126,11 @@ jobs:
           fi
 
       - name: Generate wrangler.toml from template
+        env:
+          WORKER_NAME: ${{ secrets.WORKER_NAME }}
         run: |
-          sed -e "s/__WORKER_NAME__/${{ secrets.WORKER_NAME }}/g" \
+          WORKER_NAME="${WORKER_NAME:-vn-shelf}"
+          sed -e "s/__WORKER_NAME__/$WORKER_NAME/g" \
             -e "s/__D1_DATABASE_ID__/${{ steps.ensure_resources.outputs.d1_id }}/g" \
             wrangler.toml.example > wrangler.toml
           if [[ -n "${{ secrets.CUSTOM_DOMAIN }}" ]]; then
