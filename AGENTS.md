@@ -35,7 +35,7 @@ src/
 
 public/
 ├── index.html / login.html / settings.html / stats.html / tier.html
-├── cover.webp / favicon.ico / robots.txt
+├── cover.webp / favicon.ico / favicon.svg / social.png / robots.txt
 ├── css/                # base（全站共享）→ forms → cards-detail → 页面级样式
 └── js/
     ├── app.js            # Alpine.js 入口（i18n 初始化 + 壳层注入 + 组件注册）

@@ -27,6 +27,15 @@
   color: var(--primary-text-color);
 }
 
+/* 品牌图标（favicon.svg 同源）：必须为 .login-title 的前置兄弟节点——
+   site-identity.js 以 textContent 独占写入 h1，内嵌子节点会被覆写 */
+.login-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+}
+
 /* ===== Responsive - 480 (紧凑手机) ===== */
 @media screen and (max-width: 480px) {
   .login-box {

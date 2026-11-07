@@ -273,6 +273,14 @@ main.container {
   gap: 10px;
 }
 
+/* 品牌图标（favicon.svg 同源）；SVG 自带 squircle 透明圆角，无需再切角 */
+.banner-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
 .banner-title {
   font-size: 1.5rem;
   font-weight: 700;
