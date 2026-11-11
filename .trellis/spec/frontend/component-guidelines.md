@@ -105,11 +105,13 @@ Do NOT invent a prop-passing API; Alpine's reactivity model doesn't need one. If
 
 ## Styling Patterns
 
-- **Single global stylesheet**: `public/css/style.css` (~1900 lines), served as-is by Worker Assets. No CSS-modules, Tailwind, styled-components, or build-time processing.
-- **Class naming**: BEM-ish scoped by component (`.vn-card`, `.vn-card-image-wrapper`, `.modal`, `.modal-header`, `.tier-vn-card`, `.toast`, `.toast-error`). Convention: block-element-modifier via hyphens; state classes `.active` / `.dragging` / `.hidden` toggled by Alpine `:class`.
-- **Alpine binds DOM ↔ field**: prefers `x-show` / `:class` / `:style` over imperative DOM ops. Inline `:style` is allowed only for truly dynamic per-instance values (e.g. NSFW overlay radius, dragged-card transform) — structural styling goes in `style.css`.
-- **Dark mode**: `body.dark-mode` class (set by `theme.js` from `localStorage.theme`) overrides CSS variables; do not write `prefers-color-scheme` media queries — the toggle is manual.
-- **Focus-visible**: every interactive element should have a visible `:focus-visible` outline. The project has historically under-covered this (B3 audit found only ~7 focus selectors) — when adding new interactive elements, add the `:focus-visible` rule alongside the install.
+细则（CSS 模块归属与 `<link>` 顺序、断点、动效时长、焦点环、主题挂载点）都在 `quality-guidelines.md`；此处只记组件侧的写法约定：
+
+- **CSS 是拆分的页面级模块，不存在单一 `style.css`**：`public/css/` 下按 `base` → `forms` → `cards-detail` → 页面文件 的顺序 `<link>`，后者可覆盖前者。组件样式就近落页面模块；被 JS 注入的共享 DOM（壳层 / 页脚 / markdown）或 3+ 页面共用的类才上提到 `base.css`。
+- **类名 BEM-ish**：块-元素-修饰词用连字符（`.vn-card` / `.vn-card-image-wrapper` / `.modal-header`），状态类 `.active` / `.dragging` / `.hidden` 由 Alpine `:class` 切换。
+- **Alpine 绑定 DOM ↔ 字段**：优先 `x-show` / `:class` / `:style` 而非命令式 DOM 操作。内联 `:style` 只留给真正的逐实例动态值（NSFW 遮罩圆角、拖拽卡片 transform）；结构性布局一律进页面 CSS 模块的具名类，页面标记里不写 `style=`。
+- **暗色主题 class 挂在 `<html>`**：`html.dark-mode`，由各页 `<head>` 的内联脚本在首帧前写入（`theme.js` 的 `initTheme()` **不**负责写这个 class）。组件里不要写 `prefers-color-scheme` 媒体查询，也不要用 `body.dark-mode`——主题是手动开关，系统偏好只是无存储值时的初值。
+- **键盘焦点环来自 `base.css` 的唯一一条全局规则**（`--focus-ring` + `:is(a, button, [role="button"], select, input, textarea):focus-visible`）。新交互元素只要是原生控件或带 `role="button"` 就自动获得焦点环，**不要**自己写 `outline`：自己写会与全局规则打架，而漏写则是「加了个点不到的元素也看不出问题」的隐性 a11y 缺陷。
 
 ---
 
@@ -259,3 +261,41 @@ applyRefreshedEntry(entry) {
 ```
 
 **Related**：quality-guidelines.md「reduced-motion counterpart」与「Motion timing scale」（09-15）；上方「弹窗生命周期守卫（withModalGuard，09-12）」。
+
+---
+
+## Scenario: 长表单页按配置类型分页（tablist，11-10 固化，样板：设置页）
+
+**What**：一个塞得很长的表单页（设置）按「管的是什么」拆成 5 个分类，桌面左侧栏 / 窄屏顶部横滑标签，同一时刻只显示一个面板。样板：`public/settings.html` + `public/js/components/settingsPage.js` + `public/js/settings-tabs.js` + `public/css/settings.css`。
+
+**结构**：
+
+```js
+// settings-tabs.js —— 纯模块：零 DOM / API / i18n import、无副作用（同 tier-diff.js 口径）
+export const SETTINGS_TABS = Object.freeze(['vndb', 'appearance', 'tags', 'security', 'data']);
+export function resolveSettingsTab(hash)      // hash → 分类 id；空 / 未知 / 原型键一律回落默认
+export function nextSettingsTab(current, key) // 键盘 key → 目标分类；非导航键返回 null
+
+// settingsPage.js
+activeTab: resolveSettingsTab(window.location.hash),  // 工厂内即取值——首帧就是正确分类，不闪默认分类
+setupTabs() { window.addEventListener('hashchange', …); new ResizeObserver(() => this._syncNavLayout()); }
+_applyTab(tab) { this.activeTab = tab; window.scrollTo({ top: 0, behavior: 'instant' }); … }
+selectTab(id)  { this._applyTab(tab); history.replaceState(history.state, '', `#${tab}`); }
+```
+
+**契约要点**：
+
+- **分类 id 三处同值**：DOM id 后缀（`settings-tab-<id>` / `settings-panel-<id>`）、URL hash、纯模块的 `SETTINGS_TABS`。手写标记与常量表必然漂移，所以 `tests/public/settings-tabs.test.mjs` 读 `settings.html` 源码钉住：两侧顺序与取值全等、tab↔panel 的 `aria-controls`/`aria-labelledby` 互指、`<main>` 内无内联 `style=`。**读源码的正则必须锚定结束的 `>`**（`<div[^>]*id="…"[^>]*>`）——只用 `<div[^>]*id="…"` 时 `[^>]*` 会越过首个 `>` 一路吃到下一个元素，把嵌套结构里的元素误判成标签本身。
+- **面板一律 `x-show` + `x-cloak`，绝不用 `x-if`**：`x-if` 销毁 DOM，会丢掉已输入未保存的值、常驻 `x-ref`（Turnstile 测试容器）与轮询绑定。`x-cloak` 防 Alpine 接管前所有面板同时闪现。
+- **hash 是当前分类的镜像，不是第二事实源**：`selectTab` 走 `replaceState`（后退键该离开设置页，而不是逐个倒回分类）；`replaceState` 不派发 `hashchange`，不会自触发。分类 id 不得与页面内任何元素 id 相同，否则原生锚点滚动会插一脚。
+- **`aria-orientation` 跟随渲染结果，不跟随断点常量**：导航桌面纵向、窄屏横排，朝向读 computed `flex-direction` 同步——CSS 是唯一事实源，断点数值不重复写进 JS。方向键两轴都接受（两套都自然），这个属性只影响读屏播报口径。
+- **导航尺寸相关的呈现统一挂一个 ResizeObserver**：不只是「选中项居中」——`en` 词典懒加载会在首屏之后二次写入文案、改变标签宽度，窗口缩放同理。RO 回调只写 `navOrientation`（同值不触发 Alpine effect）与 `scrollLeft`（不改 border-box 尺寸），无回环。
+- **横滑导航里把选中项带入视野靠写主滚动容器的 `scrollLeft`，不要用 `scrollIntoView`**：后者会连带滚动整个页面，在刷新时与浏览器的滚动位置恢复打架。
+- **页面专属字段宽度用页面根上的自定义属性分档**：`.settings-layout { --settings-field-short: 360px; --settings-field-long: 560px }`，移动档只把变量改成 `100%`。`forms.css` 的全局默认（`width: 100%`）不动，其他页面的表单因此零影响。长档的「输入框 + 按钮」行让输入框 `flex: 1; min-width: 0`、按钮 `flex-shrink: 0; white-space: nowrap`，否则按钮会被挤成竖排两行。
+- **选中项不要比未选中项更难读**：色板里 `--accent-color`（#007AFF）的亮度高于 `--secondary-text-color`，所以「accent 文字 + accent tint 底」的常规选中写法在浅色档约 3.0:1、深色档约 3.4:1，而同一容器里的未选中项是浅 3.8 / 深 5.2 —— 选中项反而最不清晰。正确写法是 **accent tint 底 + `--primary-text-color` 文字 + accent 图标**：底色承担「当前位置」，色相提示交给图标。
+- **`window.scrollTo({ behavior: 'instant' })` 是有意的例外**：切分类 = 换一屏内容，不走 `base.css` 的 `html { scroll-behavior: smooth }`（否则新面板边滚边换）。这与 `layout.js` 回顶按钮「省略 `behavior`、把 smooth-vs-instant 交给 CSS」的选择**方向相反且都正确**——回顶是页内导航，切分类是内容替换。不要来「统一」这两处。
+- **状态点用可读文本，不只靠颜色**：`role="tab"` 内的运行中指示点写 `role="img"` + `data-i18n-aria-label` / `data-i18n-title`。代价是该文本会并入 tab 的可访问名（读屏读成「VNDB 同步 任务进行中」）；若将来要避免名字长度抖动，改用 `aria-describedby` + 视觉隐藏文本。
+
+**Why**：设置页原状是 9 个分区纵向堆一页、控件横贯 1247px（1440 视口），整页 3779px；「保存」「清除」因无防收缩被压成竖排。分页后每类 900–1245px，字段宽度与它装的内容相称（短档 360 / 长档 560）。
+
+**Related**：quality-guidelines.md（CSS 模块归属与断点约束、全局 `:focus-visible` 单一来源、reduced-motion 同文件配对、内联样式禁令）；`state-management.md`（组件局部状态的生命周期）。

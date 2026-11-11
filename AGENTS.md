@@ -52,6 +52,7 @@ public/
     ├── translations.js   # Tags 翻译与 IndexedDB 缓存
     ├── tier-diff.js      # Tier 拖拽 diff 纯函数
     ├── vn-list-item.js   # 完整条目 → 列表项合并纯函数
+    ├── settings-tabs.js  # 设置页分类纯函数（分类 id / hash 解析 / 键盘漫游目标）
     ├── vendor/           # 自托管第三方依赖（fetch-vendor.cjs 拉取脚本）
     └── components/
         ├── shared.js        # 跨页面共享 mixin（tags 视图 + 详情弹窗 + 管理员动作 refreshVN/deleteVN）
@@ -244,7 +245,7 @@ tests/              # node --test，按域分目录：d1 / public / queue / rout
 |------|------|
 | `vnShelf` | 主页书架：列表/搜索/排序、详情与编辑弹窗、渲染窗口化（哨兵追加 + 加载更多）、管理员单条目 VNDB 刷新 |
 | `tierlistPage` | Tier List：拖拽排序、跨 Tier 移动、分片批量提交（单批上限 200）、详情弹窗管理员刷新 + 删除（就地生效） |
-| `settingsPage` | 设置：VNDB Token、密码、索引、导入导出、外观、语言切换 |
+| `settingsPage` | 设置：左侧栏 5 分类分页（VNDB 同步 / 外观 / Tags / 安全 / 数据；`/settings#<分类 id>` 可直达，≤768px 收成顶部横滑标签），涵盖 VNDB Token、ulist 导入、索引、外观、语言切换、Tags、密码、Turnstile、导入导出 |
 | `loginPage` | 登录/初始化 |
 | `statsPage` | 统计数据展示 |
 
