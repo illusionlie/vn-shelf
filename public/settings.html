@@ -93,374 +93,553 @@
 
   <!-- 主内容 -->
   <main class="container">
-    <h1 class="page-title" data-i18n="settings.pageTitle"></h1>
+    <div class="settings-layout">
+      <h1 class="page-title" data-i18n="settings.pageTitle"></h1>
 
-    <!-- VNDB API设置 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title">VNDB API</h2>
-
-      <div class="form-group">
-        <label class="form-label">API Token</label>
-        <div style="display: flex; gap: 12px;">
-          <input
-            type="password"
-            class="form-input"
-            x-model="vndbApiToken"
-            data-i18n-placeholder="settings.tokenPlaceholder"
-          >
-          <button class="btn btn-primary" @click="saveVndbToken()" :disabled="isLoading" data-i18n="common.save">
-          </button>
-        </div>
-        <p class="form-hint">
-          <span data-i18n="settings.tokenStatusLabel"></span> <span x-text="config.hasVndbApiToken ? $t('settings.configured') : $t('settings.notConfigured')"></span>
-          <span data-i18n="settings.tokenGetPrefix"></span> <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> <span data-i18n="settings.tokenGetSuffix"></span>
-        </p>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" data-i18n="settings.ulistImportLabel"></label>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <button
-            class="btn btn-primary"
-            @click="startUListImport()"
-            :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
-            data-i18n="settings.ulistImportButton"
-          >
-          </button>
-        </div>
-        <p class="form-hint" data-i18n="settings.ulistImportHint"></p>
-      </div>
-    </section>
-
-    <!-- 密码设置 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="common.adminPassword"></h2>
-
-      <div class="form-group">
-        <label class="form-label" data-i18n="settings.newPasswordLabel"></label>
-        <input
-          type="password"
-          class="form-input"
-          x-model="newPassword"
-          data-i18n-placeholder="common.passwordMinPlaceholder"
-          minlength="6"
+      <!-- 分类导航。分类 id 三处同值：DOM id 后缀 / URL hash（/settings#tags 直达）/
+           settings-tabs.js 的 SETTINGS_TABS，由 tests/public/settings-tabs.test.mjs 钉住。
+           桌面为吸顶侧栏，≤768px 收成一行横滑条；aria-orientation 随渲染形态由
+           settingsPage._syncNavLayout 同步。方向键两轴都能切换（onTabKeydown）——
+           横排时用 ←→ 更自然，竖排时用 ↑↓ 更自然，两套都保留 -->
+      <div
+        class="settings-nav"
+        role="tablist"
+        :aria-orientation="navOrientation"
+        data-i18n-aria-label="settings.navLabel"
+        @keydown="onTabKeydown($event)"
+      >
+        <button
+          type="button"
+          class="settings-nav-item"
+          id="settings-tab-vndb"
+          role="tab"
+          aria-controls="settings-panel-vndb"
+          :class="{ 'active': activeTab === 'vndb' }"
+          :aria-selected="activeTab === 'vndb' ? 'true' : 'false'"
+          :tabindex="activeTab === 'vndb' ? 0 : -1"
+          @click="selectTab('vndb')"
         >
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" data-i18n="settings.confirmPasswordLabel"></label>
-        <input
-          type="password"
-          class="form-input"
-          x-model="confirmPassword"
-          data-i18n-placeholder="settings.confirmPasswordPlaceholder"
-        >
-      </div>
-
-      <button class="btn btn-primary" @click="changePassword()" :disabled="isLoading" data-i18n="settings.changePassword">
-      </button>
-    </section>
-
-    <!-- 登录人机验证（Cloudflare Turnstile） -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.turnstileSectionTitle"></h2>
-
-      <div class="form-group">
-        <label class="form-label" for="turnstileSiteKeyInput" data-i18n="settings.turnstileSiteKeyLabel"></label>
-        <input
-          type="text"
-          id="turnstileSiteKeyInput"
-          class="form-input"
-          maxlength="200"
-          autocomplete="off"
-          spellcheck="false"
-          x-model="turnstileSiteKey"
-          data-i18n-placeholder="settings.turnstileSiteKeyPlaceholder"
-        >
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" for="turnstileSecretInput" data-i18n="settings.turnstileSecretLabel"></label>
-        <input
-          type="password"
-          id="turnstileSecretInput"
-          class="form-input"
-          maxlength="200"
-          autocomplete="new-password"
-          x-model="turnstileSecretKey"
-          data-i18n-placeholder="settings.turnstileSecretPlaceholder"
-        >
-        <!-- 配置状态行：两键齐 = 已启用；半配 = 未启用；全空 = 未配置 -->
-        <p class="form-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span data-i18n="settings.tabVndb"></span>
+          <!-- 索引 / ulist 导入进行中：分页后在其他分类看不到进度区，靠这个点提示任务仍在跑 -->
           <span
-            x-text="turnstileStatusKey === 'enabled'
-              ? $t('settings.turnstileStatusEnabled')
-              : (turnstileStatusKey === 'half' ? $t('settings.turnstileStatusHalf') : $t('settings.notConfigured'))"
+            class="settings-nav-dot"
+            role="img"
+            data-i18n-aria-label="settings.taskRunning"
+            data-i18n-title="settings.taskRunning"
+            x-show="isIndexTaskActive(indexStatus?.status)"
+            x-cloak
           ></span>
-        </p>
-      </div>
+        </button>
 
-      <!-- 临时测试 widget 容器（测试进行时可见，用完由 turnstile.remove 清理） -->
-      <div class="turnstile-box" x-ref="turnstileTestBox" x-show="isTestingTurnstile"></div>
-
-      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button
-          class="btn btn-secondary"
-          @click="testTurnstile()"
-          :disabled="isTestingTurnstile || isLoading"
-          data-i18n="settings.turnstileTestButton"
+          type="button"
+          class="settings-nav-item"
+          id="settings-tab-appearance"
+          role="tab"
+          aria-controls="settings-panel-appearance"
+          :class="{ 'active': activeTab === 'appearance' }"
+          :aria-selected="activeTab === 'appearance' ? 'true' : 'false'"
+          :tabindex="activeTab === 'appearance' ? 0 : -1"
+          @click="selectTab('appearance')"
         >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span data-i18n="settings.tabAppearance"></span>
         </button>
-        <button class="btn btn-primary" @click="saveTurnstile()" :disabled="isLoading" data-i18n="common.save">
-        </button>
-      </div>
 
-      <p class="form-hint mt-4" data-i18n="settings.turnstileHintKeys"></p>
-      <p class="form-hint" data-i18n="settings.turnstileHintDomain"></p>
-      <p class="form-hint" data-i18n="settings.turnstileHintSave"></p>
-    </section>
-
-    <!-- 索引管理 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.indexSectionTitle"></h2>
-
-      <template x-if="indexStatus">
-        <div class="mb-4">
-          <p class="text-muted">
-            <span data-i18n="settings.taskTypeLabel"></span> <strong x-text="formatTaskType(indexStatus.type)"></strong>
-          </p>
-          <p class="text-muted">
-            <span data-i18n="settings.statusLabel"></span> <strong x-text="formatStatus(indexStatus.status)"></strong>
-            <span x-show="isIndexTaskActive(indexStatus.status)">
-              <span data-i18n="settings.progressLabel"></span> <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
-            </span>
-          </p>
-          <p class="text-muted" x-show="indexStatus.skipped > 0">
-            <span data-i18n="settings.skippedLabel"></span> <span x-text="indexStatus.skipped"></span>
-          </p>
-          <p class="text-muted" x-show="indexStatus.startedAt">
-            <span data-i18n="settings.startedAtLabel"></span> <span x-text="formatDateTime(indexStatus.startedAt)"></span>
-          </p>
-          <p class="text-muted" x-show="indexStatus.completedAt">
-            <span data-i18n="settings.completedAtLabel"></span> <span x-text="formatDateTime(indexStatus.completedAt)"></span>
-          </p>
-          <p class="text-muted" x-show="indexStatus.lastReconciledAt">
-            <span data-i18n="settings.lastReconciledLabel"></span> <span x-text="formatDateTime(indexStatus.lastReconciledAt)"></span>
-          </p>
-          <p class="text-muted" x-show="indexStatus.error">
-            <span data-i18n="settings.noteLabel"></span> <span x-text="indexStatus.error"></span>
-          </p>
-          <p class="text-muted" x-show="indexStatus.failed?.length > 0">
-            <span data-i18n="settings.failedLabel"></span> <span x-text="indexStatus.failed.join(', ')"></span>
-          </p>
-        </div>
-      </template>
-
-      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button
-          class="btn btn-primary"
-          @click="startIndex()"
-          :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
-          data-i18n="settings.startIndexButton"
+          type="button"
+          class="settings-nav-item"
+          id="settings-tab-tags"
+          role="tab"
+          aria-controls="settings-panel-tags"
+          :class="{ 'active': activeTab === 'tags' }"
+          :aria-selected="activeTab === 'tags' ? 'true' : 'false'"
+          :tabindex="activeTab === 'tags' ? 0 : -1"
+          @click="selectTab('tags')"
         >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          </svg>
+          <span data-i18n="settings.tabTags"></span>
         </button>
-        <button class="btn btn-secondary" @click="loadIndexStatus()" data-i18n="settings.refreshStatus">
+
+        <button
+          type="button"
+          class="settings-nav-item"
+          id="settings-tab-security"
+          role="tab"
+          aria-controls="settings-panel-security"
+          :class="{ 'active': activeTab === 'security' }"
+          :aria-selected="activeTab === 'security' ? 'true' : 'false'"
+          :tabindex="activeTab === 'security' ? 0 : -1"
+          @click="selectTab('security')"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span data-i18n="settings.tabSecurity"></span>
+        </button>
+
+        <button
+          type="button"
+          class="settings-nav-item"
+          id="settings-tab-data"
+          role="tab"
+          aria-controls="settings-panel-data"
+          :class="{ 'active': activeTab === 'data' }"
+          :aria-selected="activeTab === 'data' ? 'true' : 'false'"
+          :tabindex="activeTab === 'data' ? 0 : -1"
+          @click="selectTab('data')"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+          <span data-i18n="settings.tabData"></span>
         </button>
       </div>
 
-      <p class="form-hint mt-4" data-i18n="settings.indexHint">
-      </p>
-    </section>
+      <!-- 面板一律 x-show（不用 x-if）：切换分类不销毁 DOM，已输入未保存的值、Turnstile
+           测试容器（x-ref）与索引轮询都保持原样；x-cloak 防 Alpine 接管前闪现全部分类 -->
+      <div class="settings-panels">
+        <!-- ========== VNDB 同步：Token / ulist 导入 / 数据索引 ========== -->
+        <div
+          class="settings-panel"
+          id="settings-panel-vndb"
+          role="tabpanel"
+          aria-labelledby="settings-tab-vndb"
+          x-show="activeTab === 'vndb'"
+          x-cloak
+        >
+          <!-- VNDB API设置 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title">VNDB API</h2>
 
-    <!-- Tags 设置 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.tagsSectionTitle"></h2>
-
-      <div class="form-group">
-        <label class="form-label" data-i18n="settings.tagsSourceLabel"></label>
-        <div class="radio-group">
-          <label class="radio-label">
-            <input type="radio" name="tagsMode" value="vndb" x-model="config.tagsMode" @change="saveTagsConfig()">
-            <span data-i18n="settings.tagsModeVndb"></span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="tagsMode" value="manual" x-model="config.tagsMode" @change="saveTagsConfig()">
-            <span data-i18n="settings.tagsModeManual"></span>
-          </label>
-        </div>
-        <p class="form-hint" data-i18n="settings.tagsModeHint"></p>
-      </div>
-
-      <!-- VNDB Tags 翻译设置 -->
-      <template x-if="config.tagsMode === 'vndb'">
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" x-model="config.translateTags" @change="saveTagsConfig()">
-            <span data-i18n="settings.translateTagsLabel"></span>
-          </label>
-          <p class="form-hint" data-i18n="settings.translateTagsHint"></p>
-        </div>
-      </template>
-
-      <!-- 翻译文件 URL -->
-      <template x-if="config.tagsMode === 'vndb' && config.translateTags">
-        <div class="form-group">
-          <label class="form-label" data-i18n="settings.translationUrlLabel"></label>
-          <div style="display: flex; gap: 12px;">
-            <input
-              type="url"
-              class="form-input"
-              x-model="config.translationUrl"
-              data-i18n-placeholder="settings.translationUrlPlaceholder"
-            >
-            <button class="btn btn-secondary" @click="saveTagsConfig()" :disabled="isLoading" data-i18n="common.save">
-            </button>
-          </div>
-          <p class="form-hint" data-i18n="settings.translationUrlHint"></p>
-
-          <!-- 翻译缓存状态 -->
-          <template x-if="translationCacheStatus">
-            <div class="cache-status mt-4">
-              <p class="text-muted">
-                <span data-i18n="settings.cacheStatusLabel"></span>
-                <strong x-text="translationCacheStatus.version || $t('common.unknown')"></strong>
-                <span x-show="translationCacheStatus.updatedAt">
-                  <span data-i18n="settings.updatedAtPrefix"></span> <span x-text="formatDate(translationCacheStatus.updatedAt)"></span>
-                </span>
+            <div class="form-group">
+              <label class="form-label" for="vndbTokenInput">API Token</label>
+              <div class="settings-input-row">
+                <input
+                  type="password"
+                  id="vndbTokenInput"
+                  class="form-input"
+                  x-model="vndbApiToken"
+                  data-i18n-placeholder="settings.tokenPlaceholder"
+                >
+                <button class="btn btn-primary" @click="saveVndbToken()" :disabled="isLoading" data-i18n="common.save">
+                </button>
+              </div>
+              <p class="form-hint">
+                <span data-i18n="settings.tokenStatusLabel"></span> <span x-text="config.hasVndbApiToken ? $t('settings.configured') : $t('settings.notConfigured')"></span>
+                <span data-i18n="settings.tokenGetPrefix"></span> <a href="https://vndb.org/u/tokens" target="_blank">VNDB</a> <span data-i18n="settings.tokenGetSuffix"></span>
               </p>
-              <p class="text-muted">
-                <span data-i18n="settings.cachedCountPrefix"></span> <strong x-text="translationCacheStatus.count || 0"></strong> <span data-i18n="settings.cachedCountSuffix"></span>
-              </p>
-              <button class="btn btn-secondary btn-sm mt-2" @click="clearTranslationCache()" data-i18n="settings.clearCache">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" data-i18n="settings.ulistImportLabel"></label>
+              <div class="settings-actions">
+                <button
+                  class="btn btn-primary"
+                  @click="startUListImport()"
+                  :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
+                  data-i18n="settings.ulistImportButton"
+                >
+                </button>
+              </div>
+              <p class="form-hint" data-i18n="settings.ulistImportHint"></p>
+            </div>
+          </section>
+
+          <!-- 索引管理 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.indexSectionTitle"></h2>
+
+            <template x-if="indexStatus">
+              <div class="mb-4">
+                <p class="text-muted">
+                  <span data-i18n="settings.taskTypeLabel"></span> <strong x-text="formatTaskType(indexStatus.type)"></strong>
+                </p>
+                <p class="text-muted">
+                  <span data-i18n="settings.statusLabel"></span> <strong x-text="formatStatus(indexStatus.status)"></strong>
+                  <span x-show="isIndexTaskActive(indexStatus.status)">
+                    <span data-i18n="settings.progressLabel"></span> <span x-text="indexStatus.processed"></span>/<span x-text="indexStatus.total"></span>
+                  </span>
+                </p>
+                <p class="text-muted" x-show="indexStatus.skipped > 0">
+                  <span data-i18n="settings.skippedLabel"></span> <span x-text="indexStatus.skipped"></span>
+                </p>
+                <p class="text-muted" x-show="indexStatus.startedAt">
+                  <span data-i18n="settings.startedAtLabel"></span> <span x-text="formatDateTime(indexStatus.startedAt)"></span>
+                </p>
+                <p class="text-muted" x-show="indexStatus.completedAt">
+                  <span data-i18n="settings.completedAtLabel"></span> <span x-text="formatDateTime(indexStatus.completedAt)"></span>
+                </p>
+                <p class="text-muted" x-show="indexStatus.lastReconciledAt">
+                  <span data-i18n="settings.lastReconciledLabel"></span> <span x-text="formatDateTime(indexStatus.lastReconciledAt)"></span>
+                </p>
+                <p class="text-muted" x-show="indexStatus.error">
+                  <span data-i18n="settings.noteLabel"></span> <span x-text="indexStatus.error"></span>
+                </p>
+                <p class="text-muted" x-show="indexStatus.failed?.length > 0">
+                  <span data-i18n="settings.failedLabel"></span> <span x-text="indexStatus.failed.join(', ')"></span>
+                </p>
+              </div>
+            </template>
+
+            <div class="settings-actions">
+              <button
+                class="btn btn-primary"
+                @click="startIndex()"
+                :disabled="isLoading || isIndexTaskActive(indexStatus?.status)"
+                data-i18n="settings.startIndexButton"
+              >
+              </button>
+              <button class="btn btn-secondary" @click="loadIndexStatus()" data-i18n="settings.refreshStatus">
               </button>
             </div>
-          </template>
+
+            <p class="form-hint mt-4" data-i18n="settings.indexHint">
+            </p>
+          </section>
         </div>
-      </template>
-    </section>
 
-    <!-- 外观设置 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.appearanceSectionTitle"></h2>
-
-      <div class="form-group">
-        <label class="form-label" for="ownerNameInput" data-i18n="settings.ownerNameLabel"></label>
-        <input
-          type="text"
-          id="ownerNameInput"
-          class="form-input"
-          maxlength="30"
-          autocomplete="off"
-          x-model="config.ownerName"
-          data-i18n-placeholder="settings.ownerNamePlaceholder"
+        <!-- ========== 外观：站点名 / 背景 / 语言 ========== -->
+        <div
+          class="settings-panel"
+          id="settings-panel-appearance"
+          role="tabpanel"
+          aria-labelledby="settings-tab-appearance"
+          x-show="activeTab === 'appearance'"
+          x-cloak
         >
-      </div>
+          <!-- 外观设置 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.appearanceSectionTitle"></h2>
 
-      <div class="form-group">
-        <label class="form-label" data-i18n="settings.backgroundUrlLabel"></label>
-        <div style="display: flex; gap: 12px;">
-          <input
-            type="url"
-            class="form-input"
-            x-model="config.backgroundUrl"
-            data-i18n-placeholder="settings.backgroundUrlPlaceholder"
-          >
-          <button
-            class="btn btn-secondary"
-            @click="config.backgroundUrl = ''; previewBackground()"
-            :disabled="!config.backgroundUrl"
-            data-i18n="common.clear"
-          >
-          </button>
+            <div class="form-group">
+              <label class="form-label" for="ownerNameInput" data-i18n="settings.ownerNameLabel"></label>
+              <input
+                type="text"
+                id="ownerNameInput"
+                class="form-input"
+                maxlength="30"
+                autocomplete="off"
+                x-model="config.ownerName"
+                data-i18n-placeholder="settings.ownerNamePlaceholder"
+              >
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="backgroundUrlInput" data-i18n="settings.backgroundUrlLabel"></label>
+              <div class="settings-input-row">
+                <input
+                  type="url"
+                  id="backgroundUrlInput"
+                  class="form-input"
+                  x-model="config.backgroundUrl"
+                  data-i18n-placeholder="settings.backgroundUrlPlaceholder"
+                >
+                <button
+                  class="btn btn-secondary"
+                  @click="config.backgroundUrl = ''; previewBackground()"
+                  :disabled="!config.backgroundUrl"
+                  data-i18n="common.clear"
+                >
+                </button>
+              </div>
+              <p class="form-hint" data-i18n="settings.backgroundUrlHint"></p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="backgroundOverlayInput">
+                <span data-i18n="settings.overlayOpacityLabel"></span> <span x-text="Math.round((config.backgroundOverlay ?? 0.5) * 100) + '%'"></span>
+              </label>
+              <input
+                type="range"
+                id="backgroundOverlayInput"
+                class="form-range"
+                min="0"
+                max="1"
+                step="0.05"
+                x-model.number="config.backgroundOverlay"
+                @input="previewBackground()"
+              >
+              <p class="form-hint" data-i18n="settings.overlayOpacityHint"></p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="backgroundBlurInput">
+                <span data-i18n="settings.blurLabel"></span> <span x-text="(config.backgroundBlur ?? 4) + 'px'"></span>
+              </label>
+              <input
+                type="range"
+                id="backgroundBlurInput"
+                class="form-range"
+                min="0"
+                max="20"
+                step="1"
+                x-model.number="config.backgroundBlur"
+                @input="previewBackground()"
+              >
+              <p class="form-hint" data-i18n="settings.blurHint"></p>
+            </div>
+
+            <button class="btn btn-primary" @click="saveAppearanceConfig()" :disabled="isLoading" data-i18n="settings.saveAppearance">
+            </button>
+          </section>
+
+          <!-- 语言设置 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.languageSectionTitle"></h2>
+
+            <div class="form-group">
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="uiLocale" value="zh-CN" x-model="locale" @change="changeLocale()">
+                  <span>简体中文</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="uiLocale" value="en" x-model="locale" @change="changeLocale()">
+                  <span>English</span>
+                </label>
+              </div>
+              <p class="form-hint" data-i18n="settings.languageHint"></p>
+            </div>
+          </section>
         </div>
-        <p class="form-hint" data-i18n="settings.backgroundUrlHint"></p>
-      </div>
 
-      <div class="form-group">
-        <label class="form-label">
-          <span data-i18n="settings.overlayOpacityLabel"></span> <span x-text="Math.round((config.backgroundOverlay ?? 0.5) * 100) + '%'"></span>
-        </label>
-        <input
-          type="range"
-          class="form-range"
-          min="0"
-          max="1"
-          step="0.05"
-          x-model.number="config.backgroundOverlay"
-          @input="previewBackground()"
+        <!-- ========== Tags：来源 / 翻译 / 缓存 ========== -->
+        <div
+          class="settings-panel"
+          id="settings-panel-tags"
+          role="tabpanel"
+          aria-labelledby="settings-tab-tags"
+          x-show="activeTab === 'tags'"
+          x-cloak
         >
-        <p class="form-hint" data-i18n="settings.overlayOpacityHint"></p>
-      </div>
+          <!-- Tags 设置 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.tagsSectionTitle"></h2>
 
-      <div class="form-group">
-        <label class="form-label">
-          <span data-i18n="settings.blurLabel"></span> <span x-text="(config.backgroundBlur ?? 4) + 'px'"></span>
-        </label>
-        <input
-          type="range"
-          class="form-range"
-          min="0"
-          max="20"
-          step="1"
-          x-model.number="config.backgroundBlur"
-          @input="previewBackground()"
-        >
-        <p class="form-hint" data-i18n="settings.blurHint"></p>
-      </div>
+            <div class="form-group">
+              <label class="form-label" data-i18n="settings.tagsSourceLabel"></label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="tagsMode" value="vndb" x-model="config.tagsMode" @change="saveTagsConfig()">
+                  <span data-i18n="settings.tagsModeVndb"></span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="tagsMode" value="manual" x-model="config.tagsMode" @change="saveTagsConfig()">
+                  <span data-i18n="settings.tagsModeManual"></span>
+                </label>
+              </div>
+              <p class="form-hint" data-i18n="settings.tagsModeHint"></p>
+            </div>
 
-      <button class="btn btn-primary" @click="saveAppearanceConfig()" :disabled="isLoading" data-i18n="settings.saveAppearance">
-      </button>
-    </section>
+            <!-- VNDB Tags 翻译设置 -->
+            <template x-if="config.tagsMode === 'vndb'">
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" x-model="config.translateTags" @change="saveTagsConfig()">
+                  <span data-i18n="settings.translateTagsLabel"></span>
+                </label>
+                <p class="form-hint" data-i18n="settings.translateTagsHint"></p>
+              </div>
+            </template>
 
-    <!-- 语言设置 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.languageSectionTitle"></h2>
+            <!-- 翻译文件 URL -->
+            <template x-if="config.tagsMode === 'vndb' && config.translateTags">
+              <div class="form-group">
+                <label class="form-label" for="translationUrlInput" data-i18n="settings.translationUrlLabel"></label>
+                <div class="settings-input-row">
+                  <input
+                    type="url"
+                    id="translationUrlInput"
+                    class="form-input"
+                    x-model="config.translationUrl"
+                    data-i18n-placeholder="settings.translationUrlPlaceholder"
+                  >
+                  <button class="btn btn-secondary" @click="saveTagsConfig()" :disabled="isLoading" data-i18n="common.save">
+                  </button>
+                </div>
+                <p class="form-hint" data-i18n="settings.translationUrlHint"></p>
 
-      <div class="form-group">
-        <div class="radio-group">
-          <label class="radio-label">
-            <input type="radio" name="uiLocale" value="zh-CN" x-model="locale" @change="changeLocale()">
-            <span>简体中文</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="uiLocale" value="en" x-model="locale" @change="changeLocale()">
-            <span>English</span>
-          </label>
+                <!-- 翻译缓存状态 -->
+                <template x-if="translationCacheStatus">
+                  <div class="cache-status mt-4">
+                    <p class="text-muted">
+                      <span data-i18n="settings.cacheStatusLabel"></span>
+                      <strong x-text="translationCacheStatus.version || $t('common.unknown')"></strong>
+                      <span x-show="translationCacheStatus.updatedAt">
+                        <span data-i18n="settings.updatedAtPrefix"></span> <span x-text="formatDate(translationCacheStatus.updatedAt)"></span>
+                      </span>
+                    </p>
+                    <p class="text-muted">
+                      <span data-i18n="settings.cachedCountPrefix"></span> <strong x-text="translationCacheStatus.count || 0"></strong> <span data-i18n="settings.cachedCountSuffix"></span>
+                    </p>
+                    <button class="btn btn-secondary btn-sm mt-2" @click="clearTranslationCache()" data-i18n="settings.clearCache">
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </section>
         </div>
-        <p class="form-hint" data-i18n="settings.languageHint"></p>
+
+        <!-- ========== 安全：密码 / 登录人机验证 / 账户 ========== -->
+        <div
+          class="settings-panel"
+          id="settings-panel-security"
+          role="tabpanel"
+          aria-labelledby="settings-tab-security"
+          x-show="activeTab === 'security'"
+          x-cloak
+        >
+          <!-- 密码设置 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="common.adminPassword"></h2>
+
+            <div class="form-group">
+              <label class="form-label" for="newPasswordInput" data-i18n="settings.newPasswordLabel"></label>
+              <input
+                type="password"
+                id="newPasswordInput"
+                class="form-input"
+                x-model="newPassword"
+                data-i18n-placeholder="common.passwordMinPlaceholder"
+                minlength="6"
+              >
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="confirmPasswordInput" data-i18n="settings.confirmPasswordLabel"></label>
+              <input
+                type="password"
+                id="confirmPasswordInput"
+                class="form-input"
+                x-model="confirmPassword"
+                data-i18n-placeholder="settings.confirmPasswordPlaceholder"
+              >
+            </div>
+
+            <button class="btn btn-primary" @click="changePassword()" :disabled="isLoading" data-i18n="settings.changePassword">
+            </button>
+          </section>
+
+          <!-- 登录人机验证（Cloudflare Turnstile） -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.turnstileSectionTitle"></h2>
+
+            <div class="form-group">
+              <label class="form-label" for="turnstileSiteKeyInput" data-i18n="settings.turnstileSiteKeyLabel"></label>
+              <input
+                type="text"
+                id="turnstileSiteKeyInput"
+                class="form-input settings-field-long"
+                maxlength="200"
+                autocomplete="off"
+                spellcheck="false"
+                x-model="turnstileSiteKey"
+                data-i18n-placeholder="settings.turnstileSiteKeyPlaceholder"
+              >
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="turnstileSecretInput" data-i18n="settings.turnstileSecretLabel"></label>
+              <input
+                type="password"
+                id="turnstileSecretInput"
+                class="form-input settings-field-long"
+                maxlength="200"
+                autocomplete="new-password"
+                x-model="turnstileSecretKey"
+                data-i18n-placeholder="settings.turnstileSecretPlaceholder"
+              >
+              <!-- 配置状态行：两键齐 = 已启用；半配 = 未启用；全空 = 未配置 -->
+              <p class="form-hint">
+                <span
+                  x-text="turnstileStatusKey === 'enabled'
+                    ? $t('settings.turnstileStatusEnabled')
+                    : (turnstileStatusKey === 'half' ? $t('settings.turnstileStatusHalf') : $t('settings.notConfigured'))"
+                ></span>
+              </p>
+            </div>
+
+            <!-- 临时测试 widget 容器（测试进行时可见，用完由 turnstile.remove 清理） -->
+            <div class="turnstile-box" x-ref="turnstileTestBox" x-show="isTestingTurnstile"></div>
+
+            <div class="settings-actions">
+              <button
+                class="btn btn-secondary"
+                @click="testTurnstile()"
+                :disabled="isTestingTurnstile || isLoading"
+                data-i18n="settings.turnstileTestButton"
+              >
+              </button>
+              <button class="btn btn-primary" @click="saveTurnstile()" :disabled="isLoading" data-i18n="common.save">
+              </button>
+            </div>
+
+            <p class="form-hint mt-4" data-i18n="settings.turnstileHintKeys"></p>
+            <p class="form-hint" data-i18n="settings.turnstileHintDomain"></p>
+            <p class="form-hint" data-i18n="settings.turnstileHintSave"></p>
+          </section>
+
+          <!-- 退出登录 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.accountSectionTitle"></h2>
+
+            <button class="btn btn-danger" @click="logout()" data-i18n="settings.logout">
+            </button>
+          </section>
+        </div>
+
+        <!-- ========== 数据：导出 / 导入 ========== -->
+        <div
+          class="settings-panel"
+          id="settings-panel-data"
+          role="tabpanel"
+          aria-labelledby="settings-tab-data"
+          x-show="activeTab === 'data'"
+          x-cloak
+        >
+          <!-- 数据导入导出 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title" data-i18n="settings.dataSectionTitle"></h2>
+
+            <div class="settings-actions">
+              <button class="btn btn-secondary" @click="exportData()" data-i18n="settings.exportData">
+              </button>
+
+              <!-- 原生按钮触发隐藏文件框：旧的 <label> 包裹写法不可聚焦，键盘无法触发导入 -->
+              <button class="btn btn-secondary" type="button" @click="$refs.importFile.click()" data-i18n="settings.importData">
+              </button>
+              <input
+                type="file"
+                accept=".json"
+                class="hidden"
+                x-ref="importFile"
+                @change="importData($event)"
+              >
+            </div>
+
+            <p class="form-hint mt-4" data-i18n="settings.dataHint">
+            </p>
+          </section>
+        </div>
       </div>
-    </section>
-
-    <!-- 数据导入导出 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.dataSectionTitle"></h2>
-
-      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <button class="btn btn-secondary" @click="exportData()" data-i18n="settings.exportData">
-        </button>
-
-        <label class="btn btn-secondary" style="cursor: pointer;">
-          <span data-i18n="settings.importData"></span>
-          <input
-            type="file"
-            accept=".json"
-            @change="importData($event)"
-            style="display: none;"
-          >
-        </label>
-      </div>
-
-      <p class="form-hint mt-4" data-i18n="settings.dataHint">
-      </p>
-    </section>
-
-    <!-- 退出登录 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings.accountSectionTitle"></h2>
-
-      <button class="btn btn-danger" @click="logout()" data-i18n="settings.logout">
-      </button>
-    </section>
+    </div>
   </main>
 </body>
 </html>

@@ -1,3 +1,160 @@
+/* ===== Settings Layout（分类分页）=====
+ * 整体限宽居中：200 侧栏 + 32 间距 + 720 内容区 = 952。
+ * 字段分档变量挂在布局根上，只作用于设置页——forms.css 的全局默认（width:100%）不动，
+ * index / login / tier 的表单不受影响。
+ */
+.settings-layout {
+  --settings-field-short: 360px; /* 短值：密码 / 主人名 / 滑杆 / 单选复选行 */
+  --settings-field-long: 560px;  /* 长值：Token / URL / Turnstile 两键（含同行按钮） */
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  column-gap: 32px;
+  max-width: 952px;
+  margin: 0 auto;
+}
+
+.settings-layout > .page-title {
+  grid-column: 1 / -1;
+}
+
+/* ===== 分类导航（role=tablist）=====
+ * 与 .settings-section 同款玻璃卡片，自定义背景图下也保证可读。
+ * 吸顶偏移 = 固定头部高度（约 65px）+ 间距。
+ */
+.settings-nav {
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: var(--card-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  backdrop-filter: blur(10px);
+}
+
+/* 悬停 / 选中配色与头部 .banner-nav a 一致（同一套「当前位置」语言） */
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: none;
+  color: var(--secondary-text-color);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  /* :hover / .active 仅变 background / color */
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.settings-nav-item:hover {
+  color: var(--accent-color);
+  background: var(--tag-bg-color);
+}
+
+/* 选中态：accent tint 底 + 主文字色，而不是 accent 文字。
+   accent 蓝（#007AFF）压在 accent tint 上，浅色档约 3.0:1、深色档约 3.4:1，
+   比未选中项的 --secondary-text-color（浅档约 3.8:1、深档约 5.2:1）还低——
+   「当前所在」反而比其它项更难读，方向是反的。底色的 accent tint 已足够
+   表达选中，图标保留 accent 维持色相提示。
+   两条同级规则（.active 与 :hover 同为 (0,2,0)）靠书写顺序定胜负：
+   悬停选中项时 .active 在后，底色与文字色都不被 hover 抢走。 */
+.settings-nav-item.active {
+  color: var(--primary-text-color);
+  background: rgba(0, 122, 255, 0.15);
+}
+
+.settings-nav-item.active svg {
+  color: var(--accent-color);
+}
+
+.settings-nav-item svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+/* 运行中任务状态点（索引 / ulist 导入）：透明度脉冲，不位移 */
+.settings-nav-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--accent-color);
+  animation: settings-dot-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes settings-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* grid 子项默认 min-width:auto，长内容（failed 列表等）会把轨道撑破 */
+.settings-panels {
+  min-width: 0;
+}
+
+/* 面板内最后一张卡片不再留底部间距（页脚自带 margin-top） */
+.settings-panel > .settings-section:last-child {
+  margin-bottom: 0;
+}
+
+/* ===== 字段宽度分档 =====
+ * 面板内默认短档，长档显式声明；提示文字（.form-hint）不限宽，随内容区走。
+ */
+.settings-panel .form-input,
+.settings-panel .form-range,
+.settings-panel .radio-group,
+.settings-panel .checkbox-label {
+  max-width: var(--settings-field-short);
+}
+
+.settings-panel .form-input.settings-field-long,
+.settings-panel .cache-status {
+  max-width: var(--settings-field-long);
+}
+
+/* 输入框 + 按钮同行（长档）：输入框吃剩余宽度，按钮不收缩不折行 */
+.settings-input-row {
+  display: flex;
+  gap: 12px;
+  max-width: var(--settings-field-long);
+}
+
+.settings-panel .settings-input-row .form-input {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+
+/* 按钮组（测试 / 保存、导出 / 导入等） */
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-input-row .btn,
+.settings-actions .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 字段左对齐后，Turnstile 测试 widget 跟着左对齐（base.css 默认居中，供登录页用） */
+.settings-panel .turnstile-box {
+  justify-content: flex-start;
+}
+
 /* ===== Cache Status ===== */
 .cache-status {
   padding: 16px;
@@ -12,4 +169,57 @@
 
 .cache-status p:last-child {
   margin-bottom: 0;
+}
+
+/* ===== Responsive - 768（单列）===== */
+@media screen and (max-width: 768px) {
+  /* 字段一律撑满 */
+  .settings-layout {
+    display: block;
+    --settings-field-short: 100%;
+    --settings-field-long: 100%;
+  }
+
+  /* 导航收成一行：放得下时均分成分段条，放不下横滑（不折行、不吸顶）。
+     padding 同时给焦点环留位，避免被横滑容器裁掉 */
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    padding: 6px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav-item {
+    flex: 1 0 auto;
+    width: auto;
+    justify-content: center;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+
+  .settings-nav-dot {
+    margin-left: 0;
+  }
+}
+
+/* ===== Responsive - 480（紧凑手机）===== */
+@media screen and (max-width: 480px) {
+  /* 只留文字，五项尽量一屏放下 */
+  .settings-nav-item svg {
+    display: none;
+  }
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .settings-nav-dot {
+    animation: none;
+  }
 }

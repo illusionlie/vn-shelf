@@ -232,6 +232,13 @@ export default {
   },
   settings: {
     pageTitle: '⚙️ Settings',
+    navLabel: 'Settings categories',
+    tabVndb: 'VNDB Sync',
+    tabAppearance: 'Appearance',
+    tabTags: 'Tags',
+    tabSecurity: 'Security',
+    tabData: 'Data',
+    taskRunning: 'Task in progress',
     tokenPlaceholder: 'Enter a new API token',
     tokenStatusLabel: 'Current status:',
     configured: 'Configured',

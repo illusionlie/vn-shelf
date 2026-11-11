@@ -250,6 +250,13 @@ export default {
   },
   settings: {
     pageTitle: '⚙️ 设置',
+    navLabel: '设置分类',
+    tabVndb: 'VNDB 同步',
+    tabAppearance: '外观',
+    tabTags: 'Tags',
+    tabSecurity: '安全',
+    tabData: '数据',
+    taskRunning: '任务进行中',
     tokenPlaceholder: '输入新的API Token',
     tokenStatusLabel: '当前状态:',
     configured: '已配置',

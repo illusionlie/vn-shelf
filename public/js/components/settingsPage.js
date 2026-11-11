@@ -4,6 +4,7 @@
 
 import { authAPI, configAPI, friendlyErrorMessage, indexAPI, dataAPI, ulistAPI } from '../api.js';
 import { getLocale, getStoredLocale, setLocale, t } from '../i18n.js';
+import { nextSettingsTab, resolveSettingsTab } from '../settings-tabs.js';
 import { applySiteIdentity } from '../site-identity.js';
 import { setBackgroundConfig, applyBackground } from '../theme.js';
 import {
@@ -38,6 +39,12 @@ export function settingsPage() {
     isTestingTurnstile: false,
     _turnstileTestWidgetId: null,
     locale: getStoredLocale(),
+    // 当前分类（分页）：URL hash 是它的镜像，/settings#tags 可直达；
+    // 工厂内即按 hash 取值，首帧就是正确分类，不先闪默认分类
+    activeTab: resolveSettingsTab(window.location.hash),
+    // tablist 的朝向：桌面纵向侧栏 / 窄屏横排，由 CSS 决定，随渲染结果同步
+    // （读 computed flex-direction，断点值不重复写进 JS）
+    navOrientation: 'vertical',
     indexStatus: null,
     translationCacheStatus: null,
     isLoading: false,
@@ -53,6 +60,10 @@ export function settingsPage() {
         this.stopIndexStatusPolling();
       };
       window.addEventListener('beforeunload', this._beforeUnloadHandler);
+
+      // 分类分页接线放在鉴权 await 之前：首帧之后的 hash 变更都能接住。
+      // MPA 页面级生命周期，无需 teardown（同 setupTranslationsRefresh 的前提）
+      this.setupTabs();
 
       try {
         const status = await authAPI.status();
@@ -70,6 +81,107 @@ export function settingsPage() {
       await this.loadConfig();
       await this.loadIndexStatus();
       await this.loadTranslationCacheStatus();
+    },
+
+    /**
+     * 分类分页接线：hash 变更（手改地址栏 / 页内锚点）同步到 activeTab；
+     * 窄屏横滑导航的选中项在尺寸变化时保持居中。
+     */
+    setupTabs() {
+      window.addEventListener('hashchange', () => {
+        this._applyTab(resolveSettingsTab(window.location.hash));
+      });
+
+      // 尺寸变化是两件事的共同触发源：横滑导航里选中项要居中（en 词典懒加载后
+      // 二次写入文案会改标签宽度），tablist 的 aria-orientation 要跟随
+      // 纵向侧栏 / 横排的断点切换。observe 时会先回调一次，顺带完成首屏定位
+      // （深链 /settings#data）。无 ResizeObserver 时退化为同步一次
+      const nav = document.getElementById(`settings-tab-${this.activeTab}`)?.parentElement;
+      if (nav && typeof ResizeObserver === 'function') {
+        const observer = new ResizeObserver(() => this._syncNavLayout());
+        [nav, ...nav.children].forEach(el => observer.observe(el));
+      } else {
+        this._syncNavLayout();
+      }
+    },
+
+    /**
+     * 按导航实际渲染形态同步 tablist 朝向并让选中项居中。
+     * 方向键两轴都可用（onTabKeydown），此处只影响读屏播报的口径。
+     */
+    _syncNavLayout() {
+      const nav = this._navEl();
+      if (!nav) return;
+
+      this.navOrientation = getComputedStyle(nav).flexDirection === 'row' ? 'horizontal' : 'vertical';
+      this._revealTab();
+    },
+
+    /** 导航容器（从任一分类按钮就近取，避免为样式挂多余的 id / ref）。 */
+    _navEl(tab = this.activeTab) {
+      return document.getElementById(`settings-tab-${tab}`)?.parentElement || null;
+    },
+
+    /**
+     * 切换分类的唯一内部入口（点击 / 键盘 / hashchange 共用）。
+     * @param {string} tab - 已经过 resolveSettingsTab 归一的分类 id
+     */
+    _applyTab(tab) {
+      if (tab !== this.activeTab) {
+        this.activeTab = tab;
+        // 换分类 = 换一屏内容，上一分类的滚动位置没有意义；
+        // instant：这是内容替换不是页内导航，不走 html 的 smooth 滚动
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+      this._revealTab(tab);
+    },
+
+    /**
+     * 窄屏横滑导航：把选中项居中。只动导航自身的横向滚动——不用 scrollIntoView，
+     * 它会连带滚动页面（刷新时与浏览器的滚动位置恢复打架）。
+     * 桌面纵向侧栏没有横向溢出，赋值被钳为 0，等于空操作。
+     * @param {string} [tab] - 分类 id，缺省为当前分类
+     */
+    _revealTab(tab = this.activeTab) {
+      const nav = this._navEl(tab);
+      const el = nav && document.getElementById(`settings-tab-${tab}`);
+      if (!el) return;
+
+      const navRect = nav.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      nav.scrollLeft += elRect.left - navRect.left - (navRect.width - elRect.width) / 2;
+    },
+
+    /**
+     * 选中分类并把它写进 URL hash。replaceState：不堆历史记录（后退键应离开
+     * 设置页而不是逐个倒回分类），也不触发 hashchange。
+     * @param {string} id - 分类 id（非法值回落默认分类）
+     */
+    selectTab(id) {
+      const tab = resolveSettingsTab(id);
+      this._applyTab(tab);
+      if (window.location.hash !== `#${tab}`) {
+        history.replaceState(history.state, '', `#${tab}`);
+      }
+    },
+
+    /**
+     * 导航的键盘漫游（挂在 role=tablist 容器上）：方向键前后移动并循环、
+     * Home / End 跳首尾，选中随焦点移动（自动激活——面板内容已在 DOM 内，切换无代价）。
+     * @param {KeyboardEvent} event
+     */
+    onTabKeydown(event) {
+      // 带修饰键的组合留给浏览器（Alt+←/→ 前进后退等）
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+      const target = nextSettingsTab(this.activeTab, event.key);
+      if (!target) return;
+
+      // 方向键 / Home / End 的默认行为是滚动页面
+      event.preventDefault();
+      this.selectTab(target);
+      // 导航按钮常驻 DOM，无需等 $nextTick；tabindex 尚未刷成 0 不影响脚本聚焦
+      document.getElementById(`settings-tab-${target}`)?.focus();
     },
 
     async loadConfig() {
