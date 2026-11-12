@@ -292,7 +292,7 @@ selectTab(id)  { this._applyTab(tab); history.replaceState(history.state, '', `#
 - **导航尺寸相关的呈现统一挂一个 ResizeObserver**：不只是「选中项居中」——`en` 词典懒加载会在首屏之后二次写入文案、改变标签宽度，窗口缩放同理。RO 回调只写 `navOrientation`（同值不触发 Alpine effect）与 `scrollLeft`（不改 border-box 尺寸），无回环。
 - **横滑导航里把选中项带入视野靠写主滚动容器的 `scrollLeft`，不要用 `scrollIntoView`**：后者会连带滚动整个页面，在刷新时与浏览器的滚动位置恢复打架。
 - **页面专属字段宽度用页面根上的自定义属性分档**：`.settings-layout { --settings-field-short: 360px; --settings-field-long: 560px }`，移动档只把变量改成 `100%`。`forms.css` 的全局默认（`width: 100%`）不动，其他页面的表单因此零影响。长档的「输入框 + 按钮」行让输入框 `flex: 1; min-width: 0`、按钮 `flex-shrink: 0; white-space: nowrap`，否则按钮会被挤成竖排两行。
-- **选中项不要比未选中项更难读**：色板里 `--accent-color`（#007AFF）的亮度高于 `--secondary-text-color`，所以「accent 文字 + accent tint 底」的常规选中写法在浅色档约 3.0:1、深色档约 3.4:1，而同一容器里的未选中项是浅 3.8 / 深 5.2 —— 选中项反而最不清晰。正确写法是 **accent tint 底 + `--primary-text-color` 文字 + accent 图标**：底色承担「当前位置」，色相提示交给图标。
+- **选中项不要比未选中项更难读**：色板里 `--accent-color`（#007AFF）的亮度高于 `--secondary-text-color`，所以「accent 文字 + accent tint 底」的常规选中写法在浅色档约 3.0:1、深色档约 3.8:1，而同一容器里的未选中项是浅 4.6 / 深 6.8（改后约 12.7 / 11.8；均按 base.css 声明色值叠算，不含自定义背景图） —— 选中项反而最不清晰。正确写法是 **accent tint 底 + `--primary-text-color` 文字 + accent 图标**：底色承担「当前位置」，色相提示交给图标。
 - **`window.scrollTo({ behavior: 'instant' })` 是有意的例外**：切分类 = 换一屏内容，不走 `base.css` 的 `html { scroll-behavior: smooth }`（否则新面板边滚边换）。这与 `layout.js` 回顶按钮「省略 `behavior`、把 smooth-vs-instant 交给 CSS」的选择**方向相反且都正确**——回顶是页内导航，切分类是内容替换。不要来「统一」这两处。
 - **状态点用可读文本，不只靠颜色**：`role="tab"` 内的运行中指示点写 `role="img"` + `data-i18n-aria-label` / `data-i18n-title`。代价是该文本会并入 tab 的可访问名（读屏读成「VNDB 同步 任务进行中」）；若将来要避免名字长度抖动，改用 `aria-describedby` + 视觉隐藏文本。
 

@@ -62,9 +62,10 @@
 }
 
 /* 选中态：accent tint 底 + 主文字色，而不是 accent 文字。
-   accent 蓝（#007AFF）压在 accent tint 上，浅色档约 3.0:1、深色档约 3.4:1，
-   比未选中项的 --secondary-text-color（浅档约 3.8:1、深档约 5.2:1）还低——
-   「当前所在」反而比其它项更难读，方向是反的。底色的 accent tint 已足够
+   accent 蓝（#007AFF）压在 accent tint 上，浅色档约 3.0:1、深色档约 3.8:1，
+   比未选中项的 --secondary-text-color（浅档约 4.6:1、深档约 6.8:1）还低——
+   「当前所在」反而比其它项更难读，方向是反的（换成主文字色后约 12.7 / 11.8；
+   数值按 base.css 声明的色值叠算，不含自定义背景图）。底色的 accent tint 已足够
    表达选中，图标保留 accent 维持色相提示。
    两条同级规则（.active 与 :hover 同为 (0,2,0)）靠书写顺序定胜负：
    悬停选中项时 .active 在后，底色与文字色都不被 hover 抢走。 */
